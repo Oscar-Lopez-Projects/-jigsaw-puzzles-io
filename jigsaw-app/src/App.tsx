@@ -25,6 +25,8 @@ export default function App() {
   const [generateError, setGenerateError] = useState<string | null>(null);
   const [isWon, setIsWon] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [hintPieceId, setHintPieceId] = useState<string | null>(null);
+  const hintTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── Draggable preview panel ───────────────────────────────────
   const [previewPos, setPreviewPos] = useState({ x: 20, y: 80 });
@@ -111,7 +113,19 @@ export default function App() {
     setPieces([]);
     setGenerateError(null);
     setIsWon(false);
+    if (hintTimer.current) clearTimeout(hintTimer.current);
+    setHintPieceId(null);
   };
+
+  const handleHint = useCallback(() => {
+    const candidates = pieces.filter((p) => !p.snapped);
+    if (candidates.length === 0) return;
+    // clear any running hint first
+    if (hintTimer.current) clearTimeout(hintTimer.current);
+    const pick = candidates[Math.floor(Math.random() * candidates.length)];
+    setHintPieceId(pick.id);
+    hintTimer.current = setTimeout(() => setHintPieceId(null), 2500);
+  }, [pieces]);
 
   // ── Render ───────────────────────────────────────────────────
   return (
@@ -249,6 +263,22 @@ export default function App() {
                 </button>
               )}
 
+              <button
+                type="button"
+                className={`hint-btn${hintPieceId ? ' hint-btn--active' : ''}`}
+                onClick={handleHint}
+                disabled={pieces.filter((p) => !p.snapped).length === 0}
+                aria-label="Show a hint"
+                title="Hint"
+              >
+                <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                  <circle cx="10" cy="8" r="5" stroke="currentColor" strokeWidth="1.6" />
+                  <path d="M7.5 8a2.5 2.5 0 0 1 5 0c0 1.2-.8 2-1.5 2.5V12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                  <circle cx="10" cy="14.5" r="1" fill="currentColor" />
+                </svg>
+                Hint
+              </button>
+
               <button type="button" className="reset-btn" onClick={handleReset}>
                 <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
                   <path
@@ -270,6 +300,7 @@ export default function App() {
                 cols={gridCols}
                 rows={gridRows}
                 onPiecesChange={handlePiecesChange}
+                hintPieceId={hintPieceId}
               />
             </PuzzleBoardErrorBoundary>
           </div>

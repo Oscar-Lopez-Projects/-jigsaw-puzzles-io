@@ -7,11 +7,8 @@ import './PuzzleBoard.css';
 // ─── layout constants ─────────────────────────────────────────
 const SNAP_THRESHOLD  = 0.5;
 const PANEL_GAP       = 6;
-const TRAY_GAP        = 6;
 const BOARD_VH_TARGET = 0.60;
-const TRAY_LABEL_H    = 26;
-const DIVIDER_H       = 14;
-const WRONG_FLASH_MS  = 600; // how long the red board flash lasts
+const WRONG_FLASH_MS  = 600;
 
 // ─── useImage hook ─────────────────────────────────────────────
 function useImage(src: string): HTMLImageElement | null {
@@ -29,10 +26,12 @@ interface PieceTileProps {
   piece: PuzzlePiece;
   x: number;
   y: number;
+  flashRed?: boolean;
+  flashGreen?: boolean;
   onDragEnd: (id: string, wx: number, wy: number) => void;
 }
 
-function DraggablePieceTile({ piece, x, y, onDragEnd }: PieceTileProps) {
+function DraggablePieceTile({ piece, x, y, flashRed, flashGreen, onDragEnd }: PieceTileProps) {
   const img = useImage(piece.imageUrl);
 
   const handleDragStart = useCallback((e: Konva.KonvaEventObject<DragEvent>) => {
@@ -79,6 +78,20 @@ function DraggablePieceTile({ piece, x, y, onDragEnd }: PieceTileProps) {
         width={piece.pieceWidth} height={piece.pieceHeight}
         listening={true}
       />
+      {/* Red flash on wrong drop */}
+      {flashRed && (
+        <Rect x={0} y={0} width={piece.pieceWidth} height={piece.pieceHeight}
+          fill="rgba(220,38,38,0.55)"
+          stroke="rgba(220,38,38,0.95)" strokeWidth={3}
+          listening={false} />
+      )}
+      {/* Green hint glow on piece */}
+      {flashGreen && (
+        <Rect x={0} y={0} width={piece.pieceWidth} height={piece.pieceHeight}
+          fill="rgba(34,197,94,0.35)"
+          stroke="rgba(34,197,94,1)" strokeWidth={3}
+          listening={false} />
+      )}
       {/* Green highlight when correctly snapped */}
       {piece.snapped && (
         <>
@@ -121,19 +134,61 @@ function panelSlotPos(
   };
 }
 
+// ─── how many slots fit in a panel ────────────────────────────
+function panelCapacity(panelW: number, panelH: number, pw: number, ph: number, gap: number): number {
+  const cols = Math.max(1, Math.floor((panelW + gap) / (pw + gap)));
+  const rows = Math.max(1, Math.floor((panelH + gap) / (ph + gap)));
+  return cols * rows;
+}
+
+// ─── HTML Tray Piece ───────────────────────────────────────────
+interface TrayPieceProps {
+  piece: PuzzlePiece;
+  isNew: boolean;
+  isHinted: boolean;
+  onDragToBoard: (id: string) => void;
+}
+
+function TrayPiece({ piece, isNew, isHinted, onDragToBoard }: TrayPieceProps) {
+  return (
+    <div
+      className={`tray-piece${isNew ? ' tray-piece--new' : ''}${isHinted ? ' tray-piece--hint' : ''}`}
+      style={{ width: piece.pieceWidth, height: piece.pieceHeight, flexShrink: 0 }}
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.setData('pieceId', piece.id);
+        onDragToBoard(piece.id);
+      }}
+      title="Drag back to the board"
+    >
+      <img
+        src={piece.imageUrl}
+        alt={`Piece ${piece.id}`}
+        style={{ width: '100%', height: '100%', display: 'block', pointerEvents: 'none', userSelect: 'none' }}
+        draggable={false}
+      />
+    </div>
+  );
+}
+
 // ─── PuzzleBoard ───────────────────────────────────────────────
 interface PuzzleBoardProps {
   pieces: PuzzlePiece[];
   cols: number;
   rows: number;
   onPiecesChange: (pieces: PuzzlePiece[]) => void;
+  hintPieceId?: string | null;
 }
 
-export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange }: PuzzleBoardProps) {
-  const wrapRef = useRef<HTMLDivElement>(null);
+export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }: PuzzleBoardProps) {
+  const wrapRef    = useRef<HTMLDivElement>(null);
+  const trayRef    = useRef<HTMLDivElement>(null);
   const [containerW, setContainerW] = useState(0);
   const [viewportH,  setViewportH]  = useState(window.innerHeight);
-  const [boardFlash, setBoardFlash] = useState(false); // true = show red flash
+  const [boardFlash, setBoardFlash] = useState(false);
+  const [flashingId, setFlashingId] = useState<string | null>(null);
+  // track which tray piece was most recently added so we can animate it
+  const [newestTrayId, setNewestTrayId] = useState<string | null>(null);
 
   useEffect(() => {
     const el = wrapRef.current;
@@ -167,17 +222,13 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange }: Puzz
   const rightPanelX  = boardOriginX + boardW;
   const leftPanelW   = boardOriginX;
   const rightPanelW  = Math.max(0, worldW - rightPanelX);
-  const trayOriginY  = boardOriginY + boardH + DIVIDER_H + TRAY_LABEL_H;
-  const trayColW     = pw + TRAY_GAP;
-  const trayCols     = ready ? Math.max(1, Math.floor(worldW / trayColW)) : 1;
+  const worldH       = boardH;
+  const stageH       = worldH * safeScale;
 
   const unsnapped  = pieces.filter((p) => !p.snapped);
   const snapped    = pieces.filter((p) =>  p.snapped);
   const trayPieces = unsnapped.filter((p) => p.zone === 'tray');
-  const trayRows   = Math.max(1, Math.ceil(trayPieces.length / trayCols));
-  const trayH      = trayRows * (ph + TRAY_GAP) + TRAY_GAP;
-  const worldH     = trayOriginY + trayH;
-  const stageH     = worldH * safeScale;
+  const hintPiece  = hintPieceId ? pieces.find((p) => p.id === hintPieceId && !p.snapped) ?? null : null;
 
   const handleDragEnd = useCallback(
     (id: string, wx: number, wy: number) => {
@@ -192,7 +243,6 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange }: Puzz
       const dist = Math.hypot(pCX - sCX, pCY - sCY);
 
       if (dist <= pw * SNAP_THRESHOLD) {
-        // Correct slot — snap and lock
         onPiecesChange(pieces.map((p) =>
           p.id === id
             ? { ...p, currentX: boardOriginX + piece.correctX, currentY: boardOriginY + piece.correctY, snapped: true, zone: 'free' as const }
@@ -201,7 +251,7 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange }: Puzz
         return;
       }
 
-      // Dropped inside the board area but wrong slot — flash red and return to left panel
+      // Dropped inside the board area but wrong slot — flash red on piece, send to tray
       const droppedOnBoard =
         wx >= boardOriginX && wx < boardOriginX + boardW &&
         wy >= boardOriginY && wy < boardOriginY + boardH;
@@ -211,41 +261,92 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange }: Puzz
         setBoardFlash(true);
         setTimeout(() => setBoardFlash(false), WRONG_FLASH_MS);
 
-        // Return piece to left panel at the next available slot
-        const leftPieces = pieces.filter((p) => p.id !== id && p.zone === 'left');
-        const nextSlot   = leftPieces.length;
-        onPiecesChange(pieces.map((p) =>
-          p.id === id ? { ...p, zone: 'left' as const, slotIndex: nextSlot } : p
-        ));
+        // Flash the piece red (keep it visible at drop position briefly)
+        setFlashingId(id);
+        // After flash, move piece to tray
+        setTimeout(() => {
+          setFlashingId(null);
+          setNewestTrayId(id);
+          onPiecesChange(pieces.map((p) =>
+            p.id === id
+              ? { ...p, zone: 'tray' as const, slotIndex: trayPieces.length, currentX: wx, currentY: wy }
+              : p
+          ));
+          // Scroll tray to the end so user sees the new piece
+          setTimeout(() => {
+            if (trayRef.current) {
+              trayRef.current.scrollLeft = trayRef.current.scrollWidth;
+            }
+          }, 50);
+          setTimeout(() => setNewestTrayId(null), 800);
+        }, WRONG_FLASH_MS);
         return;
       }
 
-      // Other zones — just remember where it was dropped
-      const inLeft  = leftPanelW > 0 && wx < boardOriginX && wy < trayOriginY;
-      const inRight = rightPanelW > 0 && wx >= rightPanelX && wy < trayOriginY;
-      const inTray  = wy >= trayOriginY;
+      // Other zones — staging panels or free
+      const inLeft  = leftPanelW > 0 && wx < boardOriginX && wy < worldH;
+      const inRight = rightPanelW > 0 && wx >= rightPanelX && wy < worldH;
 
       if (inLeft) {
+        const leftCap   = panelCapacity(leftPanelW, boardH, pw, ph, PANEL_GAP);
+        const leftOccupied = pieces.filter((p) => p.id !== id && p.zone === 'left' && !p.snapped);
+        if (leftOccupied.length >= leftCap) {
+          // Panel full — send to tray
+          setNewestTrayId(id);
+          onPiecesChange(pieces.map((p) =>
+            p.id === id ? { ...p, zone: 'tray' as const, slotIndex: trayPieces.length } : p
+          ));
+          setTimeout(() => {
+            if (trayRef.current) trayRef.current.scrollLeft = trayRef.current.scrollWidth;
+          }, 50);
+          setTimeout(() => setNewestTrayId(null), 800);
+          return;
+        }
         const colW  = pw + PANEL_GAP;
         const pCols = Math.max(1, Math.floor((leftPanelW + PANEL_GAP) / colW));
         const col   = Math.max(0, Math.min(pCols - 1, Math.floor((wx - PANEL_GAP) / colW)));
         const row   = Math.max(0, Math.floor((wy - PANEL_GAP) / (ph + PANEL_GAP)));
+        const targetSlot = row * pCols + col;
+        // If slot already occupied, find next free slot
+        const usedSlots = new Set(leftOccupied.map((p) => p.slotIndex));
+        let finalSlot = targetSlot;
+        if (usedSlots.has(targetSlot)) {
+          for (let s = 0; s < leftCap; s++) {
+            if (!usedSlots.has(s)) { finalSlot = s; break; }
+          }
+        }
         onPiecesChange(pieces.map((p) =>
-          p.id === id ? { ...p, zone: 'left' as const, slotIndex: row * pCols + col } : p
+          p.id === id ? { ...p, zone: 'left' as const, slotIndex: finalSlot } : p
         ));
       } else if (inRight) {
+        const rightCap     = panelCapacity(rightPanelW, boardH, pw, ph, PANEL_GAP);
+        const rightOccupied = pieces.filter((p) => p.id !== id && p.zone === 'right' && !p.snapped);
+        if (rightOccupied.length >= rightCap) {
+          // Panel full — send to tray
+          setNewestTrayId(id);
+          onPiecesChange(pieces.map((p) =>
+            p.id === id ? { ...p, zone: 'tray' as const, slotIndex: trayPieces.length } : p
+          ));
+          setTimeout(() => {
+            if (trayRef.current) trayRef.current.scrollLeft = trayRef.current.scrollWidth;
+          }, 50);
+          setTimeout(() => setNewestTrayId(null), 800);
+          return;
+        }
         const colW  = pw + PANEL_GAP;
         const pCols = Math.max(1, Math.floor((rightPanelW + PANEL_GAP) / colW));
         const col   = Math.max(0, Math.min(pCols - 1, Math.floor((wx - rightPanelX - PANEL_GAP) / colW)));
         const row   = Math.max(0, Math.floor((wy - PANEL_GAP) / (ph + PANEL_GAP)));
+        const targetSlot = row * pCols + col;
+        const usedSlots  = new Set(rightOccupied.map((p) => p.slotIndex));
+        let finalSlot = targetSlot;
+        if (usedSlots.has(targetSlot)) {
+          for (let s = 0; s < rightCap; s++) {
+            if (!usedSlots.has(s)) { finalSlot = s; break; }
+          }
+        }
         onPiecesChange(pieces.map((p) =>
-          p.id === id ? { ...p, zone: 'right' as const, slotIndex: row * pCols + col } : p
-        ));
-      } else if (inTray) {
-        const col = Math.max(0, Math.min(trayCols - 1, Math.floor(wx / trayColW)));
-        const row = Math.max(0, Math.floor((wy - trayOriginY) / (ph + TRAY_GAP)));
-        onPiecesChange(pieces.map((p) =>
-          p.id === id ? { ...p, zone: 'tray' as const, slotIndex: row * trayCols + col } : p
+          p.id === id ? { ...p, zone: 'right' as const, slotIndex: finalSlot } : p
         ));
       } else {
         onPiecesChange(pieces.map((p) =>
@@ -253,91 +354,223 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange }: Puzz
         ));
       }
     },
-    [pieces, pw, ph, boardOriginX, boardOriginY, boardW, boardH, leftPanelW, rightPanelX, rightPanelW, trayOriginY, trayCols, trayColW, onPiecesChange]
+    [pieces, pw, ph, boardOriginX, boardOriginY, boardW, boardH, leftPanelW, rightPanelX, rightPanelW, worldH, trayPieces.length, onPiecesChange]
   );
+
+  // When a tray piece is dragged via HTML drag, move it to staging if space available
+  const handleTrayDragStart = useCallback((id: string) => {
+    const leftOccupied = pieces.filter((p) => p.id !== id && p.zone === 'left' && !p.snapped);
+    const leftCap = panelCapacity(leftPanelW, boardH, pw, ph, PANEL_GAP);
+
+    if (leftPanelW > 0 && leftOccupied.length < leftCap) {
+      // Find first free slot in left panel
+      const usedSlots = new Set(leftOccupied.map((p) => p.slotIndex));
+      let freeSlot = 0;
+      for (let s = 0; s < leftCap; s++) {
+        if (!usedSlots.has(s)) { freeSlot = s; break; }
+      }
+      onPiecesChange(pieces.map((p) =>
+        p.id === id ? { ...p, zone: 'left' as const, slotIndex: freeSlot } : p
+      ));
+      return;
+    }
+
+    // Left panel full — try right panel
+    const rightOccupied = pieces.filter((p) => p.id !== id && p.zone === 'right' && !p.snapped);
+    const rightCap = panelCapacity(rightPanelW, boardH, pw, ph, PANEL_GAP);
+
+    if (rightPanelW > 0 && rightOccupied.length < rightCap) {
+      const usedSlots = new Set(rightOccupied.map((p) => p.slotIndex));
+      let freeSlot = 0;
+      for (let s = 0; s < rightCap; s++) {
+        if (!usedSlots.has(s)) { freeSlot = s; break; }
+      }
+      onPiecesChange(pieces.map((p) =>
+        p.id === id ? { ...p, zone: 'right' as const, slotIndex: freeSlot } : p
+      ));
+      return;
+    }
+
+    // Both panels full — keep in tray (do nothing)
+  }, [pieces, onPiecesChange, leftPanelW, rightPanelW, boardH, pw, ph]);
 
   function getPiecePos(p: PuzzlePiece): { x: number; y: number } {
     switch (p.zone) {
       case 'left':  return panelSlotPos(p.slotIndex, 0, boardOriginY, leftPanelW, pw, ph, PANEL_GAP);
       case 'right': return panelSlotPos(p.slotIndex, rightPanelX, boardOriginY, rightPanelW, pw, ph, PANEL_GAP);
-      case 'tray': {
-        const tIdx = trayPieces.findIndex((t) => t.id === p.id);
-        const col  = tIdx % trayCols;
-        const row  = Math.floor(tIdx / trayCols);
-        return { x: col * trayColW + TRAY_GAP, y: trayOriginY + row * (ph + TRAY_GAP) + TRAY_GAP };
-      }
-      default: return { x: p.currentX, y: p.currentY };
+      default:      return { x: p.currentX, y: p.currentY };
     }
   }
+
+  // Tray scroll buttons
+  const scrollTray = (dir: 'left' | 'right') => {
+    if (!trayRef.current) return;
+    trayRef.current.scrollBy({ left: dir === 'left' ? -200 : 200, behavior: 'smooth' });
+  };
 
   if (!ready) {
     return <div className="puzzle-single-stage" ref={wrapRef} style={{ minHeight: 200 }} />;
   }
 
   return (
-    <div className="puzzle-single-stage" ref={wrapRef}>
-      <Stage width={containerW} height={stageH} scaleX={safeScale} scaleY={safeScale}>
+    <div className="puzzle-board-wrap" ref={wrapRef}>
+      {/* ── Konva stage (board + staging panels only) ── */}
+      <div className="puzzle-single-stage">
+        <Stage width={containerW} height={stageH} scaleX={safeScale} scaleY={safeScale}>
 
-        {/* Backgrounds */}
-        <Layer listening={false}>
-          <Rect x={0} y={0} width={worldW} height={worldH} fill="#131120" />
+          {/* Backgrounds */}
+          <Layer listening={false}>
+            <Rect x={0} y={0} width={worldW} height={worldH} fill="#131120" />
 
-          {leftPanelW > 0 && (
-            <>
-              <Rect x={0} y={0} width={leftPanelW} height={boardH} fill="#1e1b2e" />
-              <Line points={[leftPanelW - 1, 0, leftPanelW - 1, boardH]}
-                stroke="rgba(255,255,255,0.10)" strokeWidth={1} dash={[6,6]} listening={false} />
-              {leftPanelW > pw * 1.5 && (
-                <Text x={0} y={boardH - 22} width={leftPanelW} text="◀ staging area"
-                  fontSize={10} fontStyle="bold" fill="rgba(255,255,255,0.20)"
-                  align="center" listening={false} />
-              )}
-            </>
+            {leftPanelW > 0 && (
+              <>
+                <Rect x={0} y={0} width={leftPanelW} height={boardH} fill="#1e1b2e" />
+                <Line points={[leftPanelW - 1, 0, leftPanelW - 1, boardH]}
+                  stroke="rgba(255,255,255,0.10)" strokeWidth={1} dash={[6,6]} listening={false} />
+                {leftPanelW > pw * 1.5 && (
+                  <Text x={0} y={boardH - 22} width={leftPanelW} text="◀ staging area"
+                    fontSize={10} fontStyle="bold" fill="rgba(255,255,255,0.20)"
+                    align="center" listening={false} />
+                )}
+              </>
+            )}
+
+            {rightPanelW > 0 && (
+              <>
+                <Rect x={rightPanelX} y={0} width={rightPanelW} height={boardH} fill="#1e1b2e" />
+                <Line points={[rightPanelX + 1, 0, rightPanelX + 1, boardH]}
+                  stroke="rgba(255,255,255,0.10)" strokeWidth={1} dash={[6,6]} listening={false} />
+                {rightPanelW > pw * 1.5 && (
+                  <Text x={rightPanelX} y={boardH - 22} width={rightPanelW} text="staging area ▶"
+                    fontSize={10} fontStyle="bold" fill="rgba(255,255,255,0.20)"
+                    align="center" listening={false} />
+                )}
+              </>
+            )}
+
+            {/* Board background */}
+            <Rect x={boardOriginX} y={boardOriginY} width={boardW} height={boardH}
+              fill={boardFlash ? 'rgba(220,38,38,0.45)' : '#2a2740'} />
+            <SlotGrid cols={cols} rows={rows} pieceW={pw} pieceH={ph} ox={boardOriginX} oy={boardOriginY} />
+          </Layer>
+
+          {/* Snapped pieces */}
+          <Layer>
+            {snapped.map((piece) => (
+              <DraggablePieceTile key={piece.id} piece={piece}
+                x={boardOriginX + piece.correctX} y={boardOriginY + piece.correctY}
+                onDragEnd={handleDragEnd} />
+            ))}
+          </Layer>
+
+          {/* Hint slot highlight — green pulse on the target board cell */}
+          {hintPiece && (
+            <Layer listening={false}>
+              <Rect
+                x={boardOriginX + hintPiece.correctX}
+                y={boardOriginY + hintPiece.correctY}
+                width={pw} height={ph}
+                fill="rgba(34,197,94,0.22)"
+                stroke="rgba(34,197,94,1)"
+                strokeWidth={3}
+                listening={false}
+              />
+            </Layer>
           )}
 
-          {rightPanelW > 0 && (
-            <>
-              <Rect x={rightPanelX} y={0} width={rightPanelW} height={boardH} fill="#1e1b2e" />
-              <Line points={[rightPanelX + 1, 0, rightPanelX + 1, boardH]}
-                stroke="rgba(255,255,255,0.10)" strokeWidth={1} dash={[6,6]} listening={false} />
-              {rightPanelW > pw * 1.5 && (
-                <Text x={rightPanelX} y={boardH - 22} width={rightPanelW} text="staging area ▶"
-                  fontSize={10} fontStyle="bold" fill="rgba(255,255,255,0.20)"
-                  align="center" listening={false} />
-              )}
-            </>
+          {/* Unsnapped pieces (staging panels + free, NOT tray) */}
+          <Layer>
+            {unsnapped.filter((p) => p.zone !== 'tray').map((piece) => {
+              const { x, y } = getPiecePos(piece);
+              return (
+                <DraggablePieceTile
+                  key={piece.id}
+                  piece={piece}
+                  x={x} y={y}
+                  flashRed={flashingId === piece.id}
+                  flashGreen={hintPieceId === piece.id}
+                  onDragEnd={handleDragEnd}
+                />
+              );
+            })}
+          </Layer>
+
+          {/* Flashing piece — stays visible on board during red flash before moving to tray */}
+          {flashingId && (() => {
+            const fp = pieces.find((p) => p.id === flashingId);
+            if (!fp) return null;
+            return (
+              <Layer>
+                <DraggablePieceTile
+                  piece={fp}
+                  x={fp.currentX} y={fp.currentY}
+                  flashRed={true}
+                  onDragEnd={handleDragEnd}
+                />
+              </Layer>
+            );
+          })()}
+
+        </Stage>
+      </div>
+
+      {/* ── Piece Tray (HTML, horizontally scrollable) ── */}
+      <div className="piece-tray-section">
+        <div className="piece-tray-header">
+          <span className="piece-tray-label">
+            PIECE TRAY
+            {trayPieces.length > 0 && (
+              <span className="piece-tray-count">{trayPieces.length}</span>
+            )}
+          </span>
+          <span className="piece-tray-hint">
+            {trayPieces.length === 0
+              ? 'Wrong placements will appear here'
+              : 'Drag a piece back to the staging area or board'}
+          </span>
+        </div>
+
+        <div className="piece-tray-row">
+          {trayPieces.length > 0 && (
+            <button
+              className="tray-scroll-btn tray-scroll-btn--left"
+              onClick={() => scrollTray('left')}
+              aria-label="Scroll tray left"
+            >
+              ‹
+            </button>
           )}
 
-          {/* Board background — red flash on wrong drop, normal otherwise */}
-          <Rect x={boardOriginX} y={boardOriginY} width={boardW} height={boardH}
-            fill={boardFlash ? 'rgba(220,38,38,0.45)' : '#2a2740'} />
-          <SlotGrid cols={cols} rows={rows} pieceW={pw} pieceH={ph} ox={boardOriginX} oy={boardOriginY} />
+          <div
+            className={`piece-tray-track${trayPieces.length === 0 ? ' piece-tray-track--empty' : ''}`}
+            ref={trayRef}
+          >
+            {trayPieces.length === 0 ? (
+              <span className="piece-tray-empty-msg">No pieces here yet</span>
+            ) : (
+              trayPieces.map((piece) => (
+                <TrayPiece
+                  key={piece.id}
+                  piece={piece}
+                  isNew={piece.id === newestTrayId}
+                  isHinted={piece.id === hintPieceId}
+                  onDragToBoard={handleTrayDragStart}
+                />
+              ))
+            )}
+          </div>
 
-          <Text x={TRAY_GAP} y={boardOriginY + boardH + DIVIDER_H}
-            text={`PIECE TRAY  ·  ${unsnapped.length} remaining`}
-            fontSize={11} fontStyle="bold" fill="rgba(255,255,255,0.35)"
-            letterSpacing={0.8} listening={false} />
-          <Rect x={0} y={trayOriginY} width={worldW} height={trayH} fill="#1c192c" />
-        </Layer>
-
-        {/* Snapped pieces */}
-        <Layer>
-          {snapped.map((piece) => (
-            <DraggablePieceTile key={piece.id} piece={piece}
-              x={boardOriginX + piece.correctX} y={boardOriginY + piece.correctY}
-              onDragEnd={handleDragEnd} />
-          ))}
-        </Layer>
-
-        {/* Unsnapped pieces */}
-        <Layer>
-          {unsnapped.map((piece) => {
-            const { x, y } = getPiecePos(piece);
-            return <DraggablePieceTile key={piece.id} piece={piece} x={x} y={y} onDragEnd={handleDragEnd} />;
-          })}
-        </Layer>
-
-      </Stage>
+          {trayPieces.length > 0 && (
+            <button
+              className="tray-scroll-btn tray-scroll-btn--right"
+              onClick={() => scrollTray('right')}
+              aria-label="Scroll tray right"
+            >
+              ›
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

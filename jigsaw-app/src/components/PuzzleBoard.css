@@ -1,7 +1,183 @@
-/* ── Single-stage wrapper: fills 100% of the puzzle-screen ───── */
+/* ── Outer wrapper ───────────────────────────────────────────── */
+.puzzle-board-wrap {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* ── Konva stage wrapper ─────────────────────────────────────── */
 .puzzle-single-stage {
   width: 100%;
-  line-height: 0; /* removes inline gap below the canvas element */
-  border-radius: 8px;
+  line-height: 0;
+  border-radius: 8px 8px 0 0;
   overflow: hidden;
+}
+
+/* ── Piece tray section ──────────────────────────────────────── */
+.piece-tray-section {
+  background: #1c192c;
+  border-top: 1px solid rgba(255,255,255,0.08);
+  border-radius: 0 0 8px 8px;
+  padding: 10px 0 12px;
+}
+
+/* ── Tray header ─────────────────────────────────────────────── */
+.piece-tray-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px 8px;
+}
+
+.piece-tray-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  color: rgba(255,255,255,0.40);
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.piece-tray-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  background: rgba(220,38,38,0.75);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 99px;
+}
+
+.piece-tray-hint {
+  font-size: 11px;
+  color: rgba(255,255,255,0.22);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Scroll row (buttons + track) ───────────────────────────── */
+.piece-tray-row {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  position: relative;
+}
+
+/* ── Scroll buttons ──────────────────────────────────────────── */
+.tray-scroll-btn {
+  flex-shrink: 0;
+  width: 32px;
+  height: 100%;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  font-weight: 300;
+  color: rgba(255,255,255,0.50);
+  background: #1c192c;
+  border: none;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+  z-index: 2;
+  line-height: 1;
+  padding: 0;
+}
+
+.tray-scroll-btn--left  { border-right: 1px solid rgba(255,255,255,0.07); }
+.tray-scroll-btn--right { border-left:  1px solid rgba(255,255,255,0.07); }
+
+.tray-scroll-btn:hover {
+  color: #fff;
+  background: rgba(255,255,255,0.06);
+}
+
+.tray-scroll-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* ── Scrollable track ────────────────────────────────────────── */
+.piece-tray-track {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 6px 12px;
+  scroll-behavior: smooth;
+  /* hide scrollbar visually but keep it functional */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.piece-tray-track::-webkit-scrollbar {
+  display: none;
+}
+
+.piece-tray-track--empty {
+  min-height: 48px;
+  justify-content: center;
+}
+
+.piece-tray-empty-msg {
+  font-size: 12px;
+  color: rgba(255,255,255,0.18);
+  font-style: italic;
+}
+
+/* ── Individual tray piece ───────────────────────────────────── */
+.tray-piece {
+  flex-shrink: 0;
+  border-radius: 4px;
+  overflow: hidden;
+  border: 2px solid rgba(220,38,38,0.50);
+  cursor: grab;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+  position: relative;
+}
+
+.tray-piece:hover {
+  border-color: rgba(220,38,38,0.90);
+  box-shadow: 0 0 10px rgba(220,38,38,0.40);
+  transform: scale(1.06);
+  z-index: 2;
+}
+
+.tray-piece:active {
+  cursor: grabbing;
+}
+
+/* New piece animation — slides in and pulses red briefly */
+.tray-piece--new {
+  animation: trayPieceIn 0.5s ease forwards;
+}
+
+@keyframes trayPieceIn {
+  0%   { transform: scale(0.7); opacity: 0; border-color: rgba(220,38,38,1); box-shadow: 0 0 16px rgba(220,38,38,0.8); }
+  60%  { transform: scale(1.08); opacity: 1; }
+  100% { transform: scale(1);    opacity: 1; border-color: rgba(220,38,38,0.50); box-shadow: none; }
+}
+
+/* ── Hinted tray piece ───────────────────────────────────────── */
+.tray-piece--hint {
+  border-color: rgba(34,197,94,1);
+  box-shadow: 0 0 12px rgba(34,197,94,0.6);
+  animation: trayHintPulse 0.6s ease infinite alternate;
+}
+
+@keyframes trayHintPulse {
+  from { box-shadow: 0 0 8px  rgba(34,197,94,0.5); }
+  to   { box-shadow: 0 0 18px rgba(34,197,94,0.9); }
 }

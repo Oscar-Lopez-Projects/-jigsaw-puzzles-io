@@ -1,6 +1,6 @@
 import './DifficultySelector.css';
 
-export type PieceCount = 50 | 100 | 150;
+export type PieceCount = 25 | 50 | 100 | 150;
 
 interface DifficultySelectorProps {
   selected: PieceCount | null;
@@ -14,6 +14,11 @@ interface Option {
 }
 
 const OPTIONS: Option[] = [
+  {
+    count: 25,
+    label: '25 Pieces',
+    description: 'Beginner',
+  },
   {
     count: 50,
     label: '50 Pieces',
