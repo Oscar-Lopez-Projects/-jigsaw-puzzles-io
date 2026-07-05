@@ -1,0 +1,131 @@
+/* ── Design tokens ───────────────────────────────────────────── */
+:root {
+  /* Colors */
+  --accent:         #7c3aed;
+  --accent-hover:   #6d28d9;
+  --accent-subtle:  rgba(124, 58, 237, 0.07);
+  --accent-ring:    rgba(124, 58, 237, 0.18);
+
+  --bg:             #f8f7fb;
+  --surface:        #ffffff;
+  --surface-subtle: #f3f2f7;
+
+  --border:         #e4e2eb;
+  --border-strong:  #cbc8d8;
+
+  --text-heading:   #18162a;
+  --text-body:      #3c3853;
+  --text-muted:     #7b788e;
+  --text-faint:     #b0adc0;
+
+  --error:        #dc2626;
+  --error-hover:  #b91c1c;
+  --error-subtle: rgba(220, 38, 38, 0.07);
+  --error-border: rgba(220, 38, 38, 0.25);
+  --error-text:   #b91c1c;
+
+  --board-bg:           #e8e6f0;
+  --board-grid-line:    rgba(0, 0, 0, 0.08);
+  --board-piece-border: rgba(0, 0, 0, 0.12);
+  --tray-bg:            #dddbe8;
+
+  --shadow-sm:  0 1px 3px rgba(0,0,0,.07), 0 1px 2px rgba(0,0,0,.05);
+  --shadow-md:  0 4px 12px rgba(0,0,0,.08), 0 2px 4px rgba(0,0,0,.05);
+  --shadow-lg:  0 10px 30px rgba(0,0,0,.10), 0 4px 8px rgba(0,0,0,.06);
+
+  /* Typography */
+  --sans:    system-ui, 'Segoe UI', Roboto, Helvetica, sans-serif;
+  --mono:    ui-monospace, Consolas, monospace;
+
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--text-body);
+  background: var(--bg);
+  color-scheme: light dark;
+
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* ── Dark mode ───────────────────────────────────────────────── */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --accent:         #a78bfa;
+    --accent-hover:   #c4b5fd;
+    --accent-subtle:  rgba(167, 139, 250, 0.1);
+    --accent-ring:    rgba(167, 139, 250, 0.2);
+
+    --bg:             #111018;
+    --surface:        #1c1a28;
+    --surface-subtle: #221f31;
+
+    --border:         #2e2b3f;
+    --border-strong:  #3f3b55;
+
+    --text-heading:   #f0eeff;
+    --text-body:      #b8b4cc;
+    --text-muted:     #7a768e;
+    --text-faint:     #4e4b60;
+
+    --error:        #f87171;
+    --error-hover:  #fca5a5;
+    --error-subtle: rgba(248, 113, 113, 0.1);
+    --error-border: rgba(248, 113, 113, 0.3);
+    --error-text:   #fca5a5;
+
+    --board-bg:           #16141f;
+    --board-grid-line:    rgba(255, 255, 255, 0.06);
+    --board-piece-border: rgba(255, 255, 255, 0.1);
+    --tray-bg:            #1a1826;
+
+    --shadow-sm:  0 1px 3px rgba(0,0,0,.3);
+    --shadow-md:  0 4px 12px rgba(0,0,0,.35);
+    --shadow-lg:  0 10px 30px rgba(0,0,0,.4);
+  }
+}
+
+/* ── Reset ───────────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+}
+
+#root {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+}
+
+h1, h2, h3 {
+  margin: 0;
+  color: var(--text-heading);
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+p {
+  margin: 0;
+}
+
+button {
+  cursor: pointer;
+  font-family: inherit;
+}
+
+/* ── Shared utility ──────────────────────────────────────────── */
+.section-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.9px;
+  color: var(--text-muted);
+  margin: 0;
+}

@@ -1,0 +1,262 @@
+.uploader-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ── Drop zone ───────────────────────────────────────────────── */
+.drop-zone {
+  border: 2px dashed var(--border);
+  border-radius: 12px;
+  background: var(--surface-subtle);
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+  outline: none;
+  overflow: hidden;
+  min-height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.drop-zone:hover,
+.drop-zone:focus-visible {
+  border-color: var(--accent);
+  background: var(--accent-subtle);
+  box-shadow: 0 0 0 4px var(--accent-ring);
+}
+
+.drop-zone.dragging {
+  border-color: var(--accent);
+  background: var(--accent-subtle);
+  box-shadow: 0 0 0 4px var(--accent-ring);
+}
+
+.drop-zone.has-image {
+  border-style: solid;
+  border-color: var(--accent);
+  min-height: 260px;
+}
+
+/* Error border state — shown when a bad file was dropped/picked */
+.drop-zone.has-error {
+  border-style: dashed;
+  border-color: var(--error);
+  background: var(--error-subtle);
+}
+
+.file-input {
+  display: none;
+}
+
+/* ── Empty / prompt state ────────────────────────────────────── */
+.drop-zone-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 40px 24px;
+  color: var(--text-muted);
+  user-select: none;
+}
+
+.upload-icon {
+  width: 44px;
+  height: 44px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.drop-primary {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text-body);
+  margin: 0;
+}
+
+.drop-secondary {
+  font-size: 14px;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.drop-link {
+  color: var(--accent);
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.drop-hint {
+  font-size: 12px;
+  color: var(--text-faint);
+  margin: 4px 0 0;
+}
+
+/* ── Preview state ───────────────────────────────────────────── */
+.preview-wrapper {
+  position: relative;
+  width: 100%;
+  min-height: 260px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.preview-img {
+  width: 100%;
+  height: 260px;
+  object-fit: cover;
+  display: block;
+  border-radius: 10px;
+}
+
+.preview-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s;
+  border-radius: 10px;
+}
+
+.drop-zone:hover .preview-overlay,
+.drop-zone:focus-visible .preview-overlay {
+  opacity: 1;
+}
+
+.preview-change-text {
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+
+/* Clear (×) button on preview */
+.clear-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: none;
+  border: none;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s, transform 0.15s;
+  z-index: 2;
+}
+
+.clear-btn svg {
+  width: 22px;
+  height: 22px;
+}
+
+.drop-zone:hover .clear-btn,
+.drop-zone:focus-visible .clear-btn {
+  opacity: 1;
+}
+
+.clear-btn:hover {
+  transform: scale(1.12);
+}
+
+.clear-btn:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+  opacity: 1;
+}
+
+/* ── Error banner ────────────────────────────────────────────── */
+.upload-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--error-subtle);
+  border: 1px solid var(--error-border);
+  border-radius: 8px;
+  animation: error-slide-in 0.18s ease;
+}
+
+@keyframes error-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.error-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.error-text {
+  flex: 1;
+  font-size: 13px;
+  color: var(--error-text);
+  line-height: 1.45;
+}
+
+.error-dismiss {
+  background: none;
+  border: none;
+  padding: 2px;
+  cursor: pointer;
+  color: var(--error-text);
+  opacity: 0.6;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: opacity 0.15s;
+}
+
+.error-dismiss:hover {
+  opacity: 1;
+}
+
+.error-dismiss:focus-visible {
+  outline: 2px solid var(--error);
+  outline-offset: 2px;
+}
+
+.error-dismiss svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* ── Success / file name row ─────────────────────────────────── */
+.file-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.check-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}

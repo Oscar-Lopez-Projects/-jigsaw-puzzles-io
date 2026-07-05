@@ -1,0 +1,7 @@
+/* ── Single-stage wrapper: fills 100% of the puzzle-screen ───── */
+.puzzle-single-stage {
+  width: 100%;
+  line-height: 0; /* removes inline gap below the canvas element */
+  border-radius: 8px;
+  overflow: hidden;
+}
