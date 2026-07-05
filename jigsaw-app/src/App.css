@@ -520,3 +520,22 @@
   from { box-shadow: 0 0 0 3px rgba(34,197,94,0.20); }
   to   { box-shadow: 0 0 0 6px rgba(34,197,94,0.05); }
 }
+
+/* ── Puzzle timer (toolbar) ──────────────────────────────────── */
+.puzzle-timer {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+
+.puzzle-timer svg {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}

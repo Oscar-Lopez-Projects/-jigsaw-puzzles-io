@@ -50,7 +50,39 @@
 .win-sub {
   font-size: 15px;
   color: var(--text-muted);
-  margin: 0 0 32px;
+  margin: 0 0 20px;
+}
+
+.win-time {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: var(--surface-subtle);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: 28px;
+}
+
+.win-time svg {
+  width: 16px;
+  height: 16px;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.win-time-label {
+  font-size: 13px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.win-time-value {
+  font-size: 22px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-heading);
+  letter-spacing: 1px;
 }
 
 .win-actions {

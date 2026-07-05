@@ -28,6 +28,34 @@ export default function App() {
   const [hintPieceId, setHintPieceId] = useState<string | null>(null);
   const hintTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // ── Timer ─────────────────────────────────────────────────────
+  const [elapsedSec, setElapsedSec] = useState(0);
+  const [finalTime, setFinalTime]   = useState(0);
+  const timerRef    = useRef<ReturnType<typeof setInterval> | null>(null);
+  const elapsedRef  = useRef(0); // mirrors elapsedSec for use in callbacks
+
+  const startTimer = () => {
+    elapsedRef.current = 0;
+    setElapsedSec(0);
+    if (timerRef.current) clearInterval(timerRef.current);
+    timerRef.current = setInterval(() => {
+      elapsedRef.current += 1;
+      setElapsedSec(elapsedRef.current);
+    }, 1000);
+  };
+
+  const stopTimer = () => {
+    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+  };
+
+  const formatTime = (sec: number) => {
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    const s = sec % 60;
+    if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  };
+
   // ── Draggable preview panel ───────────────────────────────────
   const [previewPos, setPreviewPos] = useState({ x: 20, y: 80 });
   const dragState = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
@@ -85,6 +113,7 @@ export default function App() {
       setGridRows(rows);
       setPieces(generated);
       setPhase('puzzle');
+      startTimer();
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Unknown error';
       setGenerateError(`Failed to generate puzzle: ${msg}`);
@@ -95,17 +124,23 @@ export default function App() {
   const handlePiecesChange = useCallback((updated: PuzzlePiece[]) => {
     setPieces(updated);
     const allSnapped = updated.length > 0 && updated.every((p) => p.snapped);
-    if (allSnapped) setIsWon(true);
+    if (allSnapped) {
+      stopTimer();
+      setFinalTime(elapsedRef.current);
+      setIsWon(true);
+    }
   }, []);
 
   const handleReset = useCallback(() => {
     setPieces((prev) => reshufflePieces(prev));
     setIsWon(false);
+    startTimer();
   }, []);
 
   const handlePlayAgain = useCallback(() => {
     setPieces((prev) => reshufflePieces(prev));
     setIsWon(false);
+    startTimer();
   }, []);
 
   const handleBackToSetup = () => {
@@ -113,6 +148,8 @@ export default function App() {
     setPieces([]);
     setGenerateError(null);
     setIsWon(false);
+    stopTimer();
+    setElapsedSec(0);
     if (hintTimer.current) clearTimeout(hintTimer.current);
     setHintPieceId(null);
   };
@@ -223,6 +260,16 @@ export default function App() {
                 </span>
               </div>
 
+              {/* Live timer */}
+              <div className="puzzle-timer" aria-label="Elapsed time" aria-live="off">
+                <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <circle cx="8" cy="9" r="5.5" stroke="currentColor" strokeWidth="1.4" />
+                  <path d="M8 6v3.5l2 1.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M6.5 2h3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+                </svg>
+                {formatTime(elapsedSec)}
+              </div>
+
               {/* Progress */}
               <div className="puzzle-progress">
                 <div className="progress-bar-track">
@@ -235,7 +282,7 @@ export default function App() {
                     aria-label="Puzzle progress"
                   />
                 </div>
-                <span className="progress-label">{snappedCount} / {pieces.length}</span>
+                <span className="progress-label">{Math.round((snappedCount / pieces.length) * 100)}%</span>
               </div>
 
               {selectedImage && (
@@ -311,6 +358,8 @@ export default function App() {
       {isWon && (
         <WinOverlay
           pieceCount={pieces.length}
+          completionTime={finalTime}
+          formatTime={formatTime}
           onPlayAgain={handlePlayAgain}
           onNewPuzzle={handleBackToSetup}
         />

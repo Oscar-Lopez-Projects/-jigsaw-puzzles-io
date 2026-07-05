@@ -2,11 +2,13 @@ import './WinOverlay.css';
 
 interface WinOverlayProps {
   pieceCount: number;
+  completionTime: number;
+  formatTime: (sec: number) => string;
   onPlayAgain: () => void;
   onNewPuzzle: () => void;
 }
 
-export default function WinOverlay({ pieceCount, onPlayAgain, onNewPuzzle }: WinOverlayProps) {
+export default function WinOverlay({ pieceCount, completionTime, formatTime, onPlayAgain, onNewPuzzle }: WinOverlayProps) {
   return (
     <div className="win-overlay" role="dialog" aria-modal="true" aria-label="Puzzle complete">
       <div className="win-card">
@@ -15,6 +17,17 @@ export default function WinOverlay({ pieceCount, onPlayAgain, onNewPuzzle }: Win
         <p className="win-sub">
           You placed all {pieceCount} pieces correctly.
         </p>
+
+        <div className="win-time">
+          <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <circle cx="8" cy="9" r="5.5" stroke="currentColor" strokeWidth="1.4" />
+            <path d="M8 6v3.5l2 1.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M6.5 2h3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+          </svg>
+          <span className="win-time-label">Time</span>
+          <span className="win-time-value">{formatTime(completionTime)}</span>
+        </div>
+
         <div className="win-actions">
           <button type="button" className="win-btn win-btn--primary" onClick={onPlayAgain}>
             Play Again
