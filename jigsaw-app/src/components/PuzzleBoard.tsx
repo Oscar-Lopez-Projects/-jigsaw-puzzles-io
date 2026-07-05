@@ -146,20 +146,16 @@ interface TrayPieceProps {
   piece: PuzzlePiece;
   isNew: boolean;
   isHinted: boolean;
-  onDragToBoard: (id: string) => void;
+  onMoveToStaging: (id: string) => void;
 }
 
-function TrayPiece({ piece, isNew, isHinted, onDragToBoard }: TrayPieceProps) {
+function TrayPiece({ piece, isNew, isHinted, onMoveToStaging }: TrayPieceProps) {
   return (
     <div
       className={`tray-piece${isNew ? ' tray-piece--new' : ''}${isHinted ? ' tray-piece--hint' : ''}`}
       style={{ width: piece.pieceWidth, height: piece.pieceHeight, flexShrink: 0 }}
-      draggable
-      onDragStart={(e) => {
-        e.dataTransfer.setData('pieceId', piece.id);
-        onDragToBoard(piece.id);
-      }}
-      title="Drag back to the board"
+      onClick={() => onMoveToStaging(piece.id)}
+      title="Click or drag to move back to staging area"
     >
       <img
         src={piece.imageUrl}
@@ -554,7 +550,7 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPi
                   piece={piece}
                   isNew={piece.id === newestTrayId}
                   isHinted={piece.id === hintPieceId}
-                  onDragToBoard={handleTrayDragStart}
+                  onMoveToStaging={handleTrayDragStart}
                 />
               ))
             )}
