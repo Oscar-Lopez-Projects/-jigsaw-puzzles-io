@@ -19,18 +19,18 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: jigsaw-app/package-lock.json
+          cache-dependency-path: frontend/package-lock.json
 
       - name: Install dependencies
         run: npm ci
-        working-directory: jigsaw-app
+        working-directory: frontend
 
       - name: Build
         run: npm run build
-        working-directory: jigsaw-app
+        working-directory: frontend
 
       - name: Deploy to gh-pages branch
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./jigsaw-app/dist
+          publish_dir: ./frontend/dist

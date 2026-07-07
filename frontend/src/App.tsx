@@ -6,12 +6,17 @@ import PuzzleBoard from './components/PuzzleBoard';
 import PuzzleBoardErrorBoundary from './components/PuzzleBoardErrorBoundary';
 import WinOverlay from './components/WinOverlay';
 import { getGrid, generatePieces, reshufflePieces } from './utils/puzzleUtils';
+import { useAuth } from './context/AuthContext';
+import { apiFetch } from './lib/api';
 import type { PuzzlePiece } from './types/puzzle';
 import './App.css';
 
 type Phase = 'setup' | 'generating' | 'puzzle';
 
 export default function App() {
+  // ── Auth ─────────────────────────────────────────────────────
+  const { session } = useAuth();
+
   // ── Setup state ──────────────────────────────────────────────
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [imageFileName, setImageFileName] = useState<string | null>(null);
@@ -128,8 +133,23 @@ export default function App() {
       stopTimer();
       setFinalTime(elapsedRef.current);
       setIsWon(true);
+
+      // Auto-save record if logged in
+      if (session?.access_token && pieceCount) {
+        const difficultyMap: Record<number, string> = { 25: 'beginner', 50: 'easy', 100: 'medium', 150: 'hard' };
+        apiFetch('/api/records', {
+          method: 'POST',
+          token: session.access_token,
+          body: {
+            piece_count: pieceCount,
+            completion_time_sec: elapsedRef.current,
+            difficulty: difficultyMap[pieceCount] || 'easy',
+            image_reference: imageFileName || null,
+          },
+        }).catch(() => { /* silently fail — user can still enjoy the win */ });
+      }
     }
-  }, []);
+  }, [session, pieceCount]);
 
   const handleReset = useCallback(() => {
     setPieces((prev) => reshufflePieces(prev));
@@ -163,6 +183,23 @@ export default function App() {
     setHintPieceId(pick.id);
     hintTimer.current = setTimeout(() => setHintPieceId(null), 2500);
   }, [pieces]);
+
+  const handleCollectAll = useCallback(() => {
+    setPieces((prev) =>
+      prev.map((p, _, arr) => {
+        if (p.snapped || p.zone === 'tray') return p;
+        // assign a slotIndex after existing tray pieces
+        const trayCount = arr.filter((q) => q.zone === 'tray' && q.id !== p.id).length;
+        return { ...p, zone: 'tray' as const, slotIndex: trayCount };
+      }).map((p, _, arr) => {
+        // re-index tray pieces sequentially so slots don't collide
+        if (p.zone !== 'tray' || p.snapped) return p;
+        const trayPieces = arr.filter((q) => q.zone === 'tray' && !q.snapped);
+        const idx = trayPieces.findIndex((q) => q.id === p.id);
+        return { ...p, slotIndex: idx };
+      })
+    );
+  }, []);
 
   // ── Render ───────────────────────────────────────────────────
   return (
@@ -324,6 +361,23 @@ export default function App() {
                   <circle cx="10" cy="14.5" r="1" fill="currentColor" />
                 </svg>
                 Hint
+              </button>
+
+              <button
+                type="button"
+                className="collect-btn"
+                onClick={handleCollectAll}
+                disabled={pieces.filter((p) => !p.snapped && p.zone !== 'tray').length === 0}
+                aria-label="Collect all loose pieces into tray"
+                title="Collect all pieces into tray"
+              >
+                <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                  <path d="M3 13h14" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+                  <path d="M5 13V7a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M2 13h16v2a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-2Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round"/>
+                  <path d="M8 6V4M12 6V4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+                </svg>
+                Collect
               </button>
 
               <button type="button" className="reset-btn" onClick={handleReset}>

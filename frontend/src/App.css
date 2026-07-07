@@ -539,3 +539,41 @@
   height: 15px;
   flex-shrink: 0;
 }
+
+/* ── Collect button (toolbar) ────────────────────────────────── */
+.collect-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-body);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+
+.collect-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.collect-btn:not(:disabled):hover {
+  background: var(--surface-subtle);
+  border-color: #f59e0b;
+  color: #f59e0b;
+  box-shadow: 0 0 0 3px rgba(245,158,11,0.15);
+}
+
+.collect-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.collect-btn:focus-visible {
+  outline: 2px solid #f59e0b;
+  outline-offset: 2px;
+}
