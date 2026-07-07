@@ -89,3 +89,29 @@
   background: var(--border);
   border-color: var(--border-strong);
 }
+
+/* ── Dashboard button ────────────────────────────────────────── */
+.header-dashboard-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+  background: var(--accent-subtle);
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s, box-shadow 0.15s;
+}
+
+.header-dashboard-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.header-dashboard-btn:hover {
+  background: var(--accent-ring);
+  box-shadow: 0 0 0 2px var(--accent-ring);
+}

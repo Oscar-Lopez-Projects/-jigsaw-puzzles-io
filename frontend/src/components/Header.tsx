@@ -3,9 +3,19 @@ import { useAuth } from '../context/AuthContext';
 import AuthModal from './AuthModal';
 import './Header.css';
 
-export default function Header() {
+interface HeaderProps {
+  onDashboard?: () => void;
+  onLoginSuccess?: () => void;
+}
+
+export default function Header({ onDashboard, onLoginSuccess }: HeaderProps) {
   const { user, logout, isLoading } = useAuth();
   const [showAuth, setShowAuth] = useState(false);
+
+  const handleAuthClose = () => {
+    setShowAuth(false);
+    if (onLoginSuccess) onLoginSuccess();
+  };
 
   return (
     <>
@@ -30,6 +40,17 @@ export default function Header() {
             {isLoading ? null : user ? (
               <div className="header-user">
                 <span className="header-username">{user.username}</span>
+                {onDashboard && (
+                  <button type="button" className="header-dashboard-btn" onClick={onDashboard}>
+                    <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                      <rect x="1" y="1" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.5" />
+                      <rect x="9" y="1" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.5" />
+                      <rect x="1" y="9" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.5" />
+                      <rect x="9" y="9" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.5" />
+                    </svg>
+                    Dashboard
+                  </button>
+                )}
                 <button type="button" className="header-logout-btn" onClick={logout}>
                   Sign Out
                 </button>
@@ -43,7 +64,7 @@ export default function Header() {
         </div>
       </header>
 
-      {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
+      {showAuth && <AuthModal onClose={handleAuthClose} />}
     </>
   );
 }

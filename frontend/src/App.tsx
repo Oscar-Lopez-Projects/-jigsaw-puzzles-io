@@ -1,10 +1,12 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import Header from './components/Header';
+import AuthModal from './components/AuthModal';
 import ImageUploader from './components/ImageUploader';
 import DifficultySelector, { type PieceCount } from './components/DifficultySelector';
 import PuzzleBoard from './components/PuzzleBoard';
 import PuzzleBoardErrorBoundary from './components/PuzzleBoardErrorBoundary';
 import WinOverlay from './components/WinOverlay';
+import Dashboard from './components/Dashboard';
 import { getGrid, generatePieces, reshufflePieces } from './utils/puzzleUtils';
 import { useAuth } from './context/AuthContext';
 import { apiFetch } from './lib/api';
@@ -12,10 +14,15 @@ import type { PuzzlePiece } from './types/puzzle';
 import './App.css';
 
 type Phase = 'setup' | 'generating' | 'puzzle';
+type View = 'game' | 'dashboard';
 
 export default function App() {
   // ── Auth ─────────────────────────────────────────────────────
   const { session } = useAuth();
+
+  // ── View (game vs dashboard) ─────────────────────────────────
+  const [view, setView] = useState<View>('game');
+  const [showAuthFromWin, setShowAuthFromWin] = useState(false);
 
   // ── Setup state ──────────────────────────────────────────────
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -133,10 +140,18 @@ export default function App() {
       stopTimer();
       setFinalTime(elapsedRef.current);
       setIsWon(true);
+    }
+  }, []);
 
-      // Auto-save record if logged in
+  // Save record after win — runs as effect so it always has fresh state
+  const hasWonRef = useRef(false);
+  const [debugMsg, setDebugMsg] = useState<string>('');
+  useEffect(() => {
+    if (isWon && !hasWonRef.current) {
+      hasWonRef.current = true;
+      let msg = `isWon=true | session=${!!session?.access_token} | pieceCount=${pieceCount} | time=${elapsedRef.current}`;
       if (session?.access_token && pieceCount) {
-        const difficultyMap: Record<number, string> = { 25: 'beginner', 50: 'easy', 100: 'medium', 150: 'hard' };
+        const difficultyMap: Record<number, string> = { 5: 'beginner', 25: 'beginner', 50: 'easy', 100: 'medium', 150: 'hard' };
         apiFetch('/api/records', {
           method: 'POST',
           token: session.access_token,
@@ -146,18 +161,21 @@ export default function App() {
             difficulty: difficultyMap[pieceCount] || 'easy',
             image_reference: imageFileName || null,
           },
-        }).catch(() => { /* silently fail — user can still enjoy the win */ });
+        })
+          .then((res) => setDebugMsg(msg + ' | SAVED: ' + JSON.stringify(res)))
+          .catch((err) => setDebugMsg(msg + ' | ERROR: ' + (err instanceof Error ? err.message : String(err))));
+      } else {
+        msg += ' | SKIPPED (no session or pieceCount)';
+        setDebugMsg(msg);
       }
     }
-  }, [session, pieceCount]);
+    if (!isWon) {
+      hasWonRef.current = false;
+      setDebugMsg('');
+    }
+  }, [isWon, session, pieceCount, imageFileName]);
 
   const handleReset = useCallback(() => {
-    setPieces((prev) => reshufflePieces(prev));
-    setIsWon(false);
-    startTimer();
-  }, []);
-
-  const handlePlayAgain = useCallback(() => {
     setPieces((prev) => reshufflePieces(prev));
     setIsWon(false);
     startTimer();
@@ -204,8 +222,12 @@ export default function App() {
   // ── Render ───────────────────────────────────────────────────
   return (
     <div className="app-layout">
-      <Header />
+      <Header onDashboard={() => setView('dashboard')} onLoginSuccess={() => setView('dashboard')} />
 
+      {view === 'dashboard' ? (
+        <Dashboard onBack={() => setView('game')} />
+      ) : (
+      <>
       <main className={`main-content${phase === 'puzzle' ? ' main-content--puzzle' : ''}`}>
 
         {/* ── Setup screen ── */}
@@ -414,9 +436,14 @@ export default function App() {
           pieceCount={pieces.length}
           completionTime={finalTime}
           formatTime={formatTime}
-          onPlayAgain={handlePlayAgain}
-          onNewPuzzle={handleBackToSetup}
+          isLoggedIn={!!session?.access_token}
+          onDashboard={() => { setIsWon(false); setView('dashboard'); }}
+          onPlayAgain={() => { setIsWon(false); handleBackToSetup(); }}
+          onCreateAccount={() => { setIsWon(false); setShowAuthFromWin(true); }}
+          debugMsg={debugMsg}
         />
+      )}
+      </>
       )}
 
       {/* Draggable image preview panel */}
@@ -472,6 +499,11 @@ export default function App() {
             />
           </div>
         </div>
+      )}
+
+      {/* Auth modal triggered from win overlay */}
+      {showAuthFromWin && (
+        <AuthModal onClose={() => { setShowAuthFromWin(false); setView('dashboard'); }} />
       )}
     </div>
   );
