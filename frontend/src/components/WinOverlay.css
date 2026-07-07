@@ -131,3 +131,12 @@
 .win-btn--secondary:hover {
   background: var(--border);
 }
+
+/* ── Guest notice ────────────────────────────────────────────── */
+.win-guest-notice {
+  font-size: 13px;
+  color: rgba(255,255,255,0.5);
+  font-style: italic;
+  margin: 0 0 8px;
+  text-align: center;
+}
