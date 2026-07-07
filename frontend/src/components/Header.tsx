@@ -3,9 +3,21 @@ import { useAuth } from '../context/AuthContext';
 import AuthModal from './AuthModal';
 import './Header.css';
 
-export default function Header() {
+interface HeaderProps {
+  onDashboard?: () => void;
+  onCommunity?: () => void;
+  onLeaderboard?: () => void;
+  onLoginSuccess?: () => void;
+}
+
+export default function Header({ onDashboard, onCommunity, onLeaderboard, onLoginSuccess }: HeaderProps) {
   const { user, logout, isLoading } = useAuth();
   const [showAuth, setShowAuth] = useState(false);
+
+  const handleAuthClose = () => {
+    setShowAuth(false);
+    if (onLoginSuccess) onLoginSuccess();
+  };
 
   return (
     <>
@@ -27,9 +39,26 @@ export default function Header() {
           </div>
 
           <div className="header-auth">
+            {onCommunity && (
+              <button type="button" className="header-community-btn" onClick={onCommunity}>
+                Community
+              </button>
+            )}
+
+            {onLeaderboard && (
+              <button type="button" className="header-community-btn" onClick={onLeaderboard}>
+                Leaderboard
+              </button>
+            )}
+
             {isLoading ? null : user ? (
               <div className="header-user">
                 <span className="header-username">{user.username}</span>
+                {onDashboard && (
+                  <button type="button" className="header-dashboard-btn" onClick={onDashboard}>
+                    Dashboard
+                  </button>
+                )}
                 <button type="button" className="header-logout-btn" onClick={logout}>
                   Sign Out
                 </button>
@@ -43,7 +72,7 @@ export default function Header() {
         </div>
       </header>
 
-      {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
+      {showAuth && <AuthModal onClose={handleAuthClose} />}
     </>
   );
 }

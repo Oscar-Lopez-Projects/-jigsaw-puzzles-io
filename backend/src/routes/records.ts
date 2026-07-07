@@ -62,6 +62,43 @@ router.post('/', requireAuth, async (req: AuthRequest, res) => {
     .single();
 
   if (error) return res.status(500).json({ error: error.message });
+
+  // Update ELO after successful record save
+  const eloGains: Record<number, number> = { 3: 25, 2: 15, 1: 5 };
+  const gain = eloGains[stars] || 5;
+  const { data: eloRow } = await supabase
+    .from('elo_ratings')
+    .select('rating, wins')
+    .eq('user_id', req.userId!)
+    .single();
+
+  if (eloRow) {
+    await supabase.from('elo_ratings').update({
+      rating: eloRow.rating + gain,
+      wins: eloRow.wins + 1,
+      last_match_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }).eq('user_id', req.userId!);
+  }
+
+  // If it's a community puzzle, also upsert into leaderboard_scores (keep best time)
+  if (puzzle_id) {
+    const { data: existing } = await supabase
+      .from('leaderboard_scores')
+      .select('completion_time_sec')
+      .eq('user_id', req.userId!)
+      .eq('puzzle_id', puzzle_id)
+      .single();
+
+    // Only update if this time is better (faster)
+    if (!existing || completion_time_sec < existing.completion_time_sec) {
+      await supabase.from('leaderboard_scores').upsert(
+        { user_id: req.userId, puzzle_id, completion_time_sec, stars },
+        { onConflict: 'user_id,puzzle_id' }
+      );
+    }
+  }
+
   res.status(201).json(data);
 });
 

@@ -37,6 +37,7 @@ export function generatePieces(
 ): Promise<PuzzlePiece[]> {
   return new Promise((resolve, reject) => {
     const img = new Image();
+    img.crossOrigin = 'anonymous';
     img.onload = () => {
       try {
         const imgW = img.naturalWidth;
