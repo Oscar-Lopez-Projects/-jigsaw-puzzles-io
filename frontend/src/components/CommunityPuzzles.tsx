@@ -10,6 +10,7 @@ interface Puzzle {
   image_url: string;
   piece_count: number;
   plays: number;
+  category: string;
   created_at: string;
   user_id: string;
   users: { username: string } | null;
@@ -109,22 +110,43 @@ function PuzzleCard({ puzzle, onPlay }: { puzzle: Puzzle; onPlay: () => void }) 
   );
 }
 
+const CATEGORIES = [
+  { value: 'all', label: 'All' },
+  { value: 'nature', label: 'Nature' },
+  { value: 'animals', label: 'Animals' },
+  { value: 'art', label: 'Art' },
+  { value: 'memes', label: 'Memes' },
+  { value: 'food', label: 'Food' },
+  { value: 'travel', label: 'Travel' },
+  { value: 'architecture', label: 'Architecture' },
+  { value: 'sports', label: 'Sports' },
+  { value: 'other', label: 'Other' },
+];
+
 export default function CommunityPuzzles({ onBack, onPlayPuzzle }: CommunityPuzzlesProps) {
   const { session } = useAuth();
   const [puzzles, setPuzzles] = useState<Puzzle[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showUpload, setShowUpload] = useState(false);
+  const [activeCategory, setActiveCategory] = useState('all');
 
-  const fetchPuzzles = () => {
+  const fetchPuzzles = (category?: string) => {
     setLoading(true);
-    apiFetch<Puzzle[]>('/api/puzzles')
+    const cat = category ?? activeCategory;
+    const url = cat && cat !== 'all' ? `/api/puzzles?category=${cat}` : '/api/puzzles';
+    apiFetch<Puzzle[]>(url)
       .then((data) => { setPuzzles(data); setError(null); })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   };
 
   useEffect(() => { fetchPuzzles(); }, []);
+
+  const handleCategoryChange = (cat: string) => {
+    setActiveCategory(cat);
+    fetchPuzzles(cat);
+  };
 
   const handlePlay = (puzzle: Puzzle) => {
     apiFetch(`/api/puzzles/${puzzle.id}/play`, { method: 'POST' }).catch(() => {});
@@ -163,6 +185,20 @@ export default function CommunityPuzzles({ onBack, onPlayPuzzle }: CommunityPuzz
           onSuccess={handleUploadSuccess}
         />
       )}
+
+      {/* Category filter bar */}
+      <div className="community-filters">
+        {CATEGORIES.map((cat) => (
+          <button
+            key={cat.value}
+            type="button"
+            className={`filter-chip${activeCategory === cat.value ? ' filter-chip--active' : ''}`}
+            onClick={() => handleCategoryChange(cat.value)}
+          >
+            {cat.label}
+          </button>
+        ))}
+      </div>
 
       {loading && (
         <div className="community-loading">

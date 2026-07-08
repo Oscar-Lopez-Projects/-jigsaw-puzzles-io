@@ -23,3 +23,28 @@
 .record-stats { display: flex; align-items: center; gap: 14px; flex-shrink: 0; }
 .record-stars { font-size: 16px; color: #f59e0b; letter-spacing: 1px; }
 .record-time { font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text-body); min-width: 56px; text-align: right; }
+
+/* ── Danger zone ─────────────────────────────────────────────── */
+.dashboard-danger {
+  margin-top: 40px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
+  text-align: center;
+}
+
+.delete-account-btn {
+  padding: 8px 20px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--error);
+  background: transparent;
+  border: 1px solid var(--error-border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.delete-account-btn:hover {
+  background: var(--error-subtle);
+  color: var(--error-hover, #991b1b);
+}

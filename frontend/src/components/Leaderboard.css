@@ -137,3 +137,13 @@
 .lb-row--top1 .lb-rank { color: #fbbf24; }
 .lb-row--top2 .lb-rank { color: #9ca3af; }
 .lb-row--top3 .lb-rank { color: #d97706; }
+
+.lb-user-link {
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.lb-user-link:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}

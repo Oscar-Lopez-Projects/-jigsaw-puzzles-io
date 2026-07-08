@@ -6,9 +6,12 @@ import DifficultySelector, { type PieceCount } from './components/DifficultySele
 import PuzzleBoard from './components/PuzzleBoard';
 import PuzzleBoardErrorBoundary from './components/PuzzleBoardErrorBoundary';
 import WinOverlay from './components/WinOverlay';
+import ChallengeResult from './components/ChallengeResult';
 import Dashboard from './components/Dashboard';
 import CommunityPuzzles from './components/CommunityPuzzles';
 import Leaderboard from './components/Leaderboard';
+import UserProfile from './components/UserProfile';
+import FriendsList from './components/FriendsList';
 import { getGrid, generatePieces, reshufflePieces } from './utils/puzzleUtils';
 import { useAuth } from './context/AuthContext';
 import { apiFetch } from './lib/api';
@@ -16,7 +19,7 @@ import type { PuzzlePiece } from './types/puzzle';
 import './App.css';
 
 type Phase = 'setup' | 'generating' | 'puzzle';
-type View = 'game' | 'dashboard' | 'community' | 'leaderboard';
+type View = 'game' | 'dashboard' | 'community' | 'leaderboard' | 'profile' | 'friends';
 
 export default function App() {
   // ── Auth ─────────────────────────────────────────────────────
@@ -25,12 +28,25 @@ export default function App() {
   // ── View (game vs dashboard vs community) ────────────────────
   const [view, setView] = useState<View>('game');
   const [showAuthFromWin, setShowAuthFromWin] = useState(false);
+  const [profileUserId, setProfileUserId] = useState<string | null>(null);
+  const [previousView, setPreviousView] = useState<View>('game');
 
   // ── Setup state ──────────────────────────────────────────────
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [imageFileName, setImageFileName] = useState<string | null>(null);
   const [pieceCount, setPieceCount] = useState<PieceCount | null>(null);
   const [activePuzzleId, setActivePuzzleId] = useState<string | null>(null);
+
+  // ── Challenge state ────────────────────────────────────────────
+  const [activeChallengeId, setActiveChallengeId] = useState<string | null>(null);
+  const [challengeOpponent, setChallengeOpponent] = useState<{ id: string; username: string } | null>(null);
+  const [challengeResult, setChallengeResult] = useState<{
+    challengerName: string; opponentName: string;
+    challengerTime: number; challengerStars: number;
+    opponentTime: number; opponentStars: number;
+    winner: 'challenger' | 'opponent' | 'tie';
+    isChallenger: boolean;
+  } | null>(null);
 
   // ── Puzzle state ─────────────────────────────────────────────
   const [phase, setPhase] = useState<Phase>('setup');
@@ -167,7 +183,52 @@ export default function App() {
             puzzle_id: activePuzzleId || null,
           },
         })
-          .then((res) => setDebugMsg(msg + ' | SAVED: ' + JSON.stringify(res)))
+          .then((res) => {
+            setDebugMsg(msg + ' | SAVED: ' + JSON.stringify(res));
+            // If playing a challenge, submit the result
+            if (activeChallengeId) {
+              apiFetch(`/api/challenges/${activeChallengeId}`, {
+                method: 'PATCH',
+                token: session!.access_token,
+                body: { opponent_time_sec: elapsedRef.current },
+              })
+                .then((challengeData: unknown) => {
+                  const cd = challengeData as { challenger: { username: string }; opponent: { username: string }; challenger_time_sec: number; challenger_stars: number; opponent_time_sec: number; opponent_stars: number; winner: 'challenger' | 'opponent' | 'tie' };
+                  setChallengeResult({
+                    challengerName: cd.challenger?.username || 'Challenger',
+                    opponentName: cd.opponent?.username || 'You',
+                    challengerTime: cd.challenger_time_sec,
+                    challengerStars: cd.challenger_stars,
+                    opponentTime: cd.opponent_time_sec,
+                    opponentStars: cd.opponent_stars,
+                    winner: cd.winner,
+                    isChallenger: false,
+                  });
+                })
+                .catch(() => {});
+            }
+            // If initiating a challenge from a friend's profile, auto-send it
+            else if (challengeOpponent && selectedImage && pieceCount) {
+              const diffMap: Record<number, string> = { 5: 'beginner', 25: 'beginner', 50: 'easy', 100: 'medium', 150: 'hard' };
+              const cStars = elapsedRef.current <= pieceCount * 3 ? 3 : elapsedRef.current <= pieceCount * 6 ? 2 : 1;
+              apiFetch('/api/challenges', {
+                method: 'POST',
+                token: session!.access_token,
+                body: {
+                  opponent_id: challengeOpponent.id,
+                  image_url: selectedImage,
+                  puzzle_title: imageFileName || 'Puzzle',
+                  piece_count: pieceCount,
+                  difficulty: diffMap[pieceCount] || 'easy',
+                  challenger_time_sec: elapsedRef.current,
+                  challenger_stars: cStars,
+                },
+              })
+                .then(() => setDebugMsg((prev) => prev + ' | CHALLENGE SENT to ' + challengeOpponent.username))
+                .catch(() => {})
+                .finally(() => setChallengeOpponent(null));
+            }
+          })
           .catch((err) => setDebugMsg(msg + ' | ERROR: ' + (err instanceof Error ? err.message : String(err))));
       } else {
         msg += ' | SKIPPED (no session or pieceCount)';
@@ -178,7 +239,7 @@ export default function App() {
       hasWonRef.current = false;
       setDebugMsg('');
     }
-  }, [isWon, session, pieceCount, imageFileName, activePuzzleId]);
+  }, [isWon, session, pieceCount, imageFileName, activePuzzleId, activeChallengeId, challengeOpponent, selectedImage]);
 
   const handleReset = useCallback(() => {
     setPieces((prev) => reshufflePieces(prev));
@@ -256,15 +317,66 @@ export default function App() {
         onDashboard={() => setView('dashboard')}
         onCommunity={() => setView('community')}
         onLeaderboard={() => setView('leaderboard')}
+        onFriends={() => setView('friends')}
         onLoginSuccess={() => setView('dashboard')}
+        onAcceptChallenge={(challenge) => {
+          setActiveChallengeId(challenge.id);
+          setSelectedImage(challenge.image_url);
+          setImageFileName(challenge.puzzle_title);
+          setPieceCount(challenge.piece_count as PieceCount);
+          setView('game');
+          setGenerateError(null);
+          setPhase('generating');
+          setIsWon(false);
+          const { cols, rows } = getGrid(challenge.piece_count as PieceCount);
+          generatePieces(challenge.image_url, cols, rows)
+            .then((generated) => { setGridCols(cols); setGridRows(rows); setPieces(generated); setPhase('puzzle'); startTimer(); })
+            .catch((err) => { setGenerateError(`Failed: ${err instanceof Error ? err.message : 'Unknown'}`); setPhase('setup'); });
+        }}
       />
 
       {view === 'dashboard' ? (
-        <Dashboard onBack={() => setView('game')} />
+        <Dashboard
+          onBack={() => setView('game')}
+          onViewProfile={(id) => { setPreviousView('dashboard'); setProfileUserId(id); setView('profile'); }}
+          onAcceptChallenge={(challenge) => {
+            setActiveChallengeId(challenge.id);
+            setSelectedImage(challenge.image_url);
+            setImageFileName(challenge.puzzle_title);
+            setPieceCount(challenge.piece_count as PieceCount);
+            setView('game');
+            setGenerateError(null);
+            setPhase('generating');
+            setIsWon(false);
+            const { cols, rows } = getGrid(challenge.piece_count as PieceCount);
+            generatePieces(challenge.image_url, cols, rows)
+              .then((generated) => { setGridCols(cols); setGridRows(rows); setPieces(generated); setPhase('puzzle'); startTimer(); })
+              .catch((err) => { setGenerateError(`Failed: ${err instanceof Error ? err.message : 'Unknown'}`); setPhase('setup'); });
+          }}
+        />
       ) : view === 'community' ? (
         <CommunityPuzzles onBack={() => setView('game')} onPlayPuzzle={handlePlayCommunityPuzzle} />
       ) : view === 'leaderboard' ? (
-        <Leaderboard onBack={() => setView('game')} />
+        <Leaderboard onBack={() => setView('game')} onViewProfile={(id) => { setPreviousView('leaderboard'); setProfileUserId(id); setView('profile'); }} />
+      ) : view === 'friends' ? (
+        <div style={{ width: '100%', maxWidth: 720, margin: '0 auto', padding: '32px 24px 80px' }}>
+          <button type="button" className="community-back" onClick={() => setView('game')} style={{ marginBottom: 16, display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', fontSize: 14, fontWeight: 600, color: 'var(--text-body)', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, cursor: 'pointer' }}>
+            <svg viewBox="0 0 16 16" fill="none" style={{ width: 16, height: 16 }}><path d="M10 3L5 8l5 5" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            Back
+          </button>
+          <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-heading)', margin: '0 0 20px' }}>Friends</h1>
+          <FriendsList onViewProfile={(id) => { setPreviousView('friends'); setProfileUserId(id); setView('profile'); }} />
+        </div>
+      ) : view === 'profile' && profileUserId ? (
+        <UserProfile
+          userId={profileUserId}
+          onBack={() => setView(previousView)}
+          onChallenge={(id, username) => {
+            setChallengeOpponent({ id, username });
+            setView('game');
+            handleBackToSetup();
+          }}
+        />
       ) : (
       <>
       <main className={`main-content${phase === 'puzzle' ? ' main-content--puzzle' : ''}`}>
@@ -474,12 +586,21 @@ export default function App() {
         <WinOverlay
           pieceCount={pieces.length}
           completionTime={finalTime}
+          puzzleName={imageFileName || 'Puzzle'}
           formatTime={formatTime}
           isLoggedIn={!!session?.access_token}
-          onDashboard={() => { setIsWon(false); setView('dashboard'); }}
-          onPlayAgain={() => { setIsWon(false); handleBackToSetup(); }}
+          onDashboard={() => { setIsWon(false); setActiveChallengeId(null); setView('dashboard'); }}
+          onPlayAgain={() => { setIsWon(false); setActiveChallengeId(null); handleBackToSetup(); }}
           onCreateAccount={() => { setIsWon(false); setShowAuthFromWin(true); }}
           debugMsg={debugMsg}
+        />
+      )}
+
+      {/* Challenge result overlay */}
+      {challengeResult && (
+        <ChallengeResult
+          {...challengeResult}
+          onClose={() => { setChallengeResult(null); setIsWon(false); setActiveChallengeId(null); setView('dashboard'); }}
         />
       )}
       </>

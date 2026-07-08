@@ -10,8 +10,9 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 
 router.get('/', async (req, res) => {
   const limit = parseInt(req.query.limit as string) || 20;
   const offset = parseInt(req.query.offset as string) || 0;
+  const category = req.query.category as string | undefined;
 
-  const { data, error } = await supabase
+  let query = supabase
     .from('puzzles')
     .select(`
       id,
@@ -19,11 +20,18 @@ router.get('/', async (req, res) => {
       image_url,
       piece_count,
       plays,
+      category,
       created_at,
       user_id,
       users ( username )
     `)
-    .eq('is_public', true)
+    .eq('is_public', true);
+
+  if (category && category !== 'all') {
+    query = query.eq('category', category);
+  }
+
+  const { data, error } = await query
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1);
 
@@ -34,7 +42,7 @@ router.get('/', async (req, res) => {
 // Upload a community puzzle (protected, accepts multipart image)
 router.post('/upload', requireAuth, upload.single('image'), async (req: AuthRequest, res) => {
   const file = req.file;
-  const { title, piece_count } = req.body;
+  const { title, piece_count, category } = req.body;
 
   if (!file) {
     return res.status(400).json({ error: 'Image file is required' });
@@ -80,6 +88,7 @@ router.post('/upload', requireAuth, upload.single('image'), async (req: AuthRequ
       image_url: imageUrl,
       piece_count: pieceCountNum,
       is_public: true,
+      category: category || 'other',
     })
     .select()
     .single();

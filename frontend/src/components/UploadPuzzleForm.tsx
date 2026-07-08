@@ -13,6 +13,7 @@ export default function UploadPuzzleForm({ onClose, onSuccess }: UploadPuzzleFor
   const { session } = useAuth();
   const [title, setTitle] = useState('');
   const [pieceCount, setPieceCount] = useState('25');
+  const [category, setCategory] = useState('other');
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -37,6 +38,7 @@ export default function UploadPuzzleForm({ onClose, onSuccess }: UploadPuzzleFor
     formData.append('image', file);
     formData.append('title', title.trim());
     formData.append('piece_count', pieceCount);
+    formData.append('category', category);
 
     try {
       const res = await fetch(`${API_URL}/api/puzzles/upload`, {
@@ -91,6 +93,21 @@ export default function UploadPuzzleForm({ onClose, onSuccess }: UploadPuzzleFor
               <option value="50">50 Pieces (Easy)</option>
               <option value="100">100 Pieces (Medium)</option>
               <option value="150">150 Pieces (Hard)</option>
+            </select>
+          </div>
+
+          <div className="upload-field">
+            <label htmlFor="upload-category">Category</label>
+            <select id="upload-category" value={category} onChange={(e) => setCategory(e.target.value)}>
+              <option value="nature">Nature</option>
+              <option value="animals">Animals</option>
+              <option value="art">Art</option>
+              <option value="memes">Memes</option>
+              <option value="food">Food</option>
+              <option value="travel">Travel</option>
+              <option value="architecture">Architecture</option>
+              <option value="sports">Sports</option>
+              <option value="other">Other</option>
             </select>
           </div>
 

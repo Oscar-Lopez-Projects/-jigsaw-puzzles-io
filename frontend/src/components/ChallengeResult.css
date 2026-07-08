@@ -1,0 +1,14 @@
+.challenge-result-overlay { position: fixed; inset: 0; z-index: 600; background: rgba(0,0,0,0.75); backdrop-filter: blur(6px); display: flex; align-items: center; justify-content: center; padding: 24px; }
+.challenge-result-card { background: var(--surface); border: 1px solid var(--border); border-radius: 18px; box-shadow: 0 24px 64px rgba(0,0,0,0.3); width: 100%; max-width: 420px; padding: 36px; text-align: center; }
+.challenge-result-emoji { font-size: 48px; margin-bottom: 12px; }
+.challenge-result-title { font-size: 24px; font-weight: 800; color: var(--text-heading); margin: 0 0 8px; }
+.challenge-result-subtitle { font-size: 14px; color: var(--text-muted); margin: 0 0 24px; }
+.challenge-result-vs { display: flex; justify-content: center; gap: 24px; margin-bottom: 24px; }
+.challenge-result-player { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.challenge-result-player-name { font-size: 14px; font-weight: 700; color: var(--text-heading); }
+.challenge-result-player-time { font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--accent); }
+.challenge-result-player-stars { font-size: 16px; color: #f59e0b; }
+.challenge-result-player--winner { position: relative; }
+.challenge-result-player--winner::after { content: '👑'; position: absolute; top: -20px; font-size: 18px; }
+.challenge-result-close { padding: 12px 32px; font-size: 15px; font-weight: 700; color: #fff; background: var(--accent); border: none; border-radius: 10px; cursor: pointer; transition: background 0.15s; }
+.challenge-result-close:hover { background: var(--accent-hover); }

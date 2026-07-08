@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../lib/api';
+import FriendsList from './FriendsList';
+import PendingChallenges from './PendingChallenges';
 import './Dashboard.css';
 
 interface PuzzleRecord {
@@ -15,10 +17,12 @@ interface PuzzleRecord {
 
 interface DashboardProps {
   onBack: () => void;
+  onViewProfile: (userId: string) => void;
+  onAcceptChallenge?: (challenge: { id: string; image_url: string; puzzle_title: string; piece_count: number; difficulty: string; challenger_time_sec: number; challenger_stars: number }) => void;
 }
 
-export default function Dashboard({ onBack }: DashboardProps) {
-  const { user, session } = useAuth();
+export default function Dashboard({ onBack, onViewProfile, onAcceptChallenge }: DashboardProps) {
+  const { user, session, logout } = useAuth();
   const [records, setRecords] = useState<PuzzleRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -106,6 +110,27 @@ export default function Dashboard({ onBack }: DashboardProps) {
                 ))}
               </div>
             )}
+          </div>
+
+          <PendingChallenges onAcceptChallenge={onAcceptChallenge || (() => {})} />
+
+          <FriendsList onViewProfile={onViewProfile} />
+
+          <div className="dashboard-danger">
+            <button
+              type="button"
+              className="delete-account-btn"
+              onClick={async () => {
+                if (!window.confirm('Are you sure you want to delete your account? This cannot be undone.')) return;
+                if (!session?.access_token) return;
+                try {
+                  await apiFetch('/api/users/me', { method: 'DELETE', token: session.access_token });
+                  logout();
+                } catch { /* ignore */ }
+              }}
+            >
+              Delete Account
+            </button>
           </div>
         </>
       )}

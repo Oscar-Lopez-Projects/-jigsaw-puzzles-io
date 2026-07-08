@@ -12,9 +12,10 @@ interface EloEntry {
 
 interface LeaderboardProps {
   onBack: () => void;
+  onViewProfile?: (userId: string) => void;
 }
 
-export default function Leaderboard({ onBack }: LeaderboardProps) {
+export default function Leaderboard({ onBack, onViewProfile }: LeaderboardProps) {
   const [entries, setEntries] = useState<EloEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -69,7 +70,13 @@ export default function Leaderboard({ onBack }: LeaderboardProps) {
               {entries.map((entry, i) => (
                 <tr key={entry.user_id} className={i < 3 ? `lb-row--top${i + 1}` : ''}>
                   <td className="lb-rank">{i + 1}</td>
-                  <td className="lb-user">{entry.users?.username || 'Unknown'}</td>
+                  <td className="lb-user">
+                    {onViewProfile ? (
+                      <span className="lb-user-link" onClick={() => onViewProfile(entry.user_id)}>{entry.users?.username || 'Unknown'}</span>
+                    ) : (
+                      entry.users?.username || 'Unknown'
+                    )}
+                  </td>
                   <td className="lb-rating">{entry.rating}</td>
                   <td className="lb-wins">{entry.wins}</td>
                 </tr>
