@@ -1,0 +1,45 @@
+/* ── Theme toggle ────────────────────────────────────────────── */
+.theme-toggle {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  background: var(--surface-subtle);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.theme-toggle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.theme-toggle-btn svg {
+  width: 15px;
+  height: 15px;
+}
+
+.theme-toggle-btn:hover {
+  color: var(--text-heading);
+  background: var(--border);
+}
+
+.theme-toggle-btn--active {
+  background: var(--accent);
+  color: #fff;
+}
+
+.theme-toggle-btn--active:hover {
+  background: var(--accent-hover);
+  color: #fff;
+}

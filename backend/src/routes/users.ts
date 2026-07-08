@@ -41,7 +41,7 @@ router.get('/:userId', async (req, res) => {
     .eq('user_id', userId)
     .single();
 
-  // Get their puzzle stats
+  // Get their puzzle records
   const { data: records } = await supabase
     .from('puzzle_records')
     .select('completion_time_sec, stars, piece_count')
@@ -51,11 +51,45 @@ router.get('/:userId', async (req, res) => {
   const totalStars = records?.reduce((s, r) => s + r.stars, 0) || 0;
   const avgStars = totalPuzzles > 0 ? totalStars / totalPuzzles : 0;
   const bestTime = totalPuzzles > 0 ? Math.min(...records!.map((r) => r.completion_time_sec)) : null;
+  const threeStarCount = records?.filter((r) => r.stars === 3).length || 0;
+  const totalTime = records?.reduce((s, r) => s + r.completion_time_sec, 0) || 0;
+
+  // Get challenge stats
+  const { data: challengesSent } = await supabase
+    .from('challenges')
+    .select('id, winner, status')
+    .eq('challenger_id', userId)
+    .eq('status', 'completed');
+
+  const { data: challengesReceived } = await supabase
+    .from('challenges')
+    .select('id, winner, status')
+    .eq('opponent_id', userId)
+    .eq('status', 'completed');
+
+  const allChallenges = [...(challengesSent || []), ...(challengesReceived || [])];
+  const challengeWins = (challengesSent?.filter((c) => c.winner === 'challenger').length || 0)
+    + (challengesReceived?.filter((c) => c.winner === 'opponent').length || 0);
+  const challengeLosses = (challengesSent?.filter((c) => c.winner === 'opponent').length || 0)
+    + (challengesReceived?.filter((c) => c.winner === 'challenger').length || 0);
+  const challengeTies = allChallenges.filter((c) => c.winner === 'tie').length;
 
   res.json({
     ...user,
     elo: elo || { rating: 1200, wins: 0, losses: 0 },
-    stats: { totalPuzzles, avgStars: +avgStars.toFixed(1), bestTime },
+    stats: {
+      totalPuzzles,
+      avgStars: +avgStars.toFixed(1),
+      bestTime,
+      threeStarCount,
+      totalTime,
+    },
+    challenges: {
+      total: allChallenges.length,
+      wins: challengeWins,
+      losses: challengeLosses,
+      ties: challengeTies,
+    },
   });
 });
 

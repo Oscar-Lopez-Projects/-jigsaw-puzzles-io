@@ -197,3 +197,19 @@
   background: #d97706;
   box-shadow: 0 4px 16px rgba(245, 158, 11, 0.4);
 }
+
+/* ── Section labels ──────────────────────────────────────────── */
+.profile-section-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-faint);
+  margin-top: 20px;
+  margin-bottom: 8px;
+}
+
+/* ── Colored stat values ─────────────────────────────────────── */
+.profile-stat-value--win { color: #22c55e; }
+.profile-stat-value--loss { color: #dc2626; }
+.profile-stat-value--tie { color: #f59e0b; }

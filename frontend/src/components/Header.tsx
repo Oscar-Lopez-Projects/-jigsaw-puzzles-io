@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../lib/api';
 import AuthModal from './AuthModal';
+import ThemeToggle from './ThemeToggle';
 import './Header.css';
 
 interface HeaderProps {
@@ -15,7 +16,7 @@ interface HeaderProps {
 
 interface Notification {
   id: string;
-  type: 'challenge' | 'friend_request';
+  type: 'challenge' | 'friend_request' | 'challenge_result';
   title: string;
   subtitle: string;
   data?: unknown;
@@ -26,6 +27,7 @@ export default function Header({ onDashboard, onCommunity, onLeaderboard, onFrie
   const [showAuth, setShowAuth] = useState(false);
   const [showNotifs, setShowNotifs] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [seenIds, setSeenIds] = useState<Set<string>>(new Set());
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Fetch notifications (pending challenges + pending friend requests)
@@ -37,10 +39,11 @@ export default function Header({ onDashboard, onCommunity, onLeaderboard, onFrie
 
       try {
         const [challengeData, friendData] = await Promise.all([
-          apiFetch<{ received: { id: string; puzzle_title: string; piece_count: number; difficulty: string; image_url: string; challenger_time_sec: number; challenger_stars: number; status: string; challenger?: { id: string; username: string } }[] }>('/api/challenges', { token: session.access_token }).catch(() => ({ received: [] })),
+          apiFetch<{ sent: { id: string; puzzle_title: string; piece_count: number; difficulty: string; image_url: string; challenger_time_sec: number; challenger_stars: number; opponent_time_sec: number | null; opponent_stars: number | null; winner: string | null; status: string; opponent?: { id: string; username: string } }[]; received: { id: string; puzzle_title: string; piece_count: number; difficulty: string; image_url: string; challenger_time_sec: number; challenger_stars: number; status: string; challenger?: { id: string; username: string } }[] }>('/api/challenges', { token: session.access_token }).catch(() => ({ sent: [], received: [] })),
           apiFetch<{ received: { id: string; status: string; requester: { id: string; username: string } | null }[] }>('/api/friends', { token: session.access_token }).catch(() => ({ received: [] })),
         ]);
 
+        // Pending incoming challenges
         challengeData.received
           .filter((c) => c.status === 'pending')
           .forEach((c) => {
@@ -49,6 +52,21 @@ export default function Header({ onDashboard, onCommunity, onLeaderboard, onFrie
               type: 'challenge',
               title: `Challenge: ${c.puzzle_title}`,
               subtitle: `from ${c.challenger?.username || 'someone'} · Beat ${Math.floor(c.challenger_time_sec / 60)}:${String(c.challenger_time_sec % 60).padStart(2, '0')}`,
+              data: c,
+            });
+          });
+
+        // Completed sent challenges (results are in for User 1)
+        challengeData.sent
+          .filter((c) => c.status === 'completed' && c.winner)
+          .forEach((c) => {
+            const won = c.winner === 'challenger';
+            const tied = c.winner === 'tie';
+            notifs.push({
+              id: `result-${c.id}`,
+              type: 'challenge_result' as Notification['type'],
+              title: tied ? `Tie! ${c.puzzle_title}` : won ? `You Won! ${c.puzzle_title}` : `You Lost! ${c.puzzle_title}`,
+              subtitle: `vs ${c.opponent?.username || 'opponent'} · ${c.opponent_time_sec ? Math.floor(c.opponent_time_sec / 60) + ':' + String(c.opponent_time_sec % 60).padStart(2, '0') : '?'}`,
               data: c,
             });
           });
@@ -95,13 +113,24 @@ export default function Header({ onDashboard, onCommunity, onLeaderboard, onFrie
       const c = notif.data as { id: string; image_url: string; puzzle_title: string; piece_count: number; difficulty: string; challenger_time_sec: number; challenger_stars: number };
       onAcceptChallenge(c);
       setShowNotifs(false);
+    } else if (notif.type === 'challenge_result' && onDashboard) {
+      onDashboard();
+      setShowNotifs(false);
     } else if (notif.type === 'friend_request' && onDashboard) {
       onDashboard();
       setShowNotifs(false);
     }
   };
 
-  const notifCount = notifications.length;
+  const notifCount = notifications.filter((n) => !seenIds.has(n.id)).length;
+
+  const handleBellClick = () => {
+    if (!showNotifs) {
+      // Mark all current notifications as seen
+      setSeenIds(new Set(notifications.map((n) => n.id)));
+    }
+    setShowNotifs((v) => !v);
+  };
 
   return (
     <>
@@ -123,6 +152,8 @@ export default function Header({ onDashboard, onCommunity, onLeaderboard, onFrie
           </div>
 
           <div className="header-auth">
+            <ThemeToggle />
+
             {onCommunity && (
               <button type="button" className="header-community-btn" onClick={onCommunity}>
                 Community
@@ -142,7 +173,7 @@ export default function Header({ onDashboard, onCommunity, onLeaderboard, onFrie
                   <button
                     type="button"
                     className="header-notif-btn"
-                    onClick={() => setShowNotifs((v) => !v)}
+                    onClick={handleBellClick}
                     aria-label={`Notifications (${notifCount})`}
                   >
                     <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
@@ -165,7 +196,7 @@ export default function Header({ onDashboard, onCommunity, onLeaderboard, onFrie
                             onClick={() => handleNotifClick(n)}
                           >
                             <span className={`notif-icon notif-icon--${n.type}`}>
-                              {n.type === 'challenge' ? '⚔️' : '👋'}
+                              {n.type === 'challenge' ? '⚔️' : n.type === 'challenge_result' ? '🏆' : '👋'}
                             </span>
                             <div className="notif-text">
                               <span className="notif-title">{n.title}</span>

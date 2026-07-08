@@ -9,7 +9,8 @@ interface UserProfileData {
   avatar_url: string | null;
   created_at: string;
   elo: { rating: number; wins: number; losses: number };
-  stats: { totalPuzzles: number; avgStars: number; bestTime: number | null };
+  stats: { totalPuzzles: number; avgStars: number; bestTime: number | null; threeStarCount: number; totalTime: number };
+  challenges: { total: number; wins: number; losses: number; ties: number };
 }
 
 interface UserProfileProps {
@@ -123,7 +124,7 @@ export default function UserProfile({ userId, onBack, onChallenge }: UserProfile
         <div className="profile-stats">
           <div className="profile-stat">
             <span className="profile-stat-value">{profile.stats.totalPuzzles}</span>
-            <span className="profile-stat-label">Puzzles</span>
+            <span className="profile-stat-label">Puzzles Solved</span>
           </div>
           <div className="profile-stat">
             <span className="profile-stat-value">{profile.stats.avgStars || '—'}</span>
@@ -133,16 +134,49 @@ export default function UserProfile({ userId, onBack, onChallenge }: UserProfile
             <span className="profile-stat-value">{profile.stats.bestTime ? formatTime(profile.stats.bestTime) : '—'}</span>
             <span className="profile-stat-label">Best Time</span>
           </div>
+          <div className="profile-stat">
+            <span className="profile-stat-value">{profile.stats.threeStarCount}</span>
+            <span className="profile-stat-label">3-Star Solves</span>
+          </div>
+          <div className="profile-stat">
+            <span className="profile-stat-value">{profile.stats.totalTime ? formatTime(profile.stats.totalTime) : '—'}</span>
+            <span className="profile-stat-label">Total Time</span>
+          </div>
         </div>
 
+        <div className="profile-section-label">Challenge Record</div>
         <div className="profile-stats">
           <div className="profile-stat">
-            <span className="profile-stat-value">{profile.elo.wins}</span>
+            <span className="profile-stat-value">{profile.challenges.total}</span>
+            <span className="profile-stat-label">Challenges</span>
+          </div>
+          <div className="profile-stat">
+            <span className="profile-stat-value profile-stat-value--win">{profile.challenges.wins}</span>
             <span className="profile-stat-label">Wins</span>
           </div>
           <div className="profile-stat">
-            <span className="profile-stat-value">{profile.elo.losses}</span>
+            <span className="profile-stat-value profile-stat-value--loss">{profile.challenges.losses}</span>
             <span className="profile-stat-label">Losses</span>
+          </div>
+          <div className="profile-stat">
+            <span className="profile-stat-value profile-stat-value--tie">{profile.challenges.ties}</span>
+            <span className="profile-stat-label">Ties</span>
+          </div>
+        </div>
+
+        <div className="profile-section-label">ELO Rating</div>
+        <div className="profile-stats">
+          <div className="profile-stat">
+            <span className="profile-stat-value">{profile.elo.rating}</span>
+            <span className="profile-stat-label">Rating</span>
+          </div>
+          <div className="profile-stat">
+            <span className="profile-stat-value profile-stat-value--win">{profile.elo.wins}</span>
+            <span className="profile-stat-label">Total Wins</span>
+          </div>
+          <div className="profile-stat">
+            <span className="profile-stat-value profile-stat-value--loss">{profile.elo.losses}</span>
+            <span className="profile-stat-label">Total Losses</span>
           </div>
         </div>
 

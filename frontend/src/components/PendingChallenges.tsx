@@ -24,6 +24,95 @@ interface PendingChallengesProps {
   onAcceptChallenge: (challenge: Challenge) => void;
 }
 
+function formatTime(sec: number) {
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
+function ChallengeRow({ challenge, isSentByMe, onAccept, onDecline }: {
+  challenge: Challenge;
+  userId: string | undefined;
+  isSentByMe: boolean;
+  onAccept?: (c: Challenge) => void;
+  onDecline?: (id: string) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const isChallenger = isSentByMe;
+  const opponentName = isChallenger ? challenge.opponent?.username : challenge.challenger?.username;
+  const isPending = challenge.status === 'pending';
+  const isCompleted = challenge.status === 'completed';
+  const isIncoming = !isChallenger && isPending;
+
+  let resultLabel = '';
+  let resultClass = '';
+  if (isCompleted) {
+    if (challenge.winner === 'tie') { resultLabel = 'Tie'; resultClass = 'tie'; }
+    else if ((challenge.winner === 'challenger' && isChallenger) || (challenge.winner === 'opponent' && !isChallenger)) {
+      resultLabel = 'You Won'; resultClass = 'won';
+    } else {
+      resultLabel = 'You Lost'; resultClass = 'lost';
+    }
+  } else if (isPending && isChallenger) {
+    resultLabel = 'Pending'; resultClass = 'pending';
+  }
+
+  return (
+    <div className="challenge-row-wrap">
+      <div className="challenge-row">
+        <div className="challenge-row-info">
+          <span className="challenge-row-title">{challenge.puzzle_title}</span>
+          <span className="challenge-row-meta">
+            vs {opponentName || 'Unknown'} · {challenge.piece_count} pieces · {challenge.difficulty}
+          </span>
+        </div>
+
+        {isIncoming && onAccept && onDecline && (
+          <div className="challenge-row-actions">
+            <button type="button" className="challenge-accept-btn" onClick={() => onAccept(challenge)}>Play</button>
+            <button type="button" className="challenge-decline-btn" onClick={() => onDecline(challenge.id)}>Decline</button>
+          </div>
+        )}
+
+        {!isIncoming && resultLabel && (
+          <span className={`challenge-status-badge challenge-status-badge--${resultClass}`}>{resultLabel}</span>
+        )}
+
+        <button
+          type="button"
+          className={`challenge-expand-btn${expanded ? ' challenge-expand-btn--open' : ''}`}
+          onClick={() => setExpanded((v) => !v)}
+          aria-label="Show details"
+        >
+          <svg viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+        </button>
+      </div>
+
+      {expanded && (
+        <div className="challenge-details">
+          <div className="challenge-detail-row">
+            <span className="challenge-detail-name">{challenge.challenger?.username || 'Challenger'}</span>
+            <span className="challenge-detail-stars">{'★'.repeat(challenge.challenger_stars)}{'☆'.repeat(3 - challenge.challenger_stars)}</span>
+            <span className="challenge-detail-time">{formatTime(challenge.challenger_time_sec)}</span>
+          </div>
+          {challenge.opponent_time_sec !== null && challenge.opponent_stars !== null ? (
+            <div className="challenge-detail-row">
+              <span className="challenge-detail-name">{challenge.opponent?.username || 'Opponent'}</span>
+              <span className="challenge-detail-stars">{'★'.repeat(challenge.opponent_stars)}{'☆'.repeat(3 - challenge.opponent_stars)}</span>
+              <span className="challenge-detail-time">{formatTime(challenge.opponent_time_sec)}</span>
+            </div>
+          ) : (
+            <div className="challenge-detail-row challenge-detail-row--waiting">
+              <span className="challenge-detail-name">{challenge.opponent?.username || 'Opponent'}</span>
+              <span className="challenge-detail-waiting">Waiting for response...</span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function PendingChallenges({ onAcceptChallenge }: PendingChallengesProps) {
   const { session, user } = useAuth();
   const [challenges, setChallenges] = useState<{ sent: Challenge[]; received: Challenge[] }>({ sent: [], received: [] });
@@ -46,74 +135,50 @@ export default function PendingChallenges({ onAcceptChallenge }: PendingChalleng
     }));
   };
 
-  const formatTime = (sec: number) => {
-    const m = Math.floor(sec / 60);
-    const s = sec % 60;
-    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-  };
-
   if (loading) return null;
 
-  const pending = challenges.received.filter((c) => c.status === 'pending');
+  // All challenges sorted by date (incoming pending first, then sent pending, then completed)
+  const incomingPending = challenges.received.filter((c) => c.status === 'pending');
+  const sentPending = challenges.sent.filter((c) => c.status === 'pending');
   const completed = [
     ...challenges.sent.filter((c) => c.status === 'completed'),
     ...challenges.received.filter((c) => c.status === 'completed'),
   ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 10);
 
-  if (pending.length === 0 && completed.length === 0) return null;
+  const totalCount = incomingPending.length + sentPending.length + completed.length;
+  if (totalCount === 0) return null;
 
   return (
     <div className="challenges-section">
-      <h2 className="challenges-title">Challenges</h2>
+      <h2 className="challenges-title">Challenges ({totalCount})</h2>
 
-      {/* Pending incoming */}
-      {pending.length > 0 && pending.map((c) => (
-        <div className="challenge-row" key={c.id}>
-          <div className="challenge-row-info">
-            <span className="challenge-row-title">{c.puzzle_title}</span>
-            <span className="challenge-row-meta">
-              {c.piece_count} pieces · {c.difficulty} · Beat {formatTime(c.challenger_time_sec)} {'★'.repeat(c.challenger_stars)}
-            </span>
-            <span className="challenge-row-opponent">from {c.challenger?.username || 'Unknown'}</span>
-          </div>
-          <div className="challenge-row-actions">
-            <button type="button" className="challenge-accept-btn" onClick={() => onAcceptChallenge(c)}>
-              Play
-            </button>
-            <button type="button" className="challenge-decline-btn" onClick={() => handleDecline(c.id)}>
-              Decline
-            </button>
-          </div>
+      {incomingPending.length > 0 && (
+        <div className="challenges-group">
+          <span className="challenges-group-label">Incoming</span>
+          {incomingPending.map((c) => (
+            <ChallengeRow key={c.id} challenge={c} userId={user?.id} isSentByMe={false} onAccept={onAcceptChallenge} onDecline={handleDecline} />
+          ))}
         </div>
-      ))}
+      )}
 
-      {/* Recent completed */}
-      {completed.length > 0 && completed.map((c) => {
-        const isChallenger = c.challenger?.id === user?.id;
-        const opponentName = isChallenger ? c.opponent?.username : c.challenger?.username;
-        let resultLabel: string;
-        let resultClass: string;
-        if (c.winner === 'tie') { resultLabel = 'Tie'; resultClass = 'tie'; }
-        else if ((c.winner === 'challenger' && isChallenger) || (c.winner === 'opponent' && !isChallenger)) {
-          resultLabel = 'You Won'; resultClass = 'won';
-        } else {
-          resultLabel = 'You Lost'; resultClass = 'lost';
-        }
+      {sentPending.length > 0 && (
+        <div className="challenges-group">
+          <span className="challenges-group-label">Sent (waiting)</span>
+          {sentPending.map((c) => (
+            <ChallengeRow key={c.id} challenge={c} userId={user?.id} isSentByMe={true} />
+          ))}
+        </div>
+      )}
 
-        return (
-          <div className="challenge-row" key={c.id}>
-            <div className="challenge-row-info">
-              <span className="challenge-row-title">{c.puzzle_title}</span>
-              <span className="challenge-row-meta">
-                vs {opponentName || 'Unknown'} · {c.piece_count} pieces
-              </span>
-            </div>
-            <span className={`challenge-status-badge challenge-status-badge--${resultClass}`}>
-              {resultLabel}
-            </span>
-          </div>
-        );
-      })}
+      {completed.length > 0 && (
+        <div className="challenges-group">
+          <span className="challenges-group-label">Completed</span>
+          {completed.map((c) => {
+            const sentByMe = challenges.sent.some((s) => s.id === c.id);
+            return <ChallengeRow key={c.id} challenge={c} userId={user?.id} isSentByMe={sentByMe} />;
+          })}
+        </div>
+      )}
     </div>
   );
 }

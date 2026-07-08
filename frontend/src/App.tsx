@@ -26,10 +26,42 @@ export default function App() {
   const { session } = useAuth();
 
   // ── View (game vs dashboard vs community) ────────────────────
-  const [view, setView] = useState<View>('game');
+  const [view, setViewState] = useState<View>('game');
   const [showAuthFromWin, setShowAuthFromWin] = useState(false);
   const [profileUserId, setProfileUserId] = useState<string | null>(null);
   const [previousView, setPreviousView] = useState<View>('game');
+
+  // ── URL hash routing ──────────────────────────────────────────
+  const navigate = useCallback((v: View, opts?: { profileId?: string; prev?: View }) => {
+    setViewState(v);
+    if (opts?.profileId) setProfileUserId(opts.profileId);
+    if (opts?.prev) setPreviousView(opts.prev);
+    const hashMap: Record<View, string> = {
+      game: '',
+      dashboard: '#/dashboard',
+      community: '#/community',
+      leaderboard: '#/leaderboard',
+      friends: '#/friends',
+      profile: opts?.profileId ? `#/profile/${opts.profileId}` : '#/profile',
+    };
+    window.history.replaceState(null, '', `${window.location.pathname}${hashMap[v]}`);
+  }, []);
+
+  // setView wrapper that also updates URL
+  const setView = useCallback((v: View) => navigate(v), [navigate]);
+
+  // Restore view from URL hash on mount
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash.startsWith('#/dashboard')) navigate('dashboard');
+    else if (hash.startsWith('#/community')) navigate('community');
+    else if (hash.startsWith('#/leaderboard')) navigate('leaderboard');
+    else if (hash.startsWith('#/friends')) navigate('friends');
+    else if (hash.startsWith('#/profile/')) {
+      const id = hash.replace('#/profile/', '');
+      if (id) navigate('profile', { profileId: id });
+    }
+  }, []); // eslint-disable-line
 
   // ── Setup state ──────────────────────────────────────────────
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -169,70 +201,103 @@ export default function App() {
   useEffect(() => {
     if (isWon && !hasWonRef.current) {
       hasWonRef.current = true;
-      let msg = `isWon=true | session=${!!session?.access_token} | pieceCount=${pieceCount} | time=${elapsedRef.current}`;
+      const msg = `isWon=true | session=${!!session?.access_token} | pieceCount=${pieceCount} | time=${elapsedRef.current} | challengeId=${activeChallengeId} | opponent=${challengeOpponent?.username || 'none'}`;
+
       if (session?.access_token && pieceCount) {
         const difficultyMap: Record<number, string> = { 5: 'beginner', 25: 'beginner', 50: 'easy', 100: 'medium', 150: 'hard' };
-        apiFetch('/api/records', {
-          method: 'POST',
-          token: session.access_token,
-          body: {
-            piece_count: pieceCount,
-            completion_time_sec: elapsedRef.current,
-            difficulty: difficultyMap[pieceCount] || 'easy',
-            image_reference: imageFileName || null,
-            puzzle_id: activePuzzleId || null,
-          },
-        })
-          .then((res) => {
+
+        (async () => {
+          try {
+            // Save puzzle record
+            const res = await apiFetch('/api/records', {
+              method: 'POST',
+              token: session.access_token,
+              body: {
+                piece_count: pieceCount,
+                completion_time_sec: elapsedRef.current,
+                difficulty: difficultyMap[pieceCount] || 'easy',
+                image_reference: imageFileName || null,
+                puzzle_id: activePuzzleId || null,
+              },
+            });
             setDebugMsg(msg + ' | SAVED: ' + JSON.stringify(res));
-            // If playing a challenge, submit the result
+
+            // If playing a challenge (Player B), submit result
             if (activeChallengeId) {
-              apiFetch(`/api/challenges/${activeChallengeId}`, {
-                method: 'PATCH',
-                token: session!.access_token,
-                body: { opponent_time_sec: elapsedRef.current },
-              })
-                .then((challengeData: unknown) => {
-                  const cd = challengeData as { challenger: { username: string }; opponent: { username: string }; challenger_time_sec: number; challenger_stars: number; opponent_time_sec: number; opponent_stars: number; winner: 'challenger' | 'opponent' | 'tie' };
-                  setChallengeResult({
-                    challengerName: cd.challenger?.username || 'Challenger',
-                    opponentName: cd.opponent?.username || 'You',
-                    challengerTime: cd.challenger_time_sec,
-                    challengerStars: cd.challenger_stars,
-                    opponentTime: cd.opponent_time_sec,
-                    opponentStars: cd.opponent_stars,
-                    winner: cd.winner,
-                    isChallenger: false,
-                  });
-                })
-                .catch(() => {});
+              try {
+                const cd = await apiFetch<{ challenger: { username: string }; opponent: { username: string }; challenger_time_sec: number; challenger_stars: number; opponent_time_sec: number; opponent_stars: number; winner: 'challenger' | 'opponent' | 'tie' }>(`/api/challenges/${activeChallengeId}`, {
+                  method: 'PATCH',
+                  token: session.access_token,
+                  body: { opponent_time_sec: elapsedRef.current },
+                });
+                setDebugMsg((prev) => prev + ' | CHALLENGE COMPLETED: ' + cd.winner);
+                setChallengeResult({
+                  challengerName: cd.challenger?.username || 'Challenger',
+                  opponentName: cd.opponent?.username || 'You',
+                  challengerTime: cd.challenger_time_sec,
+                  challengerStars: cd.challenger_stars,
+                  opponentTime: cd.opponent_time_sec,
+                  opponentStars: cd.opponent_stars,
+                  winner: cd.winner,
+                  isChallenger: false,
+                });
+              } catch (err) {
+                setDebugMsg((prev) => prev + ' | CHALLENGE SUBMIT ERROR: ' + (err instanceof Error ? err.message : String(err)));
+              }
             }
-            // If initiating a challenge from a friend's profile, auto-send it
+            // If initiating a challenge (Player A), upload image + send challenge
             else if (challengeOpponent && selectedImage && pieceCount) {
-              const diffMap: Record<number, string> = { 5: 'beginner', 25: 'beginner', 50: 'easy', 100: 'medium', 150: 'hard' };
               const cStars = elapsedRef.current <= pieceCount * 3 ? 3 : elapsedRef.current <= pieceCount * 6 ? 2 : 1;
-              apiFetch('/api/challenges', {
-                method: 'POST',
-                token: session!.access_token,
-                body: {
-                  opponent_id: challengeOpponent.id,
-                  image_url: selectedImage,
-                  puzzle_title: imageFileName || 'Puzzle',
-                  piece_count: pieceCount,
-                  difficulty: diffMap[pieceCount] || 'easy',
-                  challenger_time_sec: elapsedRef.current,
-                  challenger_stars: cStars,
-                },
-              })
-                .then(() => setDebugMsg((prev) => prev + ' | CHALLENGE SENT to ' + challengeOpponent.username))
-                .catch(() => {})
-                .finally(() => setChallengeOpponent(null));
+
+              // Upload image to get a public URL (data URLs won't work for opponent)
+              let imageUrl = selectedImage;
+              if (selectedImage.startsWith('data:')) {
+                try {
+                  const blob = await fetch(selectedImage).then((r) => r.blob());
+                  const formData = new FormData();
+                  formData.append('image', blob, imageFileName || 'challenge.jpg');
+                  formData.append('title', imageFileName || 'Challenge');
+                  formData.append('piece_count', String(pieceCount));
+                  formData.append('category', 'other');
+                  const uploadRes = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/puzzles/upload`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${session.access_token}` },
+                    body: formData,
+                  });
+                  const uploadData = await uploadRes.json();
+                  if (uploadRes.ok && uploadData.image_url) {
+                    imageUrl = uploadData.image_url;
+                  }
+                } catch { /* fallback to data URL */ }
+              }
+
+              try {
+                await apiFetch('/api/challenges', {
+                  method: 'POST',
+                  token: session.access_token,
+                  body: {
+                    opponent_id: challengeOpponent.id,
+                    image_url: imageUrl,
+                    puzzle_title: imageFileName || 'Puzzle',
+                    piece_count: pieceCount,
+                    difficulty: difficultyMap[pieceCount] || 'easy',
+                    challenger_time_sec: elapsedRef.current,
+                    challenger_stars: cStars,
+                  },
+                });
+                setDebugMsg((prev) => prev + ' | CHALLENGE SENT to ' + challengeOpponent.username);
+              } catch (err) {
+                setDebugMsg((prev) => prev + ' | CHALLENGE ERROR: ' + (err instanceof Error ? err.message : String(err)));
+              } finally {
+                setChallengeOpponent(null);
+              }
             }
-          })
-          .catch((err) => setDebugMsg(msg + ' | ERROR: ' + (err instanceof Error ? err.message : String(err))));
+          } catch (err) {
+            setDebugMsg(msg + ' | ERROR: ' + (err instanceof Error ? err.message : String(err)));
+          }
+        })();
       } else {
-        msg += ' | SKIPPED (no session or pieceCount)';
-        setDebugMsg(msg);
+        setDebugMsg(msg + ' | SKIPPED (no session or pieceCount)');
       }
     }
     if (!isWon) {
@@ -338,7 +403,7 @@ export default function App() {
       {view === 'dashboard' ? (
         <Dashboard
           onBack={() => setView('game')}
-          onViewProfile={(id) => { setPreviousView('dashboard'); setProfileUserId(id); setView('profile'); }}
+          onViewProfile={(id) => navigate('profile', { profileId: id, prev: 'dashboard' })}
           onAcceptChallenge={(challenge) => {
             setActiveChallengeId(challenge.id);
             setSelectedImage(challenge.image_url);
@@ -357,7 +422,7 @@ export default function App() {
       ) : view === 'community' ? (
         <CommunityPuzzles onBack={() => setView('game')} onPlayPuzzle={handlePlayCommunityPuzzle} />
       ) : view === 'leaderboard' ? (
-        <Leaderboard onBack={() => setView('game')} onViewProfile={(id) => { setPreviousView('leaderboard'); setProfileUserId(id); setView('profile'); }} />
+        <Leaderboard onBack={() => setView('game')} onViewProfile={(id) => navigate('profile', { profileId: id, prev: 'leaderboard' })} />
       ) : view === 'friends' ? (
         <div style={{ width: '100%', maxWidth: 720, margin: '0 auto', padding: '32px 24px 80px' }}>
           <button type="button" className="community-back" onClick={() => setView('game')} style={{ marginBottom: 16, display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', fontSize: 14, fontWeight: 600, color: 'var(--text-body)', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, cursor: 'pointer' }}>
@@ -365,7 +430,7 @@ export default function App() {
             Back
           </button>
           <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-heading)', margin: '0 0 20px' }}>Friends</h1>
-          <FriendsList onViewProfile={(id) => { setPreviousView('friends'); setProfileUserId(id); setView('profile'); }} />
+          <FriendsList onViewProfile={(id) => navigate('profile', { profileId: id, prev: 'friends' })} />
         </div>
       ) : view === 'profile' && profileUserId ? (
         <UserProfile
@@ -581,8 +646,8 @@ export default function App() {
         )}
       </main>
 
-      {/* Win overlay */}
-      {isWon && (
+      {/* Win overlay — hide if challenge result is showing */}
+      {isWon && !challengeResult && (
         <WinOverlay
           pieceCount={pieces.length}
           completionTime={finalTime}
