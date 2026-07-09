@@ -77,7 +77,9 @@ export default function FriendsList({ onViewProfile }: FriendsListProps) {
     setSearching(true);
     try {
       const results = await apiFetch<SearchResult[]>(`/api/users/search?q=${encodeURIComponent(searchQuery.trim())}`, { token: session.access_token });
-      setSearchResults(results);
+      // Filter out users who are already friends or have pending requests
+      const friendIds = new Set(friends.map((f) => f.user.id));
+      setSearchResults(results.filter((r) => !friendIds.has(r.id)));
     } catch { setSearchResults([]); }
     finally { setSearching(false); }
   };
