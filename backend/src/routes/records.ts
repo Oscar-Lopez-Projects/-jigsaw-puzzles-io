@@ -6,12 +6,14 @@ const router = Router();
 
 // Get all records for the authenticated user
 router.get('/', requireAuth, async (req: AuthRequest, res) => {
+  console.log('[Records GET] userId from token:', req.userId);
   const { data, error } = await supabase
     .from('puzzle_records')
     .select('*')
     .eq('user_id', req.userId!)
     .order('completed_at', { ascending: false });
 
+  console.log('[Records GET] returned', data?.length, 'records');
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
 });
