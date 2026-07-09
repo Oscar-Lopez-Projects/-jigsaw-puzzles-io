@@ -7,6 +7,7 @@ interface EloEntry {
   rating: number;
   wins: number;
   losses: number;
+  last_match_at: string | null;
   users: { username: string; avatar_url: string | null } | null;
 }
 
@@ -31,12 +32,48 @@ export default function Leaderboard({ onBack: _onBack, onViewProfile }: Leaderbo
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('global');
 
+  const fetchLeaderboard = async (tab: string) => {
+    setLoading(true);
+    setError(null);
+    try {
+      if (tab === 'friends') {
+        // Get friends first, then filter leaderboard
+        const token = localStorage.getItem('jigsaw_session');
+        const session = token ? JSON.parse(token) : null;
+        if (session?.access_token) {
+          const friendsData = await apiFetch<{ sent: { addressee: { id: string } | null; status: string }[]; received: { requester: { id: string } | null; status: string }[] }>('/api/friends', { token: session.access_token });
+          const friendIds: string[] = [];
+          friendsData.sent.filter(f => f.status === 'accepted' && f.addressee).forEach(f => friendIds.push(f.addressee!.id));
+          friendsData.received.filter(f => f.status === 'accepted' && f.requester).forEach(f => friendIds.push(f.requester!.id));
+          if (friendIds.length > 0) {
+            const data = await apiFetch<EloEntry[]>(`/api/leaderboard?friends=${friendIds.join(',')}`);
+            setEntries(data);
+          } else {
+            setEntries([]);
+          }
+        } else {
+          setEntries([]);
+        }
+      } else if (tab === 'weekly') {
+        // Weekly: show global but only players active in last 7 days
+        const data = await apiFetch<EloEntry[]>('/api/leaderboard?limit=50');
+        const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+        setEntries(data.filter((e: EloEntry) => e.last_match_at && new Date(e.last_match_at).getTime() > weekAgo));
+      } else {
+        // Global
+        const data = await apiFetch<EloEntry[]>('/api/leaderboard?limit=50');
+        setEntries(data);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    apiFetch<EloEntry[]>('/api/leaderboard?limit=50')
-      .then((data) => setEntries(data))
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
-  }, []);
+    fetchLeaderboard(activeTab);
+  }, [activeTab]);
 
   const top3 = entries.slice(0, 3);
   const rest = entries.slice(3);

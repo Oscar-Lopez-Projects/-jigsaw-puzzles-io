@@ -10,18 +10,30 @@ const ELO_GAINS: Record<number, number> = { 3: 25, 2: 15, 1: 5 };
 // Get global leaderboard (top players by ELO) — public
 router.get('/', async (req, res) => {
   const limit = parseInt(req.query.limit as string) || 50;
+  const friends = req.query.friends as string; // comma-separated user IDs
 
-  const { data, error } = await supabase
+  let query = supabase
     .from('elo_ratings')
     .select(`
       user_id,
       rating,
       wins,
       losses,
+      last_match_at,
       users ( username, avatar_url )
     `)
     .order('rating', { ascending: false })
     .limit(limit);
+
+  // Filter by friends list if provided
+  if (friends) {
+    const friendIds = friends.split(',').filter(Boolean);
+    if (friendIds.length > 0) {
+      query = query.in('user_id', friendIds);
+    }
+  }
+
+  const { data, error } = await query;
 
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
