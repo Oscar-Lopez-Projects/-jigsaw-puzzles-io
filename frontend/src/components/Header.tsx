@@ -25,8 +25,8 @@ interface Notification {
   data?: unknown;
 }
 
-export default function Header({ activeView, onDashboard, onCommunity: _onCommunity, onLeaderboard, onFriends, onHome, onLoginSuccess, onAcceptChallenge }: HeaderProps) {
-  const { user, session, logout: _logout, isLoading } = useAuth();
+export default function Header({ activeView, onDashboard, onCommunity, onLeaderboard, onFriends, onHome, onLoginSuccess, onAcceptChallenge }: HeaderProps) {
+  const { user, session, logout, isLoading } = useAuth();
   const [showAuth, setShowAuth] = useState(false);
   const [showNotifs, setShowNotifs] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -156,6 +156,12 @@ export default function Header({ activeView, onDashboard, onCommunity: _onCommun
               <span>Live Matches</span>
               <span className="nav-live-badge">LIVE</span>
             </button>
+            {onCommunity && (
+              <button type="button" className={`header-nav-link${activeView === 'community' ? ' header-nav-link--active' : ''}`} onClick={onCommunity}>
+                <svg viewBox="0 0 16 16" fill="none"><path d="M2 3h12v9H2V3Z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/><path d="M5 7h6M5 9.5h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
+                <span>Community</span>
+              </button>
+            )}
             {onLeaderboard && (
               <button type="button" className={`header-nav-link${activeView === 'leaderboard' ? ' header-nav-link--active' : ''}`} onClick={onLeaderboard}>
                 <svg viewBox="0 0 16 16" fill="none"><path d="M2 14h3V8H2v6ZM6.5 14h3V4h-3v10ZM11 14h3V6h-3v8Z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/></svg>
@@ -231,6 +237,9 @@ export default function Header({ activeView, onDashboard, onCommunity: _onCommun
                   <span className="header-user-name">{user.username}</span>
                   <span className="header-user-elo">⚡ 1,265</span>
                 </div>
+                <button type="button" className="header-logout-btn" onClick={logout} title="Sign Out">
+                  <svg viewBox="0 0 16 16" fill="none"><path d="M6 2H3.5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1H6M10.5 11.5L14 8l-3.5-3.5M14 8H6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                </button>
               </div>
             ) : (
               <button type="button" className="header-login-btn" onClick={() => setShowAuth(true)}>Sign In</button>

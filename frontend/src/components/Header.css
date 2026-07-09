@@ -327,3 +327,30 @@
   .header-nav { display: none; }
   .header-user-info { display: none; }
 }
+
+/* ── Logout button ───────────────────────────────────────────── */
+.header-logout-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.header-logout-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.header-logout-btn:hover {
+  background: var(--error-subtle);
+  border-color: var(--error-border);
+  color: var(--error);
+}
