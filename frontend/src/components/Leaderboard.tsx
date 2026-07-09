@@ -75,8 +75,8 @@ export default function Leaderboard({ onBack: _onBack, onViewProfile }: Leaderbo
     fetchLeaderboard(activeTab);
   }, [activeTab]);
 
-  const top3 = entries.slice(0, 3);
-  const rest = entries.slice(3);
+  const top3 = entries.length >= 3 ? entries.slice(0, 3) : [];
+  const tableEntries = entries.length >= 3 ? entries.slice(3) : entries;
 
   // Debug display
   const debugInfo = `Tab: ${activeTab} | Entries: ${entries.length} | Loading: ${loading} | Error: ${error || 'none'}`;
@@ -211,11 +211,12 @@ export default function Leaderboard({ onBack: _onBack, onViewProfile }: Leaderbo
               </tr>
             </thead>
             <tbody>
-              {rest.map((entry, i) => {
+              {tableEntries.map((entry, i) => {
                 const tier = getTier(entry.rating);
+                const rank = entries.length >= 3 ? i + 4 : i + 1;
                 return (
                   <tr key={entry.user_id}>
-                    <td className="lb-cell-rank">{i + 4}</td>
+                    <td className="lb-cell-rank">{rank}</td>
                     <td className="lb-cell-player">
                       <div className="lb-player-row">
                         <div className="lb-player-avatar">{entry.users?.username?.charAt(0).toUpperCase() || '?'}</div>
