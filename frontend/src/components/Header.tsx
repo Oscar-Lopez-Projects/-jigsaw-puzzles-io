@@ -7,10 +7,12 @@ import MuteToggle from './MuteToggle';
 import './Header.css';
 
 interface HeaderProps {
+  activeView?: string;
   onDashboard?: () => void;
   onCommunity?: () => void;
   onLeaderboard?: () => void;
   onFriends?: () => void;
+  onHome?: () => void;
   onLoginSuccess?: () => void;
   onAcceptChallenge?: (challenge: { id: string; image_url: string; puzzle_title: string; piece_count: number; difficulty: string; challenger_time_sec: number; challenger_stars: number }) => void;
 }
@@ -23,28 +25,26 @@ interface Notification {
   data?: unknown;
 }
 
-export default function Header({ onDashboard, onCommunity, onLeaderboard, onFriends, onLoginSuccess, onAcceptChallenge }: HeaderProps) {
-  const { user, session, logout, isLoading } = useAuth();
+export default function Header({ activeView, onDashboard, onCommunity: _onCommunity, onLeaderboard, onFriends, onHome, onLoginSuccess, onAcceptChallenge }: HeaderProps) {
+  const { user, session, logout: _logout, isLoading } = useAuth();
   const [showAuth, setShowAuth] = useState(false);
   const [showNotifs, setShowNotifs] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [seenIds, setSeenIds] = useState<Set<string>>(new Set());
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Fetch notifications (pending challenges + pending friend requests)
+  // Fetch notifications
   useEffect(() => {
     if (!session?.access_token) { setNotifications([]); return; }
 
     const fetchNotifs = async () => {
       const notifs: Notification[] = [];
-
       try {
         const [challengeData, friendData] = await Promise.all([
           apiFetch<{ sent: { id: string; puzzle_title: string; piece_count: number; difficulty: string; image_url: string; challenger_time_sec: number; challenger_stars: number; opponent_time_sec: number | null; opponent_stars: number | null; winner: string | null; status: string; opponent?: { id: string; username: string } }[]; received: { id: string; puzzle_title: string; piece_count: number; difficulty: string; image_url: string; challenger_time_sec: number; challenger_stars: number; status: string; challenger?: { id: string; username: string } }[] }>('/api/challenges', { token: session.access_token }).catch(() => ({ sent: [], received: [] })),
           apiFetch<{ received: { id: string; status: string; requester: { id: string; username: string } | null }[] }>('/api/friends', { token: session.access_token }).catch(() => ({ received: [] })),
         ]);
 
-        // Pending incoming challenges
         challengeData.received
           .filter((c) => c.status === 'pending')
           .forEach((c) => {
@@ -57,7 +57,6 @@ export default function Header({ onDashboard, onCommunity, onLeaderboard, onFrie
             });
           });
 
-        // Completed sent challenges (results are in for User 1)
         challengeData.sent
           .filter((c) => c.status === 'completed' && c.winner)
           .forEach((c) => {
@@ -65,9 +64,9 @@ export default function Header({ onDashboard, onCommunity, onLeaderboard, onFrie
             const tied = c.winner === 'tie';
             notifs.push({
               id: `result-${c.id}`,
-              type: 'challenge_result' as Notification['type'],
+              type: 'challenge_result',
               title: tied ? `Tie! ${c.puzzle_title}` : won ? `You Won! ${c.puzzle_title}` : `You Lost! ${c.puzzle_title}`,
-              subtitle: `vs ${c.opponent?.username || 'opponent'} · ${c.opponent_time_sec ? Math.floor(c.opponent_time_sec / 60) + ':' + String(c.opponent_time_sec % 60).padStart(2, '0') : '?'}`,
+              subtitle: `vs ${c.opponent?.username || 'opponent'}`,
               data: c,
             });
           });
@@ -84,7 +83,6 @@ export default function Header({ onDashboard, onCommunity, onLeaderboard, onFrie
             });
           });
       } catch { /* ignore */ }
-
       setNotifications(notifs);
     };
 
@@ -93,7 +91,7 @@ export default function Header({ onDashboard, onCommunity, onLeaderboard, onFrie
     return () => clearInterval(interval);
   }, [session]);
 
-  // Close dropdown when clicking outside
+  // Close dropdown on outside click
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
@@ -117,8 +115,8 @@ export default function Header({ onDashboard, onCommunity, onLeaderboard, onFrie
     } else if (notif.type === 'challenge_result' && onDashboard) {
       onDashboard();
       setShowNotifs(false);
-    } else if (notif.type === 'friend_request' && onDashboard) {
-      onDashboard();
+    } else if (notif.type === 'friend_request' && onFriends) {
+      onFriends();
       setShowNotifs(false);
     }
   };
@@ -127,7 +125,6 @@ export default function Header({ onDashboard, onCommunity, onLeaderboard, onFrie
 
   const handleBellClick = () => {
     if (!showNotifs) {
-      // Mark all current notifications as seen
       setSeenIds(new Set(notifications.map((n) => n.id)));
     }
     setShowNotifs((v) => !v);
@@ -137,101 +134,108 @@ export default function Header({ onDashboard, onCommunity, onLeaderboard, onFrie
     <>
       <header className="header">
         <div className="header-inner">
-          <div className="header-logo">
+          {/* Logo */}
+          <div className="header-logo" onClick={onHome} style={{ cursor: onHome ? 'pointer' : 'default' }}>
             <svg className="puzzle-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path
-                d="M7 3h4v2a1 1 0 0 0 1 1 1 1 0 0 0 1-1V3h4v4h-2a1 1 0 0 0-1 1 1 1 0 0 0 1 1h2v4h-4v-2a1 1 0 0 0-1-1 1 1 0 0 0-1 1v2H7v-4h2a1 1 0 0 0 1-1 1 1 0 0 0-1-1H7V3Z"
-                fill="currentColor"
-              />
-              <path
-                d="M3 13h4v-2a1 1 0 0 1 1-1 1 1 0 0 1 1 1v2h4v4h-2a1 1 0 0 0-1 1 1 1 0 0 0 1 1h2v3H3v-4h2a1 1 0 0 0 1-1 1 1 0 0 0-1-1H3v-3Z"
-                fill="currentColor"
-                opacity="0.6"
-              />
+              <path d="M7 3h4v2a1 1 0 0 0 1 1 1 1 0 0 0 1-1V3h4v4h-2a1 1 0 0 0-1 1 1 1 0 0 0 1 1h2v4h-4v-2a1 1 0 0 0-1-1 1 1 0 0 0-1 1v2H7v-4h2a1 1 0 0 0 1-1 1 1 0 0 0-1-1H7V3Z" fill="currentColor" />
+              <path d="M3 13h4v-2a1 1 0 0 1 1-1 1 1 0 0 1 1 1v2h4v4h-2a1 1 0 0 0-1 1 1 1 0 0 0 1 1h2v3H3v-4h2a1 1 0 0 0 1-1 1 1 0 0 0-1-1H3v-3Z" fill="currentColor" opacity="0.6" />
             </svg>
             <span className="header-title">Jigsaw Puzzles I.O</span>
           </div>
 
-          <div className="header-auth">
+          {/* Nav links */}
+          <nav className="header-nav">
+            {onHome && (
+              <button type="button" className={`header-nav-link${activeView === 'game' ? ' header-nav-link--active' : ''}`} onClick={onHome}>
+                <svg viewBox="0 0 16 16" fill="none"><path d="M2 8.5l6-6 6 6M3.5 7.5V14h3.5v-3.5h2V14H12.5V7.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                <span>Home</span>
+              </button>
+            )}
+            <button type="button" className="header-nav-link" disabled>
+              <svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="3" fill="currentColor" opacity="0.8"/><circle cx="8" cy="8" r="5.5" stroke="currentColor" strokeWidth="1.2"/></svg>
+              <span>Live Matches</span>
+              <span className="nav-live-badge">LIVE</span>
+            </button>
+            {onLeaderboard && (
+              <button type="button" className={`header-nav-link${activeView === 'leaderboard' ? ' header-nav-link--active' : ''}`} onClick={onLeaderboard}>
+                <svg viewBox="0 0 16 16" fill="none"><path d="M2 14h3V8H2v6ZM6.5 14h3V4h-3v10ZM11 14h3V6h-3v8Z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/></svg>
+                <span>Leaderboards</span>
+              </button>
+            )}
+            {onFriends && (
+              <button type="button" className={`header-nav-link${activeView === 'friends' ? ' header-nav-link--active' : ''}`} onClick={onFriends}>
+                <svg viewBox="0 0 16 16" fill="none"><circle cx="6" cy="5" r="2.5" stroke="currentColor" strokeWidth="1.3"/><path d="M1.5 14c0-2.5 2-4.5 4.5-4.5s4.5 2 4.5 4.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/><circle cx="12" cy="5.5" r="1.8" stroke="currentColor" strokeWidth="1.2"/><path d="M14.5 13c0-1.8-1.2-3.2-2.8-3.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
+                <span>Friends</span>
+              </button>
+            )}
+            {onDashboard && (
+              <button type="button" className={`header-nav-link${activeView === 'dashboard' ? ' header-nav-link--active' : ''}`} onClick={onDashboard}>
+                <svg viewBox="0 0 16 16" fill="none"><rect x="1.5" y="1.5" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3"/><rect x="9.5" y="1.5" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3"/><rect x="1.5" y="9.5" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3"/><rect x="9.5" y="9.5" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3"/></svg>
+                <span>Dashboard</span>
+              </button>
+            )}
+          </nav>
+
+          {/* Search */}
+          <div className="header-search">
+            <svg className="header-search-icon" viewBox="0 0 16 16" fill="none">
+              <circle cx="7" cy="7" r="4.5" stroke="currentColor" strokeWidth="1.4"/>
+              <path d="M10.5 10.5L14 14" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+            </svg>
+            <input type="text" className="header-search-input" placeholder="Search puzzles, players..." disabled />
+          </div>
+
+          {/* Right controls */}
+          <div className="header-controls">
             <ThemeToggle />
             <MuteToggle />
 
-            {onCommunity && (
-              <button type="button" className="header-community-btn" onClick={onCommunity}>
-                Community
-              </button>
-            )}
-
-            {onLeaderboard && (
-              <button type="button" className="header-community-btn" onClick={onLeaderboard}>
-                Leaderboard
-              </button>
-            )}
-
-            {isLoading ? null : user ? (
-              <div className="header-user">
-                {/* Notification bell */}
-                <div className="header-notif-wrap" ref={dropdownRef}>
-                  <button
-                    type="button"
-                    className="header-notif-btn"
-                    onClick={handleBellClick}
-                    aria-label={`Notifications (${notifCount})`}
-                  >
-                    <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                      <path d="M8 1.5a4 4 0 0 0-4 4v3l-1 2h10l-1-2v-3a4 4 0 0 0-4-4Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
-                      <path d="M6.5 12.5a1.5 1.5 0 0 0 3 0" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-                    </svg>
-                    {notifCount > 0 && <span className="header-notif-badge">{notifCount}</span>}
-                  </button>
-
-                  {showNotifs && (
-                    <div className="header-notif-dropdown">
-                      {notifications.length === 0 ? (
-                        <div className="notif-empty">No new notifications</div>
-                      ) : (
-                        notifications.map((n) => (
-                          <button
-                            key={n.id}
-                            type="button"
-                            className="notif-item"
-                            onClick={() => handleNotifClick(n)}
-                          >
-                            <span className={`notif-icon notif-icon--${n.type}`}>
-                              {n.type === 'challenge' ? '⚔️' : n.type === 'challenge_result' ? '🏆' : '👋'}
-                            </span>
-                            <div className="notif-text">
-                              <span className="notif-title">{n.title}</span>
-                              <span className="notif-subtitle">{n.subtitle}</span>
-                            </div>
-                          </button>
-                        ))
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                <span className="header-username">{user.username}</span>
-                {onDashboard && (
-                  <button type="button" className="header-dashboard-btn" onClick={onDashboard}>
-                    Dashboard
-                  </button>
-                )}
-                {onFriends && (
-                  <button type="button" className="header-community-btn" onClick={onFriends}>
-                    Friends
-                  </button>
-                )}
-                <button type="button" className="header-logout-btn" onClick={logout}>
-                  Sign Out
+            {/* Notification bell */}
+            {!isLoading && user && (
+              <div className="header-notif-wrap" ref={dropdownRef}>
+                <button type="button" className="header-notif-btn" onClick={handleBellClick} aria-label={`Notifications (${notifCount})`}>
+                  <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                    <path d="M8 1.5a4 4 0 0 0-4 4v3l-1 2h10l-1-2v-3a4 4 0 0 0-4-4Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+                    <path d="M6.5 12.5a1.5 1.5 0 0 0 3 0" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+                  </svg>
+                  {notifCount > 0 && <span className="header-notif-badge">{notifCount}</span>}
                 </button>
+
+                {showNotifs && (
+                  <div className="header-notif-dropdown">
+                    {notifications.length === 0 ? (
+                      <div className="notif-empty">No new notifications</div>
+                    ) : (
+                      notifications.map((n) => (
+                        <button key={n.id} type="button" className="notif-item" onClick={() => handleNotifClick(n)}>
+                          <span className="notif-icon">{n.type === 'challenge' ? '⚔️' : n.type === 'challenge_result' ? '🏆' : '👋'}</span>
+                          <div className="notif-text">
+                            <span className="notif-title">{n.title}</span>
+                            <span className="notif-subtitle">{n.subtitle}</span>
+                          </div>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
               </div>
-            ) : (
-              <button type="button" className="header-login-btn" onClick={() => setShowAuth(true)}>
-                Sign In
-              </button>
             )}
           </div>
+
+          {/* User section */}
+          {!isLoading && (
+            user ? (
+              <div className="header-user-section">
+                <div className="header-user-avatar">{user.username.charAt(0).toUpperCase()}</div>
+                <div className="header-user-info">
+                  <span className="header-user-name">{user.username}</span>
+                  <span className="header-user-elo">⚡ 1,265</span>
+                </div>
+              </div>
+            ) : (
+              <button type="button" className="header-login-btn" onClick={() => setShowAuth(true)}>Sign In</button>
+            )
+          )}
         </div>
       </header>
 

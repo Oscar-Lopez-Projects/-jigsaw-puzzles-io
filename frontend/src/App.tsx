@@ -403,6 +403,8 @@ export default function App() {
   return (
     <div className="app-layout">
       <Header
+        activeView={view}
+        onHome={() => setView('game')}
         onDashboard={() => setView('dashboard')}
         onCommunity={() => setView('community')}
         onLeaderboard={() => setView('leaderboard')}

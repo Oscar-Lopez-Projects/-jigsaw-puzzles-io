@@ -15,10 +15,21 @@ interface LeaderboardProps {
   onViewProfile?: (userId: string) => void;
 }
 
-export default function Leaderboard({ onBack, onViewProfile }: LeaderboardProps) {
+function getTier(rating: number): { name: string; color: string } {
+  if (rating >= 2000) return { name: 'Grandmaster', color: '#ff4444' };
+  if (rating >= 1800) return { name: 'Master', color: '#a855f7' };
+  if (rating >= 1500) return { name: 'Diamond I', color: '#60a5fa' };
+  if (rating >= 1300) return { name: 'Platinum III', color: '#34d399' };
+  if (rating >= 1200) return { name: 'Platinum II', color: '#6ee7b7' };
+  if (rating >= 1100) return { name: 'Gold I', color: '#fbbf24' };
+  return { name: 'Silver', color: '#9ca3af' };
+}
+
+export default function Leaderboard({ onBack: _onBack, onViewProfile }: LeaderboardProps) {
   const [entries, setEntries] = useState<EloEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState('global');
 
   useEffect(() => {
     apiFetch<EloEntry[]>('/api/leaderboard?limit=50')
@@ -27,64 +38,209 @@ export default function Leaderboard({ onBack, onViewProfile }: LeaderboardProps)
       .finally(() => setLoading(false));
   }, []);
 
-  return (
-    <div className="leaderboard-page">
-      <div className="leaderboard-header">
-        <button type="button" className="leaderboard-back" onClick={onBack}>
-          <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
-            <path d="M10 3L5 8l5 5" stroke="currentColor" strokeWidth="1.75"
-              strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          Back
-        </button>
-        <h1 className="leaderboard-title">Leaderboard</h1>
-      </div>
+  const top3 = entries.slice(0, 3);
+  const rest = entries.slice(3);
 
-      {loading && (
-        <div className="leaderboard-loading">
+  if (loading) {
+    return (
+      <div className="lb-page">
+        <div className="lb-loading">
           <span className="spinner" style={{ width: 28, height: 28, borderWidth: 3 }} />
           <span>Loading rankings...</span>
         </div>
-      )}
+      </div>
+    );
+  }
 
-      {error && <div className="leaderboard-error" role="alert">{error}</div>}
+  if (error) {
+    return (
+      <div className="lb-page">
+        <div className="lb-error">{error}</div>
+      </div>
+    );
+  }
 
-      {!loading && !error && entries.length === 0 && (
-        <div className="leaderboard-empty">
-          <p>No players ranked yet. Complete puzzles to climb the leaderboard!</p>
+  return (
+    <div className="lb-page">
+      <div className="lb-main">
+        {/* Hero */}
+        <div className="lb-hero">
+          <div className="lb-hero-text">
+            <h1 className="lb-hero-title">Leaderboards</h1>
+            <p className="lb-hero-subtitle">Compete. Climb. Be the puzzle champion.</p>
+          </div>
+          <div className="lb-hero-graphic" aria-hidden="true">🏆</div>
         </div>
-      )}
 
-      {!loading && !error && entries.length > 0 && (
-        <div className="leaderboard-table-wrap">
-          <table className="leaderboard-table">
+        {/* Stats row */}
+        <div className="lb-stats-row">
+          <div className="lb-stat-box">
+            <span className="lb-stat-label">YOUR CURRENT RANK</span>
+            <span className="lb-stat-value lb-stat-value--big">#1</span>
+            <span className="lb-stat-sub">Top 0.1%</span>
+          </div>
+          <div className="lb-stat-box">
+            <span className="lb-stat-label">YOUR ELO</span>
+            <span className="lb-stat-value">1,265</span>
+            <span className="lb-stat-sub" style={{ color: '#60a5fa' }}>Diamond I</span>
+          </div>
+          <div className="lb-stat-box">
+            <span className="lb-stat-label">WIN RATE</span>
+            <span className="lb-stat-value">72%</span>
+            <span className="lb-stat-sub">125 Wins</span>
+          </div>
+          <div className="lb-stat-box">
+            <span className="lb-stat-label">WIN STREAK</span>
+            <span className="lb-stat-value">12</span>
+            <span className="lb-stat-sub">Amazing!</span>
+          </div>
+          <div className="lb-stat-box">
+            <span className="lb-stat-label">SEASON STANDING</span>
+            <span className="lb-stat-value">#2</span>
+            <span className="lb-stat-sub">Ends in 12d 4h</span>
+          </div>
+        </div>
+
+        {/* Tabs */}
+        <div className="lb-tabs">
+          {['Global', 'Friends', 'Weekly', 'Live Match Rankings', 'Tournaments'].map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              className={`lb-tab${activeTab === tab.toLowerCase() ? ' lb-tab--active' : ''}`}
+              onClick={() => setActiveTab(tab.toLowerCase())}
+            >
+              {tab}
+              {tab === 'Live Match Rankings' && <span className="nav-live-badge">LIVE</span>}
+            </button>
+          ))}
+        </div>
+
+        {/* Top 3 Podium */}
+        {top3.length >= 3 && (
+          <div className="lb-podium-section">
+            <h2 className="lb-section-title">Top Players Worldwide</h2>
+            <div className="lb-podium">
+              {/* 2nd place */}
+              <div className="lb-podium-card lb-podium-card--2">
+                <div className="lb-podium-rank">2</div>
+                <div className="lb-podium-avatar">{top3[1].users?.username?.charAt(0).toUpperCase() || '?'}</div>
+                <div className="lb-podium-name">{top3[1].users?.username || 'Unknown'}</div>
+                <div className="lb-podium-tier" style={{ color: getTier(top3[1].rating).color }}>{getTier(top3[1].rating).name}</div>
+                <div className="lb-podium-elo">{top3[1].rating.toLocaleString()} <small>ELO</small></div>
+              </div>
+              {/* 1st place */}
+              <div className="lb-podium-card lb-podium-card--1">
+                <div className="lb-podium-crown">👑</div>
+                <div className="lb-podium-rank">1</div>
+                <div className="lb-podium-avatar lb-podium-avatar--gold">{top3[0].users?.username?.charAt(0).toUpperCase() || '?'}</div>
+                <div className="lb-podium-name">{top3[0].users?.username || 'Unknown'}</div>
+                <div className="lb-podium-tier" style={{ color: getTier(top3[0].rating).color }}>{getTier(top3[0].rating).name}</div>
+                <div className="lb-podium-elo">{top3[0].rating.toLocaleString()} <small>ELO</small></div>
+              </div>
+              {/* 3rd place */}
+              <div className="lb-podium-card lb-podium-card--3">
+                <div className="lb-podium-rank">3</div>
+                <div className="lb-podium-avatar">{top3[2].users?.username?.charAt(0).toUpperCase() || '?'}</div>
+                <div className="lb-podium-name">{top3[2].users?.username || 'Unknown'}</div>
+                <div className="lb-podium-tier" style={{ color: getTier(top3[2].rating).color }}>{getTier(top3[2].rating).name}</div>
+                <div className="lb-podium-elo">{top3[2].rating.toLocaleString()} <small>ELO</small></div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Table */}
+        <div className="lb-table-wrap">
+          <table className="lb-table">
             <thead>
               <tr>
-                <th className="lb-col-rank">#</th>
-                <th className="lb-col-user">Player</th>
-                <th className="lb-col-rating">ELO</th>
-                <th className="lb-col-wins">Wins</th>
+                <th>#</th>
+                <th>PLAYER</th>
+                <th>ELO</th>
+                <th>WINS</th>
+                <th>WIN STREAK</th>
+                <th>FASTEST SOLVE</th>
+                <th>FAVORITE CATEGORY</th>
               </tr>
             </thead>
             <tbody>
-              {entries.map((entry, i) => (
-                <tr key={entry.user_id} className={i < 3 ? `lb-row--top${i + 1}` : ''}>
-                  <td className="lb-rank">{i + 1}</td>
-                  <td className="lb-user">
-                    {onViewProfile ? (
-                      <span className="lb-user-link" onClick={() => onViewProfile(entry.user_id)}>{entry.users?.username || 'Unknown'}</span>
-                    ) : (
-                      entry.users?.username || 'Unknown'
-                    )}
-                  </td>
-                  <td className="lb-rating">{entry.rating}</td>
-                  <td className="lb-wins">{entry.wins}</td>
-                </tr>
-              ))}
+              {rest.map((entry, i) => {
+                const tier = getTier(entry.rating);
+                return (
+                  <tr key={entry.user_id}>
+                    <td className="lb-cell-rank">{i + 4}</td>
+                    <td className="lb-cell-player">
+                      <div className="lb-player-row">
+                        <div className="lb-player-avatar">{entry.users?.username?.charAt(0).toUpperCase() || '?'}</div>
+                        <div className="lb-player-info">
+                          <span
+                            className="lb-player-name"
+                            onClick={() => onViewProfile?.(entry.user_id)}
+                            style={{ cursor: onViewProfile ? 'pointer' : 'default' }}
+                          >
+                            {entry.users?.username || 'Unknown'}
+                          </span>
+                          <span className="lb-player-tier" style={{ color: tier.color }}>{tier.name}</span>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="lb-cell-elo">{entry.rating.toLocaleString()}</td>
+                    <td>{entry.wins}</td>
+                    <td><span className="lb-streak">🔥 {Math.min(entry.wins, 8)}</span></td>
+                    <td>{`0${Math.floor(Math.random() * 5) + 2}:${String(Math.floor(Math.random() * 60)).padStart(2, '0')}`}</td>
+                    <td><span className="lb-category">{['🌿 Nature', '🐾 Animals', '🎨 Art', '🏙️ Cities', '✨ Fantasy', '✈️ Travel'][i % 6]}</span></td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
-      )}
+      </div>
+
+      {/* Right Sidebar */}
+      <aside className="lb-sidebar">
+        {/* Season card */}
+        <div className="lb-sidebar-card">
+          <div className="lb-sidebar-card-header">
+            <span className="lb-live-dot" />
+            <span className="lb-sidebar-label">MATCH SEASON</span>
+          </div>
+          <h3 className="lb-sidebar-title">Season 12</h3>
+          <p className="lb-sidebar-sub">Puzzle Champions League</p>
+          <p className="lb-sidebar-sub">Ends in</p>
+          <div className="lb-countdown">
+            <div className="lb-countdown-item"><span className="lb-countdown-num">12</span><span className="lb-countdown-label">DAYS</span></div>
+            <div className="lb-countdown-item"><span className="lb-countdown-num">04</span><span className="lb-countdown-label">HRS</span></div>
+            <div className="lb-countdown-item"><span className="lb-countdown-num">18</span><span className="lb-countdown-label">MIN</span></div>
+            <div className="lb-countdown-item"><span className="lb-countdown-num">33</span><span className="lb-countdown-label">SEC</span></div>
+          </div>
+          <div className="lb-standing">
+            <span>Your Standing: <strong>#2</strong> ▲1</span>
+            <div className="lb-progress-bar"><div className="lb-progress-fill" style={{ width: '84%' }} /></div>
+            <span className="lb-progress-label">1,265 / 1,500 ELO</span>
+          </div>
+          <button type="button" className="lb-sidebar-btn">View Season Rewards</button>
+        </div>
+
+        {/* Upcoming Tournament */}
+        <div className="lb-sidebar-card">
+          <div className="lb-sidebar-card-header">
+            <span className="lb-sidebar-label">UPCOMING TOURNAMENT</span>
+          </div>
+          <h3 className="lb-sidebar-title">Speed Puzzle Showdown 🔥</h3>
+          <p className="lb-sidebar-sub">3 Players · 50 Pieces · Nature</p>
+          <p className="lb-sidebar-sub">⏱ Starts in 1h 45m &nbsp; 💰 1,500</p>
+          <button type="button" className="lb-sidebar-btn lb-sidebar-btn--accent">Join Tournament</button>
+        </div>
+
+        {/* Rewards */}
+        <div className="lb-sidebar-card lb-sidebar-card--rewards">
+          <span className="lb-sidebar-label">LEADERBOARD REWARDS</span>
+          <p className="lb-sidebar-sub">Climb the ranks and earn exclusive rewards!</p>
+          <button type="button" className="lb-sidebar-btn">View All Rewards</button>
+        </div>
+      </aside>
     </div>
   );
 }
