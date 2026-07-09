@@ -9,7 +9,6 @@ import './Header.css';
 interface HeaderProps {
   activeView?: string;
   onDashboard?: () => void;
-  onCommunity?: () => void;
   onLeaderboard?: () => void;
   onFriends?: () => void;
   onHome?: () => void;
@@ -25,7 +24,7 @@ interface Notification {
   data?: unknown;
 }
 
-export default function Header({ activeView, onDashboard, onCommunity, onLeaderboard, onFriends, onHome, onLoginSuccess, onAcceptChallenge }: HeaderProps) {
+export default function Header({ activeView, onDashboard, onLeaderboard, onFriends, onHome, onLoginSuccess, onAcceptChallenge }: HeaderProps) {
   const { user, session, logout, isLoading } = useAuth();
   const [showAuth, setShowAuth] = useState(false);
   const [showNotifs, setShowNotifs] = useState(false);
@@ -156,12 +155,6 @@ export default function Header({ activeView, onDashboard, onCommunity, onLeaderb
               <span>Live Matches</span>
               <span className="nav-live-badge">LIVE</span>
             </button>
-            {onCommunity && (
-              <button type="button" className={`header-nav-link${activeView === 'community' ? ' header-nav-link--active' : ''}`} onClick={onCommunity}>
-                <svg viewBox="0 0 16 16" fill="none"><path d="M2 3h12v9H2V3Z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/><path d="M5 7h6M5 9.5h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
-                <span>Community</span>
-              </button>
-            )}
             {onLeaderboard && (
               <button type="button" className={`header-nav-link${activeView === 'leaderboard' ? ' header-nav-link--active' : ''}`} onClick={onLeaderboard}>
                 <svg viewBox="0 0 16 16" fill="none"><path d="M2 14h3V8H2v6ZM6.5 14h3V4h-3v10ZM11 14h3V6h-3v8Z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/></svg>

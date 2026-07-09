@@ -1,8 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import Header from './components/Header';
 import AuthModal from './components/AuthModal';
-import ImageUploader from './components/ImageUploader';
-import DifficultySelector, { type PieceCount } from './components/DifficultySelector';
+import { type PieceCount } from './components/DifficultySelector';
 import PuzzleBoard from './components/PuzzleBoard';
 import PuzzleBoardErrorBoundary from './components/PuzzleBoardErrorBoundary';
 import WinOverlay from './components/WinOverlay';
@@ -87,7 +86,7 @@ export default function App() {
   const [pieces, setPieces] = useState<PuzzlePiece[]>([]);
   const [gridCols, setGridCols] = useState(0);
   const [gridRows, setGridRows] = useState(0);
-  const [generateError, setGenerateError] = useState<string | null>(null);
+  const [, setGenerateError] = useState<string | null>(null);
   const [isWon, setIsWon] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [hintPieceId, setHintPieceId] = useState<string | null>(null);
@@ -174,41 +173,9 @@ export default function App() {
     dragState.current = null;
   }, []);
 
-  const canStart = selectedImage !== null && pieceCount !== null;
   const snappedCount = pieces.filter((p) => p.snapped).length;
 
   // ── Handlers ─────────────────────────────────────────────────
-  const handleImageSelected = (dataUrl: string, fileName: string) => {
-    setSelectedImage(dataUrl);
-    setImageFileName(fileName);
-  };
-
-  const handleImageCleared = () => {
-    setSelectedImage(null);
-    setImageFileName(null);
-  };
-
-  const handleStartPuzzle = async () => {
-    if (!selectedImage || !pieceCount) return;
-    setGenerateError(null);
-    setPhase('generating');
-    setIsWon(false);
-    setActivePuzzleId(null); // local image, no community puzzle ID
-
-    try {
-      const { cols, rows } = getGrid(pieceCount);
-      const generated = await generatePieces(selectedImage, cols, rows);
-      setGridCols(cols);
-      setGridRows(rows);
-      setPieces(generated);
-      setPhase('puzzle');
-      startTimer();
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Unknown error';
-      setGenerateError(`Failed to generate puzzle: ${msg}`);
-      setPhase('setup');
-    }
-  };
 
   const handlePiecesChange = useCallback((updated: PuzzlePiece[]) => {
     setPieces(updated);
@@ -406,7 +373,6 @@ export default function App() {
         activeView={view}
         onHome={() => setView('game')}
         onDashboard={() => setView('dashboard')}
-        onCommunity={() => setView('community')}
         onLeaderboard={() => setView('leaderboard')}
         onFriends={() => setView('friends')}
         onLoginSuccess={() => setView('dashboard')}
@@ -445,8 +411,6 @@ export default function App() {
               .catch((err) => { setGenerateError(`Failed: ${err instanceof Error ? err.message : 'Unknown'}`); setPhase('setup'); });
           }}
         />
-      ) : view === 'community' ? (
-        <CommunityPuzzles onBack={() => setView('game')} onPlayPuzzle={handlePlayCommunityPuzzle} />
       ) : view === 'leaderboard' ? (
         <Leaderboard onBack={() => setView('game')} onViewProfile={(id) => navigate('profile', { profileId: id, prev: 'leaderboard' })} />
       ) : view === 'friends' ? (
@@ -472,68 +436,9 @@ export default function App() {
       <>
       <main className={`main-content${phase === 'puzzle' ? ' main-content--puzzle' : ''}`}>
 
-        {/* ── Setup screen ── */}
+        {/* ── Home: Community Puzzles (browse + upload) ── */}
         {(phase === 'setup' || phase === 'generating') && (
-          <div className="setup-card">
-            <div className="setup-card-header">
-              <h1 className="setup-title">Create your puzzle</h1>
-              <p className="setup-subtitle">
-                Pick any image from your device and choose how many pieces you want to solve.
-              </p>
-            </div>
-
-            <div className="setup-body">
-              <ImageUploader
-                selectedImage={selectedImage}
-                fileName={imageFileName}
-                onImageSelected={handleImageSelected}
-                onImageCleared={handleImageCleared}
-              />
-              <DifficultySelector
-                selected={pieceCount}
-                onSelect={setPieceCount}
-              />
-            </div>
-
-            {generateError && (
-              <div className="generate-error" role="alert">{generateError}</div>
-            )}
-
-            <div className="setup-footer">
-              <button
-                type="button"
-                className="start-btn"
-                disabled={!canStart || phase === 'generating'}
-                onClick={handleStartPuzzle}
-                aria-disabled={!canStart || phase === 'generating'}
-              >
-                {phase === 'generating' ? (
-                  <>
-                    <span className="spinner" aria-hidden="true" />
-                    Generating…
-                  </>
-                ) : (
-                  <>
-                    <svg className="start-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-                      <circle cx="10" cy="10" r="9" stroke="currentColor" strokeWidth="1.5" />
-                      <path d="M8 7l5 3-5 3V7Z" fill="currentColor" />
-                    </svg>
-                    Start Puzzle
-                  </>
-                )}
-              </button>
-
-              {!canStart && phase !== 'generating' && (
-                <p className="start-hint" aria-live="polite">
-                  {!selectedImage && !pieceCount
-                    ? 'Select an image and a piece count to begin'
-                    : !selectedImage
-                    ? 'Select an image to continue'
-                    : 'Choose a piece count to continue'}
-                </p>
-              )}
-            </div>
-          </div>
+          <CommunityPuzzles onBack={null} onPlayPuzzle={handlePlayCommunityPuzzle} />
         )}
 
         {/* ── Puzzle screen ── */}

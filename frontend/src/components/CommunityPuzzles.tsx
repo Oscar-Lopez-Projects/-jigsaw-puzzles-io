@@ -24,7 +24,7 @@ interface LeaderboardEntry {
 }
 
 interface CommunityPuzzlesProps {
-  onBack: () => void;
+  onBack: (() => void) | null;
   onPlayPuzzle: (imageUrl: string, title: string, pieceCount: number, puzzleId: string) => void;
 }
 
@@ -161,13 +161,15 @@ export default function CommunityPuzzles({ onBack, onPlayPuzzle }: CommunityPuzz
   return (
     <div className="community">
       <div className="community-header">
-        <button type="button" className="community-back" onClick={onBack}>
-          <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
-            <path d="M10 3L5 8l5 5" stroke="currentColor" strokeWidth="1.75"
-              strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          Back
-        </button>
+        {onBack && (
+          <button type="button" className="community-back" onClick={onBack}>
+            <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M10 3L5 8l5 5" stroke="currentColor" strokeWidth="1.75"
+                strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            Back
+          </button>
+        )}
         <h1 className="community-title">Community Puzzles</h1>
         {session?.access_token && (
           <button type="button" className="community-upload-btn" onClick={() => setShowUpload(true)}>
