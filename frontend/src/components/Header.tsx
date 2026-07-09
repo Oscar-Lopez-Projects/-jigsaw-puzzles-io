@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../lib/api';
 import AuthModal from './AuthModal';
 import ThemeToggle from './ThemeToggle';
+import MuteToggle from './MuteToggle';
 import './Header.css';
 
 interface HeaderProps {
@@ -153,6 +154,7 @@ export default function Header({ onDashboard, onCommunity, onLeaderboard, onFrie
 
           <div className="header-auth">
             <ThemeToggle />
+            <MuteToggle />
 
             {onCommunity && (
               <button type="button" className="header-community-btn" onClick={onCommunity}>

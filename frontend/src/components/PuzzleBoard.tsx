@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { Stage, Layer, Image as KonvaImage, Rect, Line, Text, Group } from 'react-konva';
 import type Konva from 'konva';
 import type { PuzzlePiece } from '../types/puzzle';
+import { playSnapSound, playWrongSound } from '../lib/sounds';
 import './PuzzleBoard.css';
 
 // ─── layout constants ─────────────────────────────────────────
@@ -239,6 +240,7 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPi
       const dist = Math.hypot(pCX - sCX, pCY - sCY);
 
       if (dist <= pw * SNAP_THRESHOLD) {
+        playSnapSound();
         onPiecesChange(pieces.map((p) =>
           p.id === id
             ? { ...p, currentX: boardOriginX + piece.correctX, currentY: boardOriginY + piece.correctY, snapped: true, zone: 'free' as const }
@@ -253,6 +255,7 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPi
         wy >= boardOriginY && wy < boardOriginY + boardH;
 
       if (droppedOnBoard) {
+        playWrongSound();
         // Flash the board red
         setBoardFlash(true);
         setTimeout(() => setBoardFlash(false), WRONG_FLASH_MS);

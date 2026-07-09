@@ -10,11 +10,10 @@ interface WinOverlayProps {
   onDashboard: () => void;
   onPlayAgain: () => void;
   onCreateAccount: () => void;
-  debugMsg?: string;
 }
 
 export default function WinOverlay({
-  pieceCount, completionTime, puzzleName, formatTime, isLoggedIn, onDashboard, onPlayAgain, onCreateAccount, debugMsg,
+  pieceCount, completionTime, puzzleName, formatTime, isLoggedIn, onDashboard, onPlayAgain, onCreateAccount,
 }: WinOverlayProps) {
   const [copied, setCopied] = useState(false);
 
@@ -68,17 +67,9 @@ export default function WinOverlay({
           <p className="win-guest-notice">Playing without an account does not save your progress.</p>
         )}
 
-        {debugMsg && (
-          <div style={{ marginTop: 12, padding: '8px 12px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, fontSize: 11, fontFamily: 'monospace', color: '#aaa', wordBreak: 'break-all', maxHeight: 100, overflow: 'auto' }}>
-            {debugMsg}
-          </div>
-        )}
-
         <div className="win-actions">
           {isLoggedIn ? (
-            <>
-              <button type="button" className="win-btn win-btn--primary" onClick={onDashboard}>View Dashboard</button>
-            </>
+            <button type="button" className="win-btn win-btn--primary" onClick={onDashboard}>View Dashboard</button>
           ) : (
             <>
               <button type="button" className="win-btn win-btn--primary" onClick={onCreateAccount}>Create Account</button>

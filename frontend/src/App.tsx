@@ -15,6 +15,7 @@ import FriendsList from './components/FriendsList';
 import { getGrid, generatePieces, reshufflePieces } from './utils/puzzleUtils';
 import { useAuth } from './context/AuthContext';
 import { apiFetch } from './lib/api';
+import { playWinSound, playClickSound } from './lib/sounds';
 import type { PuzzlePiece } from './types/puzzle';
 import './App.css';
 
@@ -33,6 +34,7 @@ export default function App() {
 
   // ── URL hash routing ──────────────────────────────────────────
   const navigate = useCallback((v: View, opts?: { profileId?: string; prev?: View }) => {
+    playClickSound();
     setViewState(v);
     if (opts?.profileId) setProfileUserId(opts.profileId);
     if (opts?.prev) setPreviousView(opts.prev);
@@ -110,6 +112,29 @@ export default function App() {
   const stopTimer = () => {
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
   };
+
+  const pauseTimer = () => {
+    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+  };
+
+  const resumeTimer = () => {
+    if (timerRef.current) return; // already running
+    timerRef.current = setInterval(() => {
+      elapsedRef.current += 1;
+      setElapsedSec(elapsedRef.current);
+    }, 1000);
+  };
+
+  // Pause timer when tab is hidden, resume when visible
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (phase !== 'puzzle' || isWon) return;
+      if (document.hidden) pauseTimer();
+      else resumeTimer();
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, [phase, isWon]);
 
   const formatTime = (sec: number) => {
     const h = Math.floor(sec / 3600);
@@ -192,12 +217,12 @@ export default function App() {
       stopTimer();
       setFinalTime(elapsedRef.current);
       setIsWon(true);
+      playWinSound();
     }
   }, []);
 
   // Save record after win — runs as effect so it always has fresh state
   const hasWonRef = useRef(false);
-  const [debugMsg, setDebugMsg] = useState<string>('');
   useEffect(() => {
     if (isWon && !hasWonRef.current) {
       hasWonRef.current = true;
@@ -220,7 +245,7 @@ export default function App() {
                 puzzle_id: activePuzzleId || null,
               },
             });
-            setDebugMsg(msg + ' | SAVED: ' + JSON.stringify(res));
+            console.log('[Record]', msg, res);
 
             // If playing a challenge (Player B), submit result
             if (activeChallengeId) {
@@ -230,7 +255,7 @@ export default function App() {
                   token: session.access_token,
                   body: { opponent_time_sec: elapsedRef.current },
                 });
-                setDebugMsg((prev) => prev + ' | CHALLENGE COMPLETED: ' + cd.winner);
+                console.log('[Challenge] Completed:', cd.winner);
                 setChallengeResult({
                   challengerName: cd.challenger?.username || 'Challenger',
                   opponentName: cd.opponent?.username || 'You',
@@ -242,7 +267,7 @@ export default function App() {
                   isChallenger: false,
                 });
               } catch (err) {
-                setDebugMsg((prev) => prev + ' | CHALLENGE SUBMIT ERROR: ' + (err instanceof Error ? err.message : String(err)));
+                console.error('[Challenge] Submit error:', err);
               }
             }
             // If initiating a challenge (Player A), upload image + send challenge
@@ -285,24 +310,23 @@ export default function App() {
                     challenger_stars: cStars,
                   },
                 });
-                setDebugMsg((prev) => prev + ' | CHALLENGE SENT to ' + challengeOpponent.username);
+                console.log('[Challenge] Sent to:', challengeOpponent.username);
               } catch (err) {
-                setDebugMsg((prev) => prev + ' | CHALLENGE ERROR: ' + (err instanceof Error ? err.message : String(err)));
+                console.error('[Challenge] Send error:', err);
               } finally {
                 setChallengeOpponent(null);
               }
             }
           } catch (err) {
-            setDebugMsg(msg + ' | ERROR: ' + (err instanceof Error ? err.message : String(err)));
+            console.error('[Record] Error:', err);
           }
         })();
       } else {
-        setDebugMsg(msg + ' | SKIPPED (no session or pieceCount)');
+        console.log('[Record] Skipped — no session or pieceCount');
       }
     }
     if (!isWon) {
       hasWonRef.current = false;
-      setDebugMsg('');
     }
   }, [isWon, session, pieceCount, imageFileName, activePuzzleId, activeChallengeId, challengeOpponent, selectedImage]);
 
@@ -657,7 +681,6 @@ export default function App() {
           onDashboard={() => { setIsWon(false); setActiveChallengeId(null); setView('dashboard'); }}
           onPlayAgain={() => { setIsWon(false); setActiveChallengeId(null); handleBackToSetup(); }}
           onCreateAccount={() => { setIsWon(false); setShowAuthFromWin(true); }}
-          debugMsg={debugMsg}
         />
       )}
 

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { playClickSound } from '../lib/sounds';
 import './ThemeToggle.css';
 
 type Theme = 'light' | 'medium' | 'dark';
@@ -16,12 +17,17 @@ export default function ThemeToggle() {
     localStorage.setItem(STORAGE_KEY, theme);
   }, [theme]);
 
+  const handleThemeChange = (t: Theme) => {
+    playClickSound();
+    setTheme(t);
+  };
+
   return (
     <div className="theme-toggle" aria-label="Theme selector">
       <button
         type="button"
         className={`theme-toggle-btn${theme === 'light' ? ' theme-toggle-btn--active' : ''}`}
-        onClick={() => setTheme('light')}
+        onClick={() => handleThemeChange('light')}
         title="Light"
         aria-label="Light theme"
       >
@@ -33,7 +39,7 @@ export default function ThemeToggle() {
       <button
         type="button"
         className={`theme-toggle-btn${theme === 'medium' ? ' theme-toggle-btn--active' : ''}`}
-        onClick={() => setTheme('medium')}
+        onClick={() => handleThemeChange('medium')}
         title="Medium"
         aria-label="Medium theme"
       >
@@ -45,7 +51,7 @@ export default function ThemeToggle() {
       <button
         type="button"
         className={`theme-toggle-btn${theme === 'dark' ? ' theme-toggle-btn--active' : ''}`}
-        onClick={() => setTheme('dark')}
+        onClick={() => handleThemeChange('dark')}
         title="Dark"
         aria-label="Dark theme"
       >

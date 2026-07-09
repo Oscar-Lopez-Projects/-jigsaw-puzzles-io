@@ -232,3 +232,29 @@
   font-size: 11px;
   color: var(--text-muted);
 }
+
+/* ── Mute toggle ─────────────────────────────────────────────── */
+.mute-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-body);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.mute-toggle svg {
+  width: 18px;
+  height: 18px;
+}
+
+.mute-toggle:hover {
+  background: var(--surface-subtle);
+  border-color: var(--border-strong);
+}
