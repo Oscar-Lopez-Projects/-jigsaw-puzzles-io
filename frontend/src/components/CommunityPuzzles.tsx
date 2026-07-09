@@ -35,6 +35,73 @@ const CATEGORIES = [
   { value: 'other', label: 'Other', icon: '🎲' },
 ];
 
+interface LeaderboardEntry {
+  user_id: string;
+  completion_time_sec: number;
+  stars: number;
+  users: { username: string; avatar_url: string | null } | null;
+}
+
+function HomePuzzleCard({ puzzle, onPlay }: { puzzle: Puzzle; onPlay: () => void }) {
+  const [showScore, setShowScore] = useState(false);
+  const [topScore, setTopScore] = useState<LeaderboardEntry | null>(null);
+  const [loadingScore, setLoadingScore] = useState(false);
+  const [fetched, setFetched] = useState(false);
+
+  const toggleScore = () => {
+    if (!fetched) {
+      setLoadingScore(true);
+      apiFetch<LeaderboardEntry[]>(`/api/leaderboard/puzzle/${puzzle.id}?limit=1`)
+        .then((data) => setTopScore(data.length > 0 ? data[0] : null))
+        .catch(() => setTopScore(null))
+        .finally(() => { setLoadingScore(false); setFetched(true); });
+    }
+    setShowScore((v) => !v);
+  };
+
+  const formatTime = (sec: number) => `${String(Math.floor(sec / 60)).padStart(2, '0')}:${String(sec % 60).padStart(2, '0')}`;
+
+  return (
+    <div className="home-puzzle-card">
+      <div className="home-puzzle-img-wrap">
+        <img src={puzzle.image_url} alt={puzzle.title} className="home-puzzle-img" loading="lazy" />
+        <span className="home-puzzle-pieces-badge">⭐ {puzzle.piece_count}</span>
+      </div>
+      <div className="home-puzzle-body">
+        <span className="home-puzzle-title">{puzzle.title}</span>
+        <span className="home-puzzle-author">by {puzzle.users?.username || 'Unknown'} · ⭐⭐⭐⭐ 4.7 xoxo</span>
+        <div className="home-puzzle-meta">
+          <span>🧩 {puzzle.piece_count}</span>
+          <span>▶ {puzzle.plays || 0}</span>
+          <span>⏱ 00:37 xoxo</span>
+        </div>
+      </div>
+      <div className="home-puzzle-actions">
+        <button type="button" className="home-puzzle-play-btn" onClick={onPlay}>Play</button>
+        <button type="button" className={`home-puzzle-score-btn${showScore ? ' home-puzzle-score-btn--open' : ''}`} onClick={toggleScore}>
+          🏆 {showScore ? '▲' : '▼'}
+        </button>
+      </div>
+      {showScore && (
+        <div className="home-puzzle-scoreboard">
+          {loadingScore ? (
+            <span className="home-score-loading">Loading...</span>
+          ) : !topScore ? (
+            <span className="home-score-empty">No scores yet — be the first!</span>
+          ) : (
+            <div className="home-score-entry">
+              <span className="home-score-rank">#1</span>
+              <span className="home-score-user">{topScore.users?.username || 'Unknown'}</span>
+              <span className="home-score-stars">{'★'.repeat(topScore.stars)}{'☆'.repeat(3 - topScore.stars)}</span>
+              <span className="home-score-time">{formatTime(topScore.completion_time_sec)}</span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function CommunityPuzzles({ onBack, onPlayPuzzle }: CommunityPuzzlesProps) {
   const { session, user } = useAuth();
   const [puzzles, setPuzzles] = useState<Puzzle[]>([]);
@@ -184,22 +251,7 @@ export default function CommunityPuzzles({ onBack, onPlayPuzzle }: CommunityPuzz
         {!loading && !error && puzzles.length > 0 && (
           <div className="home-puzzle-grid">
             {puzzles.map((puzzle) => (
-              <div className="home-puzzle-card" key={puzzle.id}>
-                <div className="home-puzzle-img-wrap">
-                  <img src={puzzle.image_url} alt={puzzle.title} className="home-puzzle-img" loading="lazy" />
-                  <span className="home-puzzle-pieces-badge">⭐ {puzzle.piece_count}</span>
-                </div>
-                <div className="home-puzzle-body">
-                  <span className="home-puzzle-title">{puzzle.title}</span>
-                  <span className="home-puzzle-author">by {puzzle.users?.username || 'Unknown'} · ⭐⭐⭐⭐ 4.7 xoxo</span>
-                  <div className="home-puzzle-meta">
-                    <span>🧩 {puzzle.piece_count}</span>
-                    <span>▶ {puzzle.plays || 0}</span>
-                    <span>⏱ 00:37 xoxo</span>
-                  </div>
-                </div>
-                <button type="button" className="home-puzzle-play-btn" onClick={() => handlePlay(puzzle)}>Play</button>
-              </div>
+              <HomePuzzleCard key={puzzle.id} puzzle={puzzle} onPlay={() => handlePlay(puzzle)} />
             ))}
           </div>
         )}
