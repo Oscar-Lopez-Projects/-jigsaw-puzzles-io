@@ -78,6 +78,9 @@ export default function Leaderboard({ onBack: _onBack, onViewProfile }: Leaderbo
   const top3 = entries.slice(0, 3);
   const rest = entries.slice(3);
 
+  // Debug display
+  const debugInfo = `Tab: ${activeTab} | Entries: ${entries.length} | Loading: ${loading} | Error: ${error || 'none'}`;
+
   if (loading) {
     return (
       <div className="lb-page">
@@ -151,6 +154,12 @@ export default function Leaderboard({ onBack: _onBack, onViewProfile }: Leaderbo
               {tab === 'Live Match Rankings' && <span className="nav-live-badge">LIVE</span>}
             </button>
           ))}
+        </div>
+
+        {/* Debug */}
+        <div style={{ padding: '10px 14px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, fontSize: 12, fontFamily: 'monospace', color: '#aaa', marginBottom: 16 }}>
+          {debugInfo}
+          {entries.length > 0 && <span> | First: {JSON.stringify(entries[0]).slice(0, 100)}...</span>}
         </div>
 
         {/* Top 3 Podium */}
