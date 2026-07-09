@@ -57,6 +57,11 @@ export default function Dashboard({ onBack, onViewProfile, onAcceptChallenge }: 
 
   useEffect(() => {
     if (!session?.access_token || !user?.id) return;
+    // Reset state when user changes
+    setRecords([]);
+    setProfile(null);
+    setLoading(true);
+    setError(null);
     Promise.all([
       apiFetch<PuzzleRecord[]>('/api/records', { token: session.access_token }),
       apiFetch<ProfileData>(`/api/users/${user.id}`),
@@ -64,7 +69,7 @@ export default function Dashboard({ onBack, onViewProfile, onAcceptChallenge }: 
       .then(([recs, prof]) => { setRecords(recs); setProfile(prof); })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
-  }, [session, user]);
+  }, [session?.access_token, user?.id]);
 
   if (loading) {
     return <div className="dash-page"><div className="dash-loading"><span className="spinner" style={{ width: 28, height: 28, borderWidth: 3 }} /> Loading dashboard...</div></div>;
