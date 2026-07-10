@@ -19,6 +19,7 @@ interface Puzzle {
 interface CommunityPuzzlesProps {
   onBack: (() => void) | null;
   onPlayPuzzle: (imageUrl: string, title: string, pieceCount: number, puzzleId: string) => void;
+  challengeOpponent?: { id: string; username: string } | null;
 }
 
 const CATEGORIES = [
@@ -102,7 +103,7 @@ function HomePuzzleCard({ puzzle, onPlay }: { puzzle: Puzzle; onPlay: () => void
   );
 }
 
-export default function CommunityPuzzles({ onBack, onPlayPuzzle }: CommunityPuzzlesProps) {
+export default function CommunityPuzzles({ onBack, onPlayPuzzle, challengeOpponent }: CommunityPuzzlesProps) {
   const { session, user } = useAuth();
   const [puzzles, setPuzzles] = useState<Puzzle[]>([]);
   const [loading, setLoading] = useState(true);
@@ -167,6 +168,13 @@ export default function CommunityPuzzles({ onBack, onPlayPuzzle }: CommunityPuzz
           </div>
         </div>
       </div>
+
+      {/* Challenge Mode Banner */}
+      {challengeOpponent && (
+        <div className="home-challenge-banner">
+          <span>⚔️ <strong>Challenge Mode:</strong> Pick a puzzle to play against <strong>{challengeOpponent.username}</strong>! Complete it and the challenge will be sent automatically.</span>
+        </div>
+      )}
 
       {/* Stats Row */}
       <div className="home-stats-row">

@@ -119,3 +119,24 @@
 .home-score-user { flex: 1; font-weight: 600; color: var(--text-body); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .home-score-stars { color: #f59e0b; font-size: 13px; }
 .home-score-time { font-weight: 700; font-variant-numeric: tabular-nums; color: var(--accent); }
+
+/* ── Challenge Mode Banner ───────────────────────────────────── */
+.home-challenge-banner {
+  background: linear-gradient(135deg, rgba(245,158,11,0.1), rgba(245,158,11,0.05));
+  border: 2px solid #f59e0b;
+  border-radius: 12px;
+  padding: 14px 20px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  color: var(--text-body);
+  animation: challengePulse 2s ease infinite;
+}
+
+.home-challenge-banner strong {
+  color: #f59e0b;
+}
+
+@keyframes challengePulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(245,158,11,0.2); }
+  50% { box-shadow: 0 0 0 6px rgba(245,158,11,0); }
+}
