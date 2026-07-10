@@ -7,6 +7,7 @@ import './Dashboard.css';
 
 interface PuzzleRecord {
   id: string;
+  puzzle_id: string | null;
   piece_count: number;
   difficulty: string;
   completion_time_sec: number;
@@ -227,18 +228,29 @@ export default function Dashboard({ onBack, onViewProfile, onStartPuzzle, onAcce
             <span className="dash-ach-count">{profile?.stats.threeStarCount || 0} / 36 Unlocked xoxo</span>
           </div>
 
-          {/* Play Style */}
+          {/* Puzzles Completed */}
           <div className="dash-card">
-            <h3 style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)', margin: '0 0 10px' }}>Play Style xoxo</h3>
-            <div className="dash-playstyle">
-              <div className="dash-playstyle-main"><span className="dash-playstyle-pct">{winRate}%</span><span className="dash-playstyle-label">Speed Solver</span></div>
-              <div className="dash-playstyle-bars">
-                <div className="dash-bar-row"><span>Speed</span><div className="dash-bar"><div className="dash-bar-fill" style={{ width: '78%' }} /></div><span>78%</span></div>
-                <div className="dash-bar-row"><span>Accuracy</span><div className="dash-bar"><div className="dash-bar-fill" style={{ width: '64%' }} /></div><span>64%</span></div>
-                <div className="dash-bar-row"><span>Consistency</span><div className="dash-bar"><div className="dash-bar-fill" style={{ width: '70%' }} /></div><span>70%</span></div>
-                <div className="dash-bar-row"><span>Focus</span><div className="dash-bar"><div className="dash-bar-fill" style={{ width: '82%' }} /></div><span>82%</span></div>
-              </div>
-            </div>
+            <h3 style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)', margin: '0 0 10px' }}>Puzzles Completed</h3>
+            {(() => {
+              const total = records.length;
+              const solo = records.filter((r) => !r.puzzle_id).length;
+              const featured = records.filter((r) => r.puzzle_id).length;
+              const threeStars = records.filter((r) => r.stars === 3).length;
+              const twoStars = records.filter((r) => r.stars === 2).length;
+              const oneStar = records.filter((r) => r.stars === 1).length;
+              return (
+                <div className="dash-completed-stats">
+                  <div className="dash-completed-total"><span className="dash-completed-num">{total}</span><span className="dash-completed-label">Total</span></div>
+                  <div className="dash-completed-breakdown">
+                    <div className="dash-completed-row"><span className="dash-dot dash-dot--win" /> Featured Puzzles <span>{featured}</span></div>
+                    <div className="dash-completed-row"><span className="dash-dot dash-dot--tie" /> Solo Puzzles <span>{solo}</span></div>
+                    <div className="dash-completed-row" style={{ marginTop: 8, borderTop: '1px solid var(--border)', paddingTop: 8 }}><span style={{ color: '#f59e0b' }}>★★★</span> 3-Star Solves <span>{threeStars}</span></div>
+                    <div className="dash-completed-row"><span style={{ color: '#f59e0b' }}>★★☆</span> 2-Star Solves <span>{twoStars}</span></div>
+                    <div className="dash-completed-row"><span style={{ color: '#f59e0b' }}>★☆☆</span> 1-Star Solves <span>{oneStar}</span></div>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </div>
 
