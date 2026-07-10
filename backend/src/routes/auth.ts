@@ -41,7 +41,7 @@ router.post('/register', async (req, res) => {
   // Create initial ELO rating
   await supabase
     .from('elo_ratings')
-    .insert({ user_id: authData.user.id });
+    .insert({ user_id: authData.user.id, rating: 0 });
 
   res.status(201).json({
     message: 'Account created successfully',

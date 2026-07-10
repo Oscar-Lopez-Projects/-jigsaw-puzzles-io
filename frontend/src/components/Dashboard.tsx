@@ -168,7 +168,7 @@ export default function Dashboard({ onBack, onViewProfile, onStartPuzzle, onAcce
           <div className="dash-card">
             <div className="dash-card-header"><h3>ELO Progress</h3></div>
             {(() => {
-              const rating = profile?.elo.rating || 1200;
+              const rating = profile?.elo.rating || 0;
               const tiers = [
                 { name: 'Silver', color: '#9ca3af', min: 0, max: 1099 },
                 { name: 'Gold I', color: '#fbbf24', min: 1100, max: 1199 },

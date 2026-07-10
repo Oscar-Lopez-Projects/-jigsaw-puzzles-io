@@ -120,7 +120,7 @@ router.get('/:userId', async (req, res) => {
 
   res.json({
     ...user,
-    elo: elo || { rating: 1200, wins: 0, losses: 0 },
+    elo: elo || { rating: 0, wins: 0, losses: 0 },
     rank: { position: rank, percentile: rankPercentile, totalPlayers: totalPlayers || 0 },
     stats: {
       totalPuzzles,
