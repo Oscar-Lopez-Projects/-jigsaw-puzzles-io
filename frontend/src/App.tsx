@@ -438,7 +438,7 @@ export default function App() {
 
         {/* ── Home: Community Puzzles (browse + upload) ── */}
         {(phase === 'setup' || phase === 'generating') && (
-          <CommunityPuzzles onBack={null} onPlayPuzzle={handlePlayCommunityPuzzle} challengeOpponent={challengeOpponent} />
+          <CommunityPuzzles onBack={null} onPlayPuzzle={handlePlayCommunityPuzzle} />
         )}
 
         {/* ── Puzzle screen ── */}
