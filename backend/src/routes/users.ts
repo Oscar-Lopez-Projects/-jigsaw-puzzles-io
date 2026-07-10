@@ -41,6 +41,22 @@ router.get('/:userId', async (req, res) => {
     .eq('user_id', userId)
     .single();
 
+  // Calculate rank position and percentile
+  const userRating = elo?.rating || 1200;
+  const { count: totalPlayers } = await supabase
+    .from('elo_ratings')
+    .select('*', { count: 'exact', head: true });
+
+  const { count: playersAbove } = await supabase
+    .from('elo_ratings')
+    .select('*', { count: 'exact', head: true })
+    .gt('rating', userRating);
+
+  const rank = (playersAbove || 0) + 1;
+  const rankPercentile = totalPlayers && totalPlayers > 0
+    ? Math.max(0.1, Math.round((rank / totalPlayers) * 1000) / 10)
+    : 0;
+
   // Get their puzzle records
   const { data: records } = await supabase
     .from('puzzle_records')
@@ -105,6 +121,7 @@ router.get('/:userId', async (req, res) => {
   res.json({
     ...user,
     elo: elo || { rating: 1200, wins: 0, losses: 0 },
+    rank: { position: rank, percentile: rankPercentile, totalPlayers: totalPlayers || 0 },
     stats: {
       totalPuzzles,
       avgStars: +avgStars.toFixed(1),

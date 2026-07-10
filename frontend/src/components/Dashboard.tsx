@@ -17,6 +17,7 @@ interface PuzzleRecord {
 
 interface ProfileData {
   elo: { rating: number; wins: number; losses: number };
+  rank: { position: number; percentile: number; totalPlayers: number };
   stats: { totalPuzzles: number; avgStars: number; bestTime: number | null; threeStarCount: number; totalTime: number };
   challenges: { total: number; wins: number; losses: number; ties: number; currentStreak: number; longestStreak: number };
 }
@@ -133,7 +134,7 @@ export default function Dashboard({ onBack, onViewProfile, onAcceptChallenge }: 
             <h1 className="dash-name">{user?.username || 'Dashboard'} <span className="dash-verified">✓</span></h1>
             <div className="dash-tier-row">
               <span className="dash-tier-badge" style={{ color: tier.color, borderColor: tier.color }}>{tier.name}</span>
-              <span className="dash-rank-text">Top 0.6% of players xoxo</span>
+              <span className="dash-rank-text">Top {profile?.rank.percentile || 0}% of players (#{profile?.rank.position || '?'})</span>
             </div>
             <div className="dash-elo-row">
               <span className="dash-elo-label">ELO RATING</span>
