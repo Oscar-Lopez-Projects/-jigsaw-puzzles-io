@@ -295,7 +295,7 @@ export default function CommunityPuzzles({ onBack, onPlayPuzzle, onSoloPlay }: C
       {showStartModal && (
         <StartPuzzleModal
           onSoloPlay={() => { setShowStartModal(false); setShowSoloModal(true); }}
-          onFeaturedPuzzle={() => { setShowStartModal(false); /* scroll to featured */ }}
+          onFeaturedPuzzle={() => { setShowStartModal(false); setShowUpload(true); }}
           onClose={() => setShowStartModal(false)}
         />
       )}
