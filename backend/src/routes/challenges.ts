@@ -195,4 +195,101 @@ async function updateEloForChallenge(userId: string, change: number, isWin: bool
   }).eq('user_id', userId);
 }
 
+// Get a single challenge with full details
+router.get('/:challengeId/details', async (req, res) => {
+  const { challengeId } = req.params;
+
+  const { data: challenge, error } = await supabase
+    .from('challenges')
+    .select(`
+      *,
+      challenger:challenger_id ( id, username, avatar_url ),
+      opponent:opponent_id ( id, username, avatar_url )
+    `)
+    .eq('id', challengeId)
+    .single();
+
+  if (error || !challenge) return res.status(404).json({ error: 'Challenge not found' });
+
+  // Get comments
+  const { data: comments } = await supabase
+    .from('challenge_comments')
+    .select(`
+      id, content, created_at,
+      user:user_id ( id, username, avatar_url )
+    `)
+    .eq('challenge_id', challengeId)
+    .order('created_at', { ascending: true });
+
+  // Get likes count
+  const { count: likesCount } = await supabase
+    .from('challenge_likes')
+    .select('*', { count: 'exact', head: true })
+    .eq('challenge_id', challengeId);
+
+  res.json({ ...challenge, comments: comments || [], likes_count: likesCount || 0 });
+});
+
+// Post a comment on a challenge
+router.post('/:challengeId/comments', requireAuth, async (req: AuthRequest, res) => {
+  const { challengeId } = req.params;
+  const { content } = req.body;
+
+  if (!content || content.trim().length === 0) {
+    return res.status(400).json({ error: 'Comment content is required' });
+  }
+  if (content.length > 500) {
+    return res.status(400).json({ error: 'Comment must be 500 characters or less' });
+  }
+
+  const { data, error } = await supabase
+    .from('challenge_comments')
+    .insert({ challenge_id: challengeId, user_id: req.userId, content: content.trim() })
+    .select(`
+      id, content, created_at,
+      user:user_id ( id, username, avatar_url )
+    `)
+    .single();
+
+  if (error) return res.status(500).json({ error: error.message });
+  res.status(201).json(data);
+});
+
+// Like/unlike a challenge (toggle)
+router.post('/:challengeId/like', requireAuth, async (req: AuthRequest, res) => {
+  const { challengeId } = req.params;
+
+  // Check if already liked
+  const { data: existing } = await supabase
+    .from('challenge_likes')
+    .select('id')
+    .eq('challenge_id', challengeId)
+    .eq('user_id', req.userId!)
+    .single();
+
+  if (existing) {
+    // Unlike
+    await supabase.from('challenge_likes').delete().eq('id', existing.id);
+    res.json({ liked: false });
+  } else {
+    // Like
+    await supabase.from('challenge_likes').insert({ challenge_id: challengeId, user_id: req.userId });
+    res.json({ liked: true });
+  }
+});
+
+// Check if user liked a challenge
+router.get('/:challengeId/liked', requireAuth, async (req: AuthRequest, res) => {
+  const { challengeId } = req.params;
+
+  const { data } = await supabase
+    .from('challenge_likes')
+    .select('id')
+    .eq('challenge_id', challengeId)
+    .eq('user_id', req.userId!)
+    .single();
+
+  res.json({ liked: !!data });
+});
+
 export default router;

@@ -6,6 +6,7 @@ import PuzzleBoard from './components/PuzzleBoard';
 import PuzzleBoardErrorBoundary from './components/PuzzleBoardErrorBoundary';
 import WinOverlay from './components/WinOverlay';
 import ChallengeResult from './components/ChallengeResult';
+import ChallengeDetails from './components/ChallengeDetails';
 import ChallengePicker from './components/ChallengePicker';
 import StartPuzzleModal from './components/StartPuzzleModal';
 import SoloPlayModal from './components/SoloPlayModal';
@@ -23,7 +24,7 @@ import type { PuzzlePiece } from './types/puzzle';
 import './App.css';
 
 type Phase = 'setup' | 'generating' | 'puzzle';
-type View = 'game' | 'dashboard' | 'community' | 'leaderboard' | 'profile' | 'friends';
+type View = 'game' | 'dashboard' | 'community' | 'leaderboard' | 'profile' | 'friends' | 'challenge-details';
 
 export default function App() {
   // ── Auth ─────────────────────────────────────────────────────
@@ -81,6 +82,7 @@ export default function App() {
   const [showGlobalStartModal, setShowGlobalStartModal] = useState(false);
   const [showGlobalSoloModal, setShowGlobalSoloModal] = useState(false);
   const [showGlobalUploadModal, setShowGlobalUploadModal] = useState(false);
+  const [challengeDetailsId, setChallengeDetailsId] = useState<string | null>(null);
   const [challengeResult, setChallengeResult] = useState<{
     challengerName: string; opponentName: string;
     challengerTime: number; challengerStars: number;
@@ -418,6 +420,7 @@ export default function App() {
         onLeaderboard={() => setView('leaderboard')}
         onFriends={() => setView('friends')}
         onLoginSuccess={() => setView('dashboard')}
+        onViewChallengeResult={(id) => { setChallengeDetailsId(id); setPreviousView(view); setView('challenge-details'); }}
         onAcceptChallenge={(challenge) => {
           setActiveChallengeId(challenge.id);
           setSelectedImage(challenge.image_url);
@@ -473,6 +476,8 @@ export default function App() {
             setShowChallengePicker(true);
           }}
         />
+      ) : view === 'challenge-details' && challengeDetailsId ? (
+        <ChallengeDetails challengeId={challengeDetailsId} onBack={() => setView(previousView)} />
       ) : (
       <>
       <main className={`main-content${phase === 'puzzle' ? ' main-content--puzzle' : ''}`}>

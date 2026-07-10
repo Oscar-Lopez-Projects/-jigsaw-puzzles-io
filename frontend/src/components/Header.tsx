@@ -14,6 +14,7 @@ interface HeaderProps {
   onHome?: () => void;
   onLoginSuccess?: () => void;
   onAcceptChallenge?: (challenge: { id: string; image_url: string; puzzle_title: string; piece_count: number; difficulty: string; challenger_time_sec: number; challenger_stars: number }) => void;
+  onViewChallengeResult?: (challengeId: string) => void;
 }
 
 interface Notification {
@@ -24,7 +25,7 @@ interface Notification {
   data?: unknown;
 }
 
-export default function Header({ activeView, onDashboard, onLeaderboard, onFriends, onHome, onLoginSuccess, onAcceptChallenge }: HeaderProps) {
+export default function Header({ activeView, onDashboard, onLeaderboard, onFriends, onHome, onLoginSuccess, onAcceptChallenge, onViewChallengeResult }: HeaderProps) {
   const { user, session, logout, isLoading } = useAuth();
   const [showAuth, setShowAuth] = useState(false);
   const [showNotifs, setShowNotifs] = useState(false);
@@ -119,8 +120,9 @@ export default function Header({ activeView, onDashboard, onLeaderboard, onFrien
       const c = notif.data as { id: string; image_url: string; puzzle_title: string; piece_count: number; difficulty: string; challenger_time_sec: number; challenger_stars: number };
       onAcceptChallenge(c);
       setShowNotifs(false);
-    } else if (notif.type === 'challenge_result' && onDashboard) {
-      onDashboard();
+    } else if (notif.type === 'challenge_result' && onViewChallengeResult) {
+      const c = notif.data as { id: string };
+      onViewChallengeResult(c.id);
       setShowNotifs(false);
     } else if (notif.type === 'friend_request' && onFriends) {
       onFriends();
