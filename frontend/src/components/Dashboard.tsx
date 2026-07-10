@@ -45,9 +45,23 @@ function formatTime(sec: number) {
 
 function formatDate(iso: string) {
   const d = new Date(iso);
-  const date = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
-  const time = d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
-  return `${date}\n${time}`;
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function formatTimeOfDay(iso: string) {
+  const d = new Date(iso);
+  return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
+}
+
+function DateCell({ iso }: { iso: string }) {
+  const [showTime, setShowTime] = useState(false);
+  return (
+    <span className="dash-date-cell" onClick={() => setShowTime((v) => !v)} style={{ cursor: 'pointer' }}>
+      {formatDate(iso)}
+      {showTime && <span className="dash-date-time">{formatTimeOfDay(iso)}</span>}
+      {!showTime && <span className="dash-date-hint">▼</span>}
+    </span>
+  );
 }
 
 export default function Dashboard({ onBack, onViewProfile, onAcceptChallenge }: DashboardProps) {
@@ -174,7 +188,9 @@ export default function Dashboard({ onBack, onViewProfile, onAcceptChallenge }: 
                     <td>{r.piece_count}</td>
                     <td className="dash-hist-stars">{'★'.repeat(r.stars)}{'☆'.repeat(3 - r.stars)}</td>
                     <td>{formatTime(r.completion_time_sec)}</td>
-                    <td className="dash-hist-date" style={{ whiteSpace: 'pre-line' }}>{formatDate(r.completed_at)}</td>
+                    <td className="dash-hist-date" style={{ whiteSpace: 'pre-line' }}>
+                      <DateCell iso={r.completed_at} />
+                    </td>
                   </tr>
                 )) : (
                   <tr><td colSpan={5} className="dash-hist-empty">No puzzles solved yet. Start playing!</td></tr>

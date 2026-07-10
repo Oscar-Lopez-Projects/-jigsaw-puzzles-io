@@ -105,3 +105,8 @@
 .dash-danger-zone { text-align: center; }
 .dash-delete-btn { padding: 8px 20px; font-size: 12px; font-weight: 600; color: var(--error); background: transparent; border: 1px solid var(--error-border); border-radius: 8px; cursor: pointer; transition: background 0.15s; }
 .dash-delete-btn:hover { background: var(--error-subtle); }
+
+/* ── Date cell dropdown ──────────────────────────────────────── */
+.dash-date-cell { display: flex; flex-direction: column; gap: 2px; }
+.dash-date-hint { font-size: 8px; color: var(--text-faint); }
+.dash-date-time { font-size: 10px; color: var(--accent); font-weight: 600; }
