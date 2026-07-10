@@ -407,7 +407,7 @@ export default function App() {
     <div className="app-layout">
       <Header
         activeView={view}
-        onHome={() => setView('game')}
+        onHome={() => { setView('game'); setPhase('setup'); setIsWon(false); }}
         onDashboard={() => setView('dashboard')}
         onLeaderboard={() => setView('leaderboard')}
         onFriends={() => setView('friends')}
