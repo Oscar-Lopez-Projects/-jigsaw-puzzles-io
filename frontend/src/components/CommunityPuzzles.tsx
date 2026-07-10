@@ -169,13 +169,6 @@ export default function CommunityPuzzles({ onBack, onPlayPuzzle, challengeOppone
         </div>
       </div>
 
-      {/* Challenge Mode Banner */}
-      {challengeOpponent && (
-        <div className="home-challenge-banner">
-          <span>⚔️ <strong>Challenge Mode:</strong> Pick a puzzle to play against <strong>{challengeOpponent.username}</strong>! Complete it and the challenge will be sent automatically.</span>
-        </div>
-      )}
-
       {/* Stats Row */}
       <div className="home-stats-row">
         <div className="home-stat"><span className="home-stat-icon">🥇</span><div><span className="home-stat-label">CURRENT RANK</span><span className="home-stat-val">#1 xoxo</span><span className="home-stat-sub">Top 0.1% ▲</span></div></div>

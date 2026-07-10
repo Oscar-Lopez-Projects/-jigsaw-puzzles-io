@@ -6,6 +6,7 @@ import PuzzleBoard from './components/PuzzleBoard';
 import PuzzleBoardErrorBoundary from './components/PuzzleBoardErrorBoundary';
 import WinOverlay from './components/WinOverlay';
 import ChallengeResult from './components/ChallengeResult';
+import ChallengePicker from './components/ChallengePicker';
 import Dashboard from './components/Dashboard';
 import CommunityPuzzles from './components/CommunityPuzzles';
 import Leaderboard from './components/Leaderboard';
@@ -73,6 +74,7 @@ export default function App() {
   // ── Challenge state ────────────────────────────────────────────
   const [activeChallengeId, setActiveChallengeId] = useState<string | null>(null);
   const [challengeOpponent, setChallengeOpponent] = useState<{ id: string; username: string } | null>(null);
+  const [showChallengePicker, setShowChallengePicker] = useState(false);
   const [challengeResult, setChallengeResult] = useState<{
     challengerName: string; opponentName: string;
     challengerTime: number; challengerStars: number;
@@ -418,8 +420,7 @@ export default function App() {
           onViewProfile={(id) => navigate('profile', { profileId: id, prev: 'friends' })}
           onChallenge={(id, username) => {
             setChallengeOpponent({ id, username });
-            setView('game');
-            handleBackToSetup();
+            setShowChallengePicker(true);
           }}
         />
       ) : view === 'profile' && profileUserId ? (
@@ -428,8 +429,7 @@ export default function App() {
           onBack={() => setView(previousView)}
           onChallenge={(id, username) => {
             setChallengeOpponent({ id, username });
-            setView('game');
-            handleBackToSetup();
+            setShowChallengePicker(true);
           }}
         />
       ) : (
@@ -659,6 +659,18 @@ export default function App() {
       {/* Auth modal triggered from win overlay */}
       {showAuthFromWin && (
         <AuthModal onClose={() => { setShowAuthFromWin(false); setView('dashboard'); }} />
+      )}
+
+      {/* Challenge Picker modal */}
+      {showChallengePicker && challengeOpponent && (
+        <ChallengePicker
+          opponent={challengeOpponent}
+          onSelectPuzzle={(imageUrl, title, pieceCount, puzzleId) => {
+            setShowChallengePicker(false);
+            handlePlayCommunityPuzzle(imageUrl, title, pieceCount, puzzleId);
+          }}
+          onClose={() => { setShowChallengePicker(false); setChallengeOpponent(null); }}
+        />
       )}
     </div>
   );
