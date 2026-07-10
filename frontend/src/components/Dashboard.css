@@ -110,3 +110,7 @@
 .dash-date-cell { display: flex; flex-direction: column; gap: 2px; }
 .dash-date-hint { font-size: 8px; color: var(--text-faint); }
 .dash-date-time { font-size: 10px; color: var(--accent); font-weight: 600; }
+
+/* ── Sortable table headers ──────────────────────────────────── */
+.dash-th-sort { cursor: pointer; user-select: none; transition: color 0.15s; }
+.dash-th-sort:hover { color: var(--accent); }

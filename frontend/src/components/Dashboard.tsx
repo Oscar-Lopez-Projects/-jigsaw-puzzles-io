@@ -70,6 +70,8 @@ export default function Dashboard({ onBack, onViewProfile, onAcceptChallenge }: 
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [sortCol, setSortCol] = useState<'puzzle' | 'pieces' | 'stars' | 'time' | 'date'>('date');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
   useEffect(() => {
     if (!session?.access_token || !user?.id) return;
@@ -97,6 +99,29 @@ export default function Dashboard({ onBack, onViewProfile, onAcceptChallenge }: 
 
   const tier = profile ? getTier(profile.elo.rating) : { name: 'Silver', color: '#9ca3af' };
   const winRate = profile && profile.challenges.total > 0 ? Math.round((profile.challenges.wins / profile.challenges.total) * 100) : 0;
+
+  const handleSort = (col: typeof sortCol) => {
+    if (sortCol === col) {
+      setSortDir((d) => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortCol(col);
+      setSortDir(col === 'date' ? 'desc' : 'asc');
+    }
+  };
+
+  const sortedRecords = [...records].sort((a, b) => {
+    let cmp = 0;
+    switch (sortCol) {
+      case 'puzzle': cmp = (a.image_reference || '').localeCompare(b.image_reference || ''); break;
+      case 'pieces': cmp = a.piece_count - b.piece_count; break;
+      case 'stars': cmp = a.stars - b.stars; break;
+      case 'time': cmp = a.completion_time_sec - b.completion_time_sec; break;
+      case 'date': cmp = new Date(a.completed_at).getTime() - new Date(b.completed_at).getTime(); break;
+    }
+    return sortDir === 'asc' ? cmp : -cmp;
+  }).slice(0, 8);
+
+  const sortArrow = (col: typeof sortCol) => sortCol === col ? (sortDir === 'asc' ? ' ▲' : ' ▼') : '';
 
   return (
     <div className="dash-page">
@@ -180,9 +205,15 @@ export default function Dashboard({ onBack, onViewProfile, onAcceptChallenge }: 
           <div className="dash-card">
             <div className="dash-card-header"><h3>Puzzle History</h3></div>
             <table className="dash-history-table">
-              <thead><tr><th>PUZZLE</th><th>PIECES</th><th>STARS</th><th>TIME</th><th>DATE</th></tr></thead>
+              <thead><tr>
+                <th className="dash-th-sort" onClick={() => handleSort('puzzle')}>PUZZLE{sortArrow('puzzle')}</th>
+                <th className="dash-th-sort" onClick={() => handleSort('pieces')}>PIECES{sortArrow('pieces')}</th>
+                <th className="dash-th-sort" onClick={() => handleSort('stars')}>STARS{sortArrow('stars')}</th>
+                <th className="dash-th-sort" onClick={() => handleSort('time')}>TIME{sortArrow('time')}</th>
+                <th className="dash-th-sort" onClick={() => handleSort('date')}>DATE{sortArrow('date')}</th>
+              </tr></thead>
               <tbody>
-                {records.length > 0 ? records.slice(0, 8).map((r) => (
+                {sortedRecords.length > 0 ? sortedRecords.map((r) => (
                   <tr key={r.id}>
                     <td className="dash-hist-name">{r.image_reference || 'Puzzle'}<br/><span className="dash-hist-by">{r.difficulty}</span></td>
                     <td>{r.piece_count}</td>
