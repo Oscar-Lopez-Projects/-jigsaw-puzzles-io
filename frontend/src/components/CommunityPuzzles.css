@@ -140,3 +140,14 @@
   0%, 100% { box-shadow: 0 0 0 0 rgba(245,158,11,0.2); }
   50% { box-shadow: 0 0 0 6px rgba(245,158,11,0); }
 }
+
+/* ── My Solo Puzzles Section ─────────────────────────────────── */
+.home-solo-section { margin-top: 28px; }
+.home-solo-grid { display: flex; flex-direction: column; gap: 8px; }
+.home-solo-card { display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; transition: background 0.1s; }
+.home-solo-card:hover { background: var(--surface-subtle); }
+.home-solo-info { flex: 1; display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.home-solo-name { font-size: 13px; font-weight: 600; color: var(--text-heading); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.home-solo-meta { font-size: 11px; color: var(--text-muted); }
+.home-solo-time { font-size: 16px; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--accent); }
+.home-solo-date { font-size: 11px; color: var(--text-faint); min-width: 50px; text-align: right; }

@@ -378,6 +378,31 @@ export default function App() {
         setPhase('setup');
       });
   };
+
+  // ── Solo play (local image, no puzzle_id) ─────────────────────
+  const handleSoloPlay = (imageDataUrl: string, fileName: string, count: PieceCount) => {
+    setSelectedImage(imageDataUrl);
+    setImageFileName(fileName);
+    setPieceCount(count);
+    setActivePuzzleId(null); // no community puzzle ID = solo
+    setView('game');
+    setPhase('generating');
+    setIsWon(false);
+    const { cols, rows } = getGrid(count);
+    generatePieces(imageDataUrl, cols, rows)
+      .then((generated) => {
+        setGridCols(cols);
+        setGridRows(rows);
+        setPieces(generated);
+        setPhase('puzzle');
+        startTimer();
+      })
+      .catch((err) => {
+        const msg2 = err instanceof Error ? err.message : 'Unknown error';
+        setGenerateError(`Failed: ${msg2}`);
+        setPhase('setup');
+      });
+  };
   return (
     <div className="app-layout">
       <Header
@@ -447,7 +472,7 @@ export default function App() {
 
         {/* ── Home: Community Puzzles (browse + upload) ── */}
         {(phase === 'setup' || phase === 'generating') && (
-          <CommunityPuzzles onBack={null} onPlayPuzzle={handlePlayCommunityPuzzle} />
+          <CommunityPuzzles onBack={null} onPlayPuzzle={handlePlayCommunityPuzzle} onSoloPlay={handleSoloPlay} />
         )}
 
         {/* ── Puzzle screen ── */}

@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../lib/api';
 import UploadPuzzleForm from './UploadPuzzleForm';
+import StartPuzzleModal from './StartPuzzleModal';
+import SoloPlayModal from './SoloPlayModal';
+import { type PieceCount } from './DifficultySelector';
 import './CommunityPuzzles.css';
 
 interface Puzzle {
@@ -19,6 +22,7 @@ interface Puzzle {
 interface CommunityPuzzlesProps {
   onBack: (() => void) | null;
   onPlayPuzzle: (imageUrl: string, title: string, pieceCount: number, puzzleId: string) => void;
+  onSoloPlay?: (imageDataUrl: string, fileName: string, pieceCount: PieceCount) => void;
 }
 
 const CATEGORIES = [
@@ -102,13 +106,16 @@ function HomePuzzleCard({ puzzle, onPlay }: { puzzle: Puzzle; onPlay: () => void
   );
 }
 
-export default function CommunityPuzzles({ onBack, onPlayPuzzle }: CommunityPuzzlesProps) {
+export default function CommunityPuzzles({ onBack, onPlayPuzzle, onSoloPlay }: CommunityPuzzlesProps) {
   const { session, user } = useAuth();
   const [puzzles, setPuzzles] = useState<Puzzle[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showUpload, setShowUpload] = useState(false);
   const [activeCategory, setActiveCategory] = useState('all');
+  const [showStartModal, setShowStartModal] = useState(false);
+  const [showSoloModal, setShowSoloModal] = useState(false);
+  const [soloRecords, setSoloRecords] = useState<{ id: string; image_reference: string | null; piece_count: number; stars: number; completion_time_sec: number; completed_at: string }[]>([]);
 
   const fetchPuzzles = (category?: string) => {
     setLoading(true);
@@ -121,6 +128,14 @@ export default function CommunityPuzzles({ onBack, onPlayPuzzle }: CommunityPuzz
   };
 
   useEffect(() => { fetchPuzzles(); }, []);
+
+  // Fetch user's solo puzzle records (no puzzle_id = solo)
+  useEffect(() => {
+    if (!session?.access_token) return;
+    apiFetch<{ id: string; image_reference: string | null; piece_count: number; stars: number; completion_time_sec: number; completed_at: string; puzzle_id: string | null }[]>('/api/records', { token: session.access_token })
+      .then((data) => setSoloRecords(data.filter((r) => !r.puzzle_id).slice(0, 6)))
+      .catch(() => {});
+  }, [session]);
 
   const handleCategoryChange = (cat: string) => {
     setActiveCategory(cat);
@@ -146,11 +161,9 @@ export default function CommunityPuzzles({ onBack, onPlayPuzzle }: CommunityPuzz
           <h1 className="home-hero-title">Race. Solve.<br /><span className="home-hero-accent">Climb</span> the ranks.</h1>
           <p className="home-hero-sub">Solve puzzles, compete in live matches, and become the ultimate puzzle champion.</p>
           <div className="home-hero-btns">
-            {session?.access_token && (
-              <button type="button" className="home-hero-btn home-hero-btn--primary" onClick={() => setShowUpload(true)}>
-                🧩 Start a Puzzle
-              </button>
-            )}
+            <button type="button" className="home-hero-btn home-hero-btn--primary" onClick={() => setShowStartModal(true)}>
+              🧩 Start a Puzzle
+            </button>
             <button type="button" className="home-hero-btn home-hero-btn--secondary" disabled>
               ⚡ Join Live Match <span className="nav-live-badge">LIVE</span>
             </button>
@@ -256,6 +269,44 @@ export default function CommunityPuzzles({ onBack, onPlayPuzzle }: CommunityPuzz
           </div>
         )}
       </div>
+
+      {/* My Solo Puzzles */}
+      {session?.access_token && soloRecords.length > 0 && (
+        <div className="home-solo-section">
+          <div className="home-featured-header">
+            <h2>🎯 My Solo Puzzles</h2>
+          </div>
+          <div className="home-solo-grid">
+            {soloRecords.map((r) => (
+              <div className="home-solo-card" key={r.id}>
+                <div className="home-solo-info">
+                  <span className="home-solo-name">{r.image_reference || 'Solo Puzzle'}</span>
+                  <span className="home-solo-meta">{r.piece_count} pieces · {'★'.repeat(r.stars)}{'☆'.repeat(3 - r.stars)}</span>
+                </div>
+                <div className="home-solo-time">{String(Math.floor(r.completion_time_sec / 60)).padStart(2, '0')}:{String(r.completion_time_sec % 60).padStart(2, '0')}</div>
+                <span className="home-solo-date">{new Date(r.completed_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Start Puzzle Choice Modal */}
+      {showStartModal && (
+        <StartPuzzleModal
+          onSoloPlay={() => { setShowStartModal(false); setShowSoloModal(true); }}
+          onFeaturedPuzzle={() => { setShowStartModal(false); /* scroll to featured */ }}
+          onClose={() => setShowStartModal(false)}
+        />
+      )}
+
+      {/* Solo Play Modal */}
+      {showSoloModal && onSoloPlay && (
+        <SoloPlayModal
+          onStart={(img, name, count) => { setShowSoloModal(false); onSoloPlay(img, name, count); }}
+          onClose={() => setShowSoloModal(false)}
+        />
+      )}
 
       {onBack && (
         <button type="button" className="community-back" onClick={onBack} style={{ position: 'fixed', top: 70, left: 20, zIndex: 50 }}>
