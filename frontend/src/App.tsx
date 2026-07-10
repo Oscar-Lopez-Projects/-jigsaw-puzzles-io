@@ -241,6 +241,7 @@ export default function App() {
             }
             // If initiating a challenge (Player A), upload image + send challenge
             else if (challengeOpponent && selectedImage && pieceCount) {
+              console.log('[Challenge] Attempting to send challenge to:', challengeOpponent.username, 'image:', selectedImage?.slice(0, 50));
               const cStars = elapsedRef.current <= pieceCount * 3 ? 3 : elapsedRef.current <= pieceCount * 6 ? 2 : 1;
 
               // Upload image to get a public URL (data URLs won't work for opponent)
