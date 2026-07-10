@@ -120,7 +120,9 @@ export default function FriendsList({ onViewProfile }: FriendsListProps) {
         <div className="friends-search-results">
           {searchResults.map((u) => (
             <div className="friend-row" key={u.id}>
-              <div className="friend-avatar">{u.username.charAt(0).toUpperCase()}</div>
+              <div className="friend-avatar">
+                {u.avatar_url ? <img src={u.avatar_url} alt={u.username} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} /> : u.username.charAt(0).toUpperCase()}
+              </div>
               <div className="friend-info">
                 <span className="friend-name" onClick={() => onViewProfile(u.id)}>{u.username}</span>
               </div>
@@ -144,7 +146,7 @@ export default function FriendsList({ onViewProfile }: FriendsListProps) {
           {friends.map((f) => (
             <div className="friend-row" key={f.id}>
               <div className="friend-avatar">
-                {f.user.username.charAt(0).toUpperCase()}
+                {f.user.avatar_url ? <img src={f.user.avatar_url} alt={f.user.username} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} /> : f.user.username.charAt(0).toUpperCase()}
               </div>
               <div className="friend-info">
                 <span className="friend-name" onClick={() => onViewProfile(f.user.id)}>
