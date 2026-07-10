@@ -125,7 +125,13 @@ export default function UserProfile({ userId, onBack, onChallenge }: UserProfile
       {/* Profile Header */}
       <div className="profile-header-card">
         <div className="profile-header-left">
-          <div className="profile-avatar-lg">{profile.username.charAt(0).toUpperCase()}</div>
+          <div className="profile-avatar-lg">
+            {profile.avatar_url ? (
+              <img src={profile.avatar_url} alt={profile.username} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+            ) : (
+              profile.username.charAt(0).toUpperCase()
+            )}
+          </div>
           <div className="profile-header-info">
             <h1 className="profile-name-lg">{profile.username} <span className="profile-verified">✓</span></h1>
             <div className="profile-tier-row">

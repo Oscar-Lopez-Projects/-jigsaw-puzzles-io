@@ -170,7 +170,7 @@ export default function Leaderboard({ onBack: _onBack, onViewProfile }: Leaderbo
               {/* 2nd place */}
               <div className="lb-podium-card lb-podium-card--2">
                 <div className="lb-podium-rank">2</div>
-                <div className="lb-podium-avatar">{top3[1].users?.username?.charAt(0).toUpperCase() || '?'}</div>
+                <div className="lb-podium-avatar">{top3[1].users?.avatar_url ? <img src={top3[1].users.avatar_url} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} /> : (top3[1].users?.username?.charAt(0).toUpperCase() || '?')}</div>
                 <div className="lb-podium-name">{top3[1].users?.username || 'Unknown'}</div>
                 <div className="lb-podium-tier" style={{ color: getTier(top3[1].rating).color }}>{getTier(top3[1].rating).name}</div>
                 <div className="lb-podium-elo">{top3[1].rating.toLocaleString()} <small>ELO</small></div>
@@ -179,7 +179,7 @@ export default function Leaderboard({ onBack: _onBack, onViewProfile }: Leaderbo
               <div className="lb-podium-card lb-podium-card--1">
                 <div className="lb-podium-crown">👑</div>
                 <div className="lb-podium-rank">1</div>
-                <div className="lb-podium-avatar lb-podium-avatar--gold">{top3[0].users?.username?.charAt(0).toUpperCase() || '?'}</div>
+                <div className="lb-podium-avatar lb-podium-avatar--gold">{top3[0].users?.avatar_url ? <img src={top3[0].users.avatar_url} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} /> : (top3[0].users?.username?.charAt(0).toUpperCase() || '?')}</div>
                 <div className="lb-podium-name">{top3[0].users?.username || 'Unknown'}</div>
                 <div className="lb-podium-tier" style={{ color: getTier(top3[0].rating).color }}>{getTier(top3[0].rating).name}</div>
                 <div className="lb-podium-elo">{top3[0].rating.toLocaleString()} <small>ELO</small></div>
@@ -187,7 +187,7 @@ export default function Leaderboard({ onBack: _onBack, onViewProfile }: Leaderbo
               {/* 3rd place */}
               <div className="lb-podium-card lb-podium-card--3">
                 <div className="lb-podium-rank">3</div>
-                <div className="lb-podium-avatar">{top3[2].users?.username?.charAt(0).toUpperCase() || '?'}</div>
+                <div className="lb-podium-avatar">{top3[2].users?.avatar_url ? <img src={top3[2].users.avatar_url} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} /> : (top3[2].users?.username?.charAt(0).toUpperCase() || '?')}</div>
                 <div className="lb-podium-name">{top3[2].users?.username || 'Unknown'}</div>
                 <div className="lb-podium-tier" style={{ color: getTier(top3[2].rating).color }}>{getTier(top3[2].rating).name}</div>
                 <div className="lb-podium-elo">{top3[2].rating.toLocaleString()} <small>ELO</small></div>
@@ -219,7 +219,7 @@ export default function Leaderboard({ onBack: _onBack, onViewProfile }: Leaderbo
                     <td className="lb-cell-rank">{rank}</td>
                     <td className="lb-cell-player">
                       <div className="lb-player-row">
-                        <div className="lb-player-avatar">{entry.users?.username?.charAt(0).toUpperCase() || '?'}</div>
+                        <div className="lb-player-avatar">{entry.users?.avatar_url ? <img src={entry.users.avatar_url} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} /> : (entry.users?.username?.charAt(0).toUpperCase() || '?')}</div>
                         <div className="lb-player-info">
                           <span
                             className="lb-player-name"

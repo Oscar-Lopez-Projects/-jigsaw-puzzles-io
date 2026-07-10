@@ -10,6 +10,13 @@ interface FriendEntry {
   direction: 'sent' | 'received';
 }
 
+function Avatar({ user, size = 32 }: { user: { username: string; avatar_url: string | null }; size?: number }) {
+  if (user.avatar_url) {
+    return <img src={user.avatar_url} alt={user.username} style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />;
+  }
+  return <div className="fp-req-avatar" style={{ width: size, height: size }}>{user.username.charAt(0).toUpperCase()}</div>;
+}
+
 interface SearchResult {
   id: string;
   username: string;
@@ -127,7 +134,7 @@ export default function FriendsPage({ onViewProfile, onChallenge }: FriendsPageP
             ) : (
               incomingRequests.map((f) => (
                 <div className="fp-request-row" key={f.id}>
-                  <div className="fp-req-avatar">{f.user.username.charAt(0).toUpperCase()}</div>
+                  <Avatar user={f.user} />
                   <div className="fp-req-info">
                     <span className="fp-req-name" onClick={() => onViewProfile(f.user.id)}>{f.user.username}</span>
                   </div>
@@ -146,7 +153,7 @@ export default function FriendsPage({ onViewProfile, onChallenge }: FriendsPageP
             ) : (
               sentInvites.map((f) => (
                 <div className="fp-request-row" key={f.id}>
-                  <div className="fp-req-avatar">{f.user.username.charAt(0).toUpperCase()}</div>
+                  <Avatar user={f.user} />
                   <span className="fp-req-name" onClick={() => onViewProfile(f.user.id)}>{f.user.username}</span>
                   <button className="fp-req-cancel" onClick={() => handleRemove(f.id)}>Cancel</button>
                 </div>
@@ -213,7 +220,7 @@ export default function FriendsPage({ onViewProfile, onChallenge }: FriendsPageP
                 ) : (
                   acceptedFriends.map((f) => (
                     <tr key={f.id}>
-                      <td><div className="fp-table-avatar">{f.user.username.charAt(0).toUpperCase()}</div></td>
+                      <td><Avatar user={f.user} /></td>
                       <td><span className="fp-table-name" onClick={() => onViewProfile(f.user.id)}>{f.user.username}</span></td>
                       <td><span className="fp-status-dot fp-status-dot--online" /> Online xoxo</td>
                       <td><span className="fp-table-rank">Diamond I xoxo</span><br/><span className="fp-table-elo">⚡ 1,180 xoxo</span></td>
