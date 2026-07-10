@@ -162,16 +162,57 @@ export default function Dashboard({ onBack, onViewProfile, onAcceptChallenge }: 
       <div className="dash-columns">
         {/* Left Column */}
         <div className="dash-col-left">
-          {/* Season Progress */}
+          {/* ELO Progress */}
           <div className="dash-card">
-            <div className="dash-card-header"><h3>Season 8 Progress xoxo</h3><span className="dash-card-meta">Ends in 24d 5h</span></div>
-            <div className="dash-season-row">
-              <span style={{ color: tier.color, fontWeight: 700, fontSize: 13 }}>{tier.name}</span>
-              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Next: {getTier((profile?.elo.rating || 1200) + 200).name}</span>
+            <div className="dash-card-header"><h3>ELO Progress</h3></div>
+            {(() => {
+              const rating = profile?.elo.rating || 1200;
+              const tiers = [
+                { name: 'Silver', color: '#9ca3af', min: 0, max: 1099 },
+                { name: 'Gold I', color: '#fbbf24', min: 1100, max: 1199 },
+                { name: 'Platinum II', color: '#6ee7b7', min: 1200, max: 1299 },
+                { name: 'Platinum III', color: '#34d399', min: 1300, max: 1499 },
+                { name: 'Diamond I', color: '#60a5fa', min: 1500, max: 1799 },
+                { name: 'Master', color: '#a855f7', min: 1800, max: 1999 },
+                { name: 'Grandmaster', color: '#ff4444', min: 2000, max: 9999 },
+              ];
+              const currentTier = tiers.find((t) => rating >= t.min && rating <= t.max) || tiers[0];
+              const currentIdx = tiers.indexOf(currentTier);
+              const nextTier = currentIdx < tiers.length - 1 ? tiers[currentIdx + 1] : null;
+              const progressInTier = rating - currentTier.min;
+              const tierRange = currentTier.max - currentTier.min + 1;
+              const pct = Math.min(100, Math.round((progressInTier / tierRange) * 100));
+
+              return (
+                <>
+                  <div className="dash-season-row">
+                    <span style={{ color: currentTier.color, fontWeight: 700, fontSize: 13 }}>{currentTier.name}</span>
+                    {nextTier && <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Next: <span style={{ color: nextTier.color, fontWeight: 600 }}>{nextTier.name}</span></span>}
+                  </div>
+                  <div className="dash-progress"><div className="dash-progress-fill" style={{ width: `${pct}%`, background: currentTier.color }} /></div>
+                  <span className="dash-progress-text">{rating} / {nextTier ? nextTier.min : '∞'} ELO ({pct}%)</span>
+                  {nextTier && <span className="dash-progress-text" style={{ marginTop: 4 }}>Need {nextTier.min - rating} more ELO to reach <span style={{ color: nextTier.color, fontWeight: 600 }}>{nextTier.name}</span></span>}
+                </>
+              );
+            })()}
+            <button type="button" className="dash-link-btn" onClick={() => {
+              const el = document.querySelector('.dash-elo-details');
+              if (el) el.classList.toggle('dash-elo-details--open');
+            }}>View Progress Details →</button>
+            <div className="dash-elo-details">
+              <table className="dash-elo-table">
+                <thead><tr><th>Tier</th><th>ELO Range</th></tr></thead>
+                <tbody>
+                  <tr><td><span style={{ color: '#9ca3af' }}>● Silver</span></td><td>0 – 1,099</td></tr>
+                  <tr><td><span style={{ color: '#fbbf24' }}>● Gold I</span></td><td>1,100 – 1,199</td></tr>
+                  <tr><td><span style={{ color: '#6ee7b7' }}>● Platinum II</span></td><td>1,200 – 1,299</td></tr>
+                  <tr><td><span style={{ color: '#34d399' }}>● Platinum III</span></td><td>1,300 – 1,499</td></tr>
+                  <tr><td><span style={{ color: '#60a5fa' }}>● Diamond I</span></td><td>1,500 – 1,799</td></tr>
+                  <tr><td><span style={{ color: '#a855f7' }}>● Master</span></td><td>1,800 – 1,999</td></tr>
+                  <tr><td><span style={{ color: '#ff4444' }}>● Grandmaster</span></td><td>2,000+</td></tr>
+                </tbody>
+              </table>
             </div>
-            <div className="dash-progress"><div className="dash-progress-fill" style={{ width: '72%' }} /></div>
-            <span className="dash-progress-text">{profile?.elo.rating || 1200} / {Math.ceil((profile?.elo.rating || 1200) / 500) * 500} ELO</span>
-            <button type="button" className="dash-link-btn">View Season Rewards → xoxo</button>
           </div>
 
           {/* Achievements */}

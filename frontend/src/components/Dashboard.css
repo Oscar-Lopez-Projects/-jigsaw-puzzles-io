@@ -114,3 +114,42 @@
 /* ── Sortable table headers ──────────────────────────────────── */
 .dash-th-sort { cursor: pointer; user-select: none; transition: color 0.15s; }
 .dash-th-sort:hover { color: var(--accent); }
+
+/* ── ELO Details Dropdown ────────────────────────────────────── */
+.dash-elo-details {
+  display: none;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.dash-elo-details--open {
+  display: block;
+}
+
+.dash-elo-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.dash-elo-table th {
+  text-align: left;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-faint);
+  padding: 6px 4px;
+  border-bottom: 1px solid var(--border);
+}
+
+.dash-elo-table td {
+  padding: 6px 4px;
+  color: var(--text-body);
+  border-bottom: 1px solid var(--border);
+}
+
+.dash-elo-table tr:last-child td {
+  border-bottom: none;
+}
