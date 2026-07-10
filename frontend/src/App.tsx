@@ -192,10 +192,12 @@ export default function App() {
 
   // Save record after win — runs as effect so it always has fresh state
   const hasWonRef = useRef(false);
+  const [debugMsg, setDebugMsg] = useState('');
   useEffect(() => {
     if (isWon && !hasWonRef.current) {
       hasWonRef.current = true;
-      const msg = `isWon=true | session=${!!session?.access_token} | pieceCount=${pieceCount} | time=${elapsedRef.current} | challengeId=${activeChallengeId} | opponent=${challengeOpponent?.username || 'none'}`;
+      const msg = `isWon=true | session=${!!session?.access_token} | pieceCount=${pieceCount} | time=${elapsedRef.current} | challengeId=${activeChallengeId} | opponent=${challengeOpponent?.username || 'none'} | image=${selectedImage ? selectedImage.slice(0, 40) : 'null'}`;
+      setDebugMsg(msg);
 
       if (session?.access_token && pieceCount) {
         const difficultyMap: Record<number, string> = { 5: 'beginner', 25: 'beginner', 50: 'easy', 100: 'medium', 150: 'hard' };
@@ -215,6 +217,7 @@ export default function App() {
               },
             });
             console.log('[Record]', msg, res);
+            setDebugMsg((prev) => prev + ' | RECORD SAVED');
 
             // If playing a challenge (Player B), submit result
             if (activeChallengeId) {
@@ -242,6 +245,7 @@ export default function App() {
             // If initiating a challenge (Player A), upload image + send challenge
             else if (challengeOpponent && selectedImage && pieceCount) {
               console.log('[Challenge] Attempting to send challenge to:', challengeOpponent.username, 'image:', selectedImage?.slice(0, 50));
+              setDebugMsg((prev) => prev + ' | SENDING CHALLENGE...');
               const cStars = elapsedRef.current <= pieceCount * 3 ? 3 : elapsedRef.current <= pieceCount * 6 ? 2 : 1;
 
               // Upload image to get a public URL (data URLs won't work for opponent)
@@ -281,14 +285,17 @@ export default function App() {
                   },
                 });
                 console.log('[Challenge] Sent to:', challengeOpponent.username);
+                setDebugMsg((prev) => prev + ' | CHALLENGE SENT!');
               } catch (err) {
                 console.error('[Challenge] Send error:', err);
+                setDebugMsg((prev) => prev + ' | CHALLENGE ERROR: ' + (err instanceof Error ? err.message : String(err)));
               } finally {
                 setChallengeOpponent(null);
               }
             }
           } catch (err) {
             console.error('[Record] Error:', err);
+            setDebugMsg((prev) => prev + ' | RECORD ERROR: ' + (err instanceof Error ? err.message : String(err)));
           }
         })();
       } else {
@@ -297,6 +304,7 @@ export default function App() {
     }
     if (!isWon) {
       hasWonRef.current = false;
+      setDebugMsg('');
     }
   }, [isWon, session, pieceCount, imageFileName, activePuzzleId, activeChallengeId, challengeOpponent, selectedImage]);
 
@@ -589,6 +597,7 @@ export default function App() {
           onDashboard={() => { setIsWon(false); setActiveChallengeId(null); setView('dashboard'); }}
           onPlayAgain={() => { setIsWon(false); setActiveChallengeId(null); handleBackToSetup(); }}
           onCreateAccount={() => { setIsWon(false); setShowAuthFromWin(true); }}
+          debugMsg={debugMsg}
         />
       )}
 
