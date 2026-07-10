@@ -22,6 +22,7 @@ interface Challenge {
 
 interface PendingChallengesProps {
   onAcceptChallenge: (challenge: Challenge) => void;
+  onViewChallenge?: (challengeId: string) => void;
 }
 
 function formatTime(sec: number) {
@@ -30,12 +31,13 @@ function formatTime(sec: number) {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
-function ChallengeRow({ challenge, isSentByMe, onAccept, onDecline }: {
+function ChallengeRow({ challenge, isSentByMe, onAccept, onDecline, onView }: {
   challenge: Challenge;
   userId: string | undefined;
   isSentByMe: boolean;
   onAccept?: (c: Challenge) => void;
   onDecline?: (id: string) => void;
+  onView?: (id: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const isChallenger = isSentByMe;
@@ -58,7 +60,7 @@ function ChallengeRow({ challenge, isSentByMe, onAccept, onDecline }: {
   }
 
   return (
-    <div className="challenge-row-wrap">
+    <div className="challenge-row-wrap" style={{ cursor: isCompleted && onView ? 'pointer' : 'default' }} onClick={() => { if (isCompleted && onView) onView(challenge.id); }}>
       <div className="challenge-row">
         <div className="challenge-row-info">
           <span className="challenge-row-title">{challenge.puzzle_title}</span>
@@ -113,7 +115,7 @@ function ChallengeRow({ challenge, isSentByMe, onAccept, onDecline }: {
   );
 }
 
-export default function PendingChallenges({ onAcceptChallenge }: PendingChallengesProps) {
+export default function PendingChallenges({ onAcceptChallenge, onViewChallenge }: PendingChallengesProps) {
   const { session, user } = useAuth();
   const [challenges, setChallenges] = useState<{ sent: Challenge[]; received: Challenge[] }>({ sent: [], received: [] });
   const [loading, setLoading] = useState(true);
@@ -156,7 +158,7 @@ export default function PendingChallenges({ onAcceptChallenge }: PendingChalleng
         <div className="challenges-group">
           <span className="challenges-group-label">Incoming</span>
           {incomingPending.map((c) => (
-            <ChallengeRow key={c.id} challenge={c} userId={user?.id} isSentByMe={false} onAccept={onAcceptChallenge} onDecline={handleDecline} />
+            <ChallengeRow key={c.id} challenge={c} userId={user?.id} isSentByMe={false} onAccept={onAcceptChallenge} onDecline={handleDecline} onView={onViewChallenge} />
           ))}
         </div>
       )}
@@ -165,7 +167,7 @@ export default function PendingChallenges({ onAcceptChallenge }: PendingChalleng
         <div className="challenges-group">
           <span className="challenges-group-label">Sent (waiting)</span>
           {sentPending.map((c) => (
-            <ChallengeRow key={c.id} challenge={c} userId={user?.id} isSentByMe={true} />
+            <ChallengeRow key={c.id} challenge={c} userId={user?.id} isSentByMe={true} onView={onViewChallenge} />
           ))}
         </div>
       )}
@@ -175,7 +177,7 @@ export default function PendingChallenges({ onAcceptChallenge }: PendingChalleng
           <span className="challenges-group-label">Completed</span>
           {completed.map((c) => {
             const sentByMe = challenges.sent.some((s) => s.id === c.id);
-            return <ChallengeRow key={c.id} challenge={c} userId={user?.id} isSentByMe={sentByMe} />;
+            return <ChallengeRow key={c.id} challenge={c} userId={user?.id} isSentByMe={sentByMe} onView={onViewChallenge} />;
           })}
         </div>
       )}

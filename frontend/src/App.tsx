@@ -442,6 +442,7 @@ export default function App() {
         <Dashboard
           onBack={() => setView('game')}
           onStartPuzzle={() => setShowGlobalStartModal(true)}
+          onViewChallenge={(id) => { setChallengeDetailsId(id); setPreviousView('dashboard'); setView('challenge-details'); }}
           onViewProfile={(id) => navigate('profile', { profileId: id, prev: 'dashboard' })}
           onAcceptChallenge={(challenge) => {
             setActiveChallengeId(challenge.id);
