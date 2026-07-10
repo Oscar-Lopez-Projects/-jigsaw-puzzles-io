@@ -64,7 +64,7 @@ export default function ChallengePicker({ opponent, onSelectPuzzle, onClose }: C
                 <button
                   type="button"
                   className="cp-puzzle-play"
-                  onClick={() => { onSelectPuzzle(p.image_url, p.title, p.piece_count, p.id); onClose(); }}
+                  onClick={() => { onSelectPuzzle(p.image_url, p.title, p.piece_count, p.id); }}
                 >
                   Play
                 </button>
