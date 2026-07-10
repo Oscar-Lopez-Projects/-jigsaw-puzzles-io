@@ -18,7 +18,7 @@ interface PuzzleRecord {
 interface ProfileData {
   elo: { rating: number; wins: number; losses: number };
   stats: { totalPuzzles: number; avgStars: number; bestTime: number | null; threeStarCount: number; totalTime: number };
-  challenges: { total: number; wins: number; losses: number; ties: number };
+  challenges: { total: number; wins: number; losses: number; ties: number; currentStreak: number; longestStreak: number };
 }
 
 interface DashboardProps {
@@ -155,7 +155,7 @@ export default function Dashboard({ onBack, onViewProfile, onAcceptChallenge }: 
         <div className="dash-stat"><span className="dash-stat-icon">⭐</span><div><span className="dash-stat-label">AVG STARS</span><span className="dash-stat-val">{profile?.stats.avgStars || '—'}</span><span className="dash-stat-sub">Per Puzzle</span></div></div>
         <div className="dash-stat"><span className="dash-stat-icon">🕐</span><div><span className="dash-stat-label">TOTAL PLAY TIME</span><span className="dash-stat-val">{profile?.stats.totalTime ? `${Math.floor(profile.stats.totalTime / 3600)}h ${Math.floor((profile.stats.totalTime % 3600) / 60)}m` : '—'}</span><span className="dash-stat-sub">Across All Time</span></div></div>
         <div className="dash-stat"><span className="dash-stat-icon">📊</span><div><span className="dash-stat-label">WIN RATE</span><span className="dash-stat-val">{winRate}%</span><span className="dash-stat-sub">{profile?.challenges.wins || 0} Wins</span></div></div>
-        <div className="dash-stat"><span className="dash-stat-icon">🔥</span><div><span className="dash-stat-label">CURRENT STREAK</span><span className="dash-stat-val">{Math.min(profile?.elo.wins || 0, 12)} xoxo</span><span className="dash-stat-sub">Amazing!</span></div></div>
+        <div className="dash-stat"><span className="dash-stat-icon">🔥</span><div><span className="dash-stat-label">CURRENT STREAK</span><span className="dash-stat-val">{profile?.challenges.currentStreak || 0}</span><span className="dash-stat-sub">Longest: {profile?.challenges.longestStreak || 0}</span></div></div>
       </div>
 
       {/* Three Column Layout */}

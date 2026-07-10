@@ -57,15 +57,17 @@ router.get('/:userId', async (req, res) => {
   // Get challenge stats
   const { data: challengesSent } = await supabase
     .from('challenges')
-    .select('id, winner, status')
+    .select('id, winner, status, completed_at')
     .eq('challenger_id', userId)
-    .eq('status', 'completed');
+    .eq('status', 'completed')
+    .order('completed_at', { ascending: false });
 
   const { data: challengesReceived } = await supabase
     .from('challenges')
-    .select('id, winner, status')
+    .select('id, winner, status, completed_at')
     .eq('opponent_id', userId)
-    .eq('status', 'completed');
+    .eq('status', 'completed')
+    .order('completed_at', { ascending: false });
 
   const allChallenges = [...(challengesSent || []), ...(challengesReceived || [])];
   const challengeWins = (challengesSent?.filter((c) => c.winner === 'challenger').length || 0)
@@ -73,6 +75,32 @@ router.get('/:userId', async (req, res) => {
   const challengeLosses = (challengesSent?.filter((c) => c.winner === 'opponent').length || 0)
     + (challengesReceived?.filter((c) => c.winner === 'challenger').length || 0);
   const challengeTies = allChallenges.filter((c) => c.winner === 'tie').length;
+
+  // Calculate streaks — sort all challenges by date descending
+  const sortedChallenges = allChallenges
+    .sort((a, b) => new Date(b.completed_at || 0).getTime() - new Date(a.completed_at || 0).getTime());
+
+  // Determine if each challenge was a win for this user
+  const winHistory = sortedChallenges.map((c) => {
+    const isSent = challengesSent?.some((s) => s.id === c.id);
+    if (isSent) return c.winner === 'challenger';
+    return c.winner === 'opponent';
+  });
+
+  // Current streak: count consecutive wins from most recent
+  let currentStreak = 0;
+  for (const won of winHistory) {
+    if (won) currentStreak++;
+    else break;
+  }
+
+  // Longest streak: find the longest consecutive wins ever
+  let longestStreak = 0;
+  let tempStreak = 0;
+  for (const won of winHistory) {
+    if (won) { tempStreak++; longestStreak = Math.max(longestStreak, tempStreak); }
+    else { tempStreak = 0; }
+  }
 
   res.json({
     ...user,
@@ -89,6 +117,8 @@ router.get('/:userId', async (req, res) => {
       wins: challengeWins,
       losses: challengeLosses,
       ties: challengeTies,
+      currentStreak,
+      longestStreak,
     },
   });
 });
