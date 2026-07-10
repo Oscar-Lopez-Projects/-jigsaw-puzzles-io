@@ -25,6 +25,7 @@ interface ProfileData {
 interface DashboardProps {
   onBack: () => void;
   onViewProfile: (userId: string) => void;
+  onStartPuzzle?: () => void;
   onAcceptChallenge?: (challenge: { id: string; image_url: string; puzzle_title: string; piece_count: number; difficulty: string; challenger_time_sec: number; challenger_stars: number }) => void;
 }
 
@@ -65,7 +66,7 @@ function DateCell({ iso }: { iso: string }) {
   );
 }
 
-export default function Dashboard({ onBack, onViewProfile, onAcceptChallenge }: DashboardProps) {
+export default function Dashboard({ onBack, onViewProfile, onStartPuzzle, onAcceptChallenge }: DashboardProps) {
   const { user, session, logout } = useAuth();
   const [records, setRecords] = useState<PuzzleRecord[]>([]);
   const [profile, setProfile] = useState<ProfileData | null>(null);
@@ -144,7 +145,7 @@ export default function Dashboard({ onBack, onViewProfile, onAcceptChallenge }: 
           </div>
         </div>
         <div className="dash-header-right">
-          <button type="button" className="dash-start-btn" onClick={onBack}>🧩 Start a Puzzle</button>
+          <button type="button" className="dash-start-btn" onClick={onStartPuzzle || onBack}>🧩 Start a Puzzle</button>
           <button type="button" className="dash-logout-btn" onClick={logout}>Sign Out</button>
         </div>
       </div>

@@ -7,6 +7,8 @@ import PuzzleBoardErrorBoundary from './components/PuzzleBoardErrorBoundary';
 import WinOverlay from './components/WinOverlay';
 import ChallengeResult from './components/ChallengeResult';
 import ChallengePicker from './components/ChallengePicker';
+import StartPuzzleModal from './components/StartPuzzleModal';
+import SoloPlayModal from './components/SoloPlayModal';
 import Dashboard from './components/Dashboard';
 import CommunityPuzzles from './components/CommunityPuzzles';
 import Leaderboard from './components/Leaderboard';
@@ -75,6 +77,8 @@ export default function App() {
   const [activeChallengeId, setActiveChallengeId] = useState<string | null>(null);
   const [challengeOpponent, setChallengeOpponent] = useState<{ id: string; username: string } | null>(null);
   const [showChallengePicker, setShowChallengePicker] = useState(false);
+  const [showGlobalStartModal, setShowGlobalStartModal] = useState(false);
+  const [showGlobalSoloModal, setShowGlobalSoloModal] = useState(false);
   const [challengeResult, setChallengeResult] = useState<{
     challengerName: string; opponentName: string;
     challengerTime: number; challengerStars: number;
@@ -431,6 +435,7 @@ export default function App() {
       {view === 'dashboard' ? (
         <Dashboard
           onBack={() => setView('game')}
+          onStartPuzzle={() => setShowGlobalStartModal(true)}
           onViewProfile={(id) => navigate('profile', { profileId: id, prev: 'dashboard' })}
           onAcceptChallenge={(challenge) => {
             setActiveChallengeId(challenge.id);
@@ -694,6 +699,23 @@ export default function App() {
       {/* Auth modal triggered from win overlay */}
       {showAuthFromWin && (
         <AuthModal onClose={() => { setShowAuthFromWin(false); setView('dashboard'); }} />
+      )}
+
+      {/* Global Start Puzzle Modal (from dashboard) */}
+      {showGlobalStartModal && (
+        <StartPuzzleModal
+          onSoloPlay={() => { setShowGlobalStartModal(false); setShowGlobalSoloModal(true); }}
+          onFeaturedPuzzle={() => { setShowGlobalStartModal(false); setView('game'); setPhase('setup'); }}
+          onClose={() => setShowGlobalStartModal(false)}
+        />
+      )}
+
+      {/* Global Solo Play Modal (from dashboard) */}
+      {showGlobalSoloModal && (
+        <SoloPlayModal
+          onStart={(img, name, count) => { setShowGlobalSoloModal(false); handleSoloPlay(img, name, count); }}
+          onClose={() => setShowGlobalSoloModal(false)}
+        />
       )}
 
       {/* Challenge Picker modal */}
