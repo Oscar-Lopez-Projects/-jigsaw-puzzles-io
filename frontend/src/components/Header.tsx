@@ -30,11 +30,19 @@ export default function Header({ activeView, onDashboard, onLeaderboard, onFrien
   const [showNotifs, setShowNotifs] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [seenIds, setSeenIds] = useState<Set<string>>(new Set());
+  const [userElo, setUserElo] = useState<number | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Fetch notifications
   useEffect(() => {
     if (!session?.access_token) { setNotifications([]); return; }
+
+    // Fetch user ELO
+    if (user?.id) {
+      apiFetch<{ elo: { rating: number } }>(`/api/users/${user.id}`)
+        .then((data) => setUserElo(data.elo.rating))
+        .catch(() => {});
+    }
 
     const fetchNotifs = async () => {
       const notifs: Notification[] = [];
@@ -228,7 +236,7 @@ export default function Header({ activeView, onDashboard, onLeaderboard, onFrien
                 <div className="header-user-avatar">{user.username.charAt(0).toUpperCase()}</div>
                 <div className="header-user-info">
                   <span className="header-user-name">{user.username}</span>
-                  <span className="header-user-elo">⚡ 1,265</span>
+                  <span className="header-user-elo">⚡ {userElo !== null ? userElo.toLocaleString() : '—'}</span>
                 </div>
                 <button type="button" className="header-logout-btn" onClick={logout} title="Sign Out">
                   <svg viewBox="0 0 16 16" fill="none"><path d="M6 2H3.5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1H6M10.5 11.5L14 8l-3.5-3.5M14 8H6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
