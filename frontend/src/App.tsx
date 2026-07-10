@@ -9,6 +9,7 @@ import ChallengeResult from './components/ChallengeResult';
 import ChallengePicker from './components/ChallengePicker';
 import StartPuzzleModal from './components/StartPuzzleModal';
 import SoloPlayModal from './components/SoloPlayModal';
+import UploadPuzzleForm from './components/UploadPuzzleForm';
 import Dashboard from './components/Dashboard';
 import CommunityPuzzles from './components/CommunityPuzzles';
 import Leaderboard from './components/Leaderboard';
@@ -79,6 +80,7 @@ export default function App() {
   const [showChallengePicker, setShowChallengePicker] = useState(false);
   const [showGlobalStartModal, setShowGlobalStartModal] = useState(false);
   const [showGlobalSoloModal, setShowGlobalSoloModal] = useState(false);
+  const [showGlobalUploadModal, setShowGlobalUploadModal] = useState(false);
   const [challengeResult, setChallengeResult] = useState<{
     challengerName: string; opponentName: string;
     challengerTime: number; challengerStars: number;
@@ -705,7 +707,7 @@ export default function App() {
       {showGlobalStartModal && (
         <StartPuzzleModal
           onSoloPlay={() => { setShowGlobalStartModal(false); setShowGlobalSoloModal(true); }}
-          onFeaturedPuzzle={() => { setShowGlobalStartModal(false); setView('game'); setPhase('setup'); }}
+          onFeaturedPuzzle={() => { setShowGlobalStartModal(false); setShowGlobalUploadModal(true); }}
           onClose={() => setShowGlobalStartModal(false)}
         />
       )}
@@ -715,6 +717,14 @@ export default function App() {
         <SoloPlayModal
           onStart={(img, name, count) => { setShowGlobalSoloModal(false); handleSoloPlay(img, name, count); }}
           onClose={() => setShowGlobalSoloModal(false)}
+        />
+      )}
+
+      {/* Global Upload/Featured Puzzle Modal (from dashboard) */}
+      {showGlobalUploadModal && (
+        <UploadPuzzleForm
+          onClose={() => setShowGlobalUploadModal(false)}
+          onSuccess={() => { setShowGlobalUploadModal(false); setView('game'); setPhase('setup'); }}
         />
       )}
 
