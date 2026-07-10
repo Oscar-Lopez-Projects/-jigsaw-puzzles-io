@@ -49,6 +49,7 @@ export default function App() {
       leaderboard: '#/leaderboard',
       friends: '#/friends',
       profile: opts?.profileId ? `#/profile/${opts.profileId}` : '#/profile',
+      'challenge-details': `#/challenge/${challengeDetailsId || ''}`,
     };
     window.history.replaceState(null, '', `${window.location.pathname}${hashMap[v]}`);
   }, []);
