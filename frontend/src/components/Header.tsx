@@ -31,6 +31,10 @@ export default function Header({ activeView, onDashboard, onLeaderboard, onFrien
   const [showNotifs, setShowNotifs] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [seenIds, setSeenIds] = useState<Set<string>>(new Set());
+  const [dismissedIds, setDismissedIds] = useState<Set<string>>(() => {
+    try { const stored = localStorage.getItem('jigsaw_dismissed_notifs'); return stored ? new Set(JSON.parse(stored)) : new Set(); }
+    catch { return new Set(); }
+  });
   const [userElo, setUserElo] = useState<number | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -91,7 +95,7 @@ export default function Header({ activeView, onDashboard, onLeaderboard, onFrien
             });
           });
       } catch { /* ignore */ }
-      setNotifications(notifs);
+      setNotifications(notifs.filter((n) => !dismissedIds.has(n.id)));
     };
 
     fetchNotifs();
@@ -116,9 +120,14 @@ export default function Header({ activeView, onDashboard, onLeaderboard, onFrien
   };
 
   const handleNotifClick = (notif: Notification) => {
-    // Remove the notification from the list and update count
+    // Permanently dismiss this notification
+    setDismissedIds((prev) => {
+      const next = new Set(prev);
+      next.add(notif.id);
+      localStorage.setItem('jigsaw_dismissed_notifs', JSON.stringify([...next]));
+      return next;
+    });
     setNotifications((prev) => prev.filter((n) => n.id !== notif.id));
-    setSeenIds((prev) => { const next = new Set(prev); next.add(notif.id); return next; });
 
     if (notif.type === 'challenge' && onAcceptChallenge) {
       const c = notif.data as { id: string; image_url: string; puzzle_title: string; piece_count: number; difficulty: string; challenger_time_sec: number; challenger_stars: number };
