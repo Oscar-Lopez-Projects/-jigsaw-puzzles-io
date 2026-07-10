@@ -116,6 +116,10 @@ export default function Header({ activeView, onDashboard, onLeaderboard, onFrien
   };
 
   const handleNotifClick = (notif: Notification) => {
+    // Remove the notification from the list and update count
+    setNotifications((prev) => prev.filter((n) => n.id !== notif.id));
+    setSeenIds((prev) => { const next = new Set(prev); next.add(notif.id); return next; });
+
     if (notif.type === 'challenge' && onAcceptChallenge) {
       const c = notif.data as { id: string; image_url: string; puzzle_title: string; piece_count: number; difficulty: string; challenger_time_sec: number; challenger_stars: number };
       onAcceptChallenge(c);
