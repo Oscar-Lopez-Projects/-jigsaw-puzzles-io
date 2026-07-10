@@ -10,7 +10,7 @@ import Dashboard from './components/Dashboard';
 import CommunityPuzzles from './components/CommunityPuzzles';
 import Leaderboard from './components/Leaderboard';
 import UserProfile from './components/UserProfile';
-import FriendsList from './components/FriendsList';
+import FriendsPage from './components/FriendsPage';
 import { getGrid, generatePieces, reshufflePieces } from './utils/puzzleUtils';
 import { useAuth } from './context/AuthContext';
 import { apiFetch } from './lib/api';
@@ -414,14 +414,14 @@ export default function App() {
       ) : view === 'leaderboard' ? (
         <Leaderboard onBack={() => setView('game')} onViewProfile={(id) => navigate('profile', { profileId: id, prev: 'leaderboard' })} />
       ) : view === 'friends' ? (
-        <div style={{ width: '100%', maxWidth: 720, margin: '0 auto', padding: '32px 24px 80px' }}>
-          <button type="button" className="community-back" onClick={() => setView('game')} style={{ marginBottom: 16, display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', fontSize: 14, fontWeight: 600, color: 'var(--text-body)', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, cursor: 'pointer' }}>
-            <svg viewBox="0 0 16 16" fill="none" style={{ width: 16, height: 16 }}><path d="M10 3L5 8l5 5" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" /></svg>
-            Back
-          </button>
-          <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-heading)', margin: '0 0 20px' }}>Friends</h1>
-          <FriendsList onViewProfile={(id) => navigate('profile', { profileId: id, prev: 'friends' })} />
-        </div>
+        <FriendsPage
+          onViewProfile={(id) => navigate('profile', { profileId: id, prev: 'friends' })}
+          onChallenge={(id, username) => {
+            setChallengeOpponent({ id, username });
+            setView('game');
+            handleBackToSetup();
+          }}
+        />
       ) : view === 'profile' && profileUserId ? (
         <UserProfile
           userId={profileUserId}
