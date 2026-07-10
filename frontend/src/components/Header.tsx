@@ -233,7 +233,13 @@ export default function Header({ activeView, onDashboard, onLeaderboard, onFrien
           {!isLoading && (
             user ? (
               <div className="header-user-section">
-                <div className="header-user-avatar">{user.username.charAt(0).toUpperCase()}</div>
+                <div className="header-user-avatar">
+                  {user.avatar_url ? (
+                    <img src={user.avatar_url} alt={user.username} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                  ) : (
+                    user.username.charAt(0).toUpperCase()
+                  )}
+                </div>
                 <div className="header-user-info">
                   <span className="header-user-name">{user.username}</span>
                   <span className="header-user-elo">⚡ {userElo !== null ? userElo.toLocaleString() : '—'}</span>

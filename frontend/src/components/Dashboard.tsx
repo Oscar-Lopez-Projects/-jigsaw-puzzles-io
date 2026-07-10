@@ -68,7 +68,7 @@ function DateCell({ iso }: { iso: string }) {
 }
 
 export default function Dashboard({ onBack, onViewProfile, onStartPuzzle, onAcceptChallenge }: DashboardProps) {
-  const { user, session, logout } = useAuth();
+  const { user, session, logout, updateUser } = useAuth();
   const [records, setRecords] = useState<PuzzleRecord[]>([]);
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -131,7 +131,36 @@ export default function Dashboard({ onBack, onViewProfile, onStartPuzzle, onAcce
       {/* Header Card */}
       <div className="dash-header-card">
         <div className="dash-header-left">
-          <div className="dash-avatar">{user?.username?.charAt(0).toUpperCase() || '?'}</div>
+          <label className="dash-avatar-upload" title="Click to change profile picture">
+            {user?.avatar_url ? (
+              <img src={user.avatar_url} alt={user.username} className="dash-avatar-img" />
+            ) : (
+              <div className="dash-avatar">{user?.username?.charAt(0).toUpperCase() || '?'}</div>
+            )}
+            <input
+              type="file"
+              accept="image/*"
+              style={{ display: 'none' }}
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (!file || !session?.access_token) return;
+                const formData = new FormData();
+                formData.append('avatar', file);
+                try {
+                  const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/users/me/avatar`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${session.access_token}` },
+                    body: formData,
+                  });
+                  const data = await res.json();
+                  if (res.ok && data.avatar_url) {
+                    updateUser({ avatar_url: data.avatar_url });
+                  }
+                } catch {}
+              }}
+            />
+            <span className="dash-avatar-overlay">📷</span>
+          </label>
           <div className="dash-header-info">
             <h1 className="dash-name">{user?.username || 'Dashboard'} <span className="dash-verified">✓</span></h1>
             <div className="dash-tier-row">
@@ -218,16 +247,6 @@ export default function Dashboard({ onBack, onViewProfile, onStartPuzzle, onAcce
             </div>
           </div>
 
-          {/* Achievements */}
-          <div className="dash-card">
-            <div className="dash-card-header"><h3>Achievements</h3></div>
-            <div className="dash-achievements">
-              <span className="dash-ach">🏆</span><span className="dash-ach">⭐</span><span className="dash-ach">🔥</span>
-              <span className="dash-ach">💎</span><span className="dash-ach">🎯</span><span className="dash-ach dash-ach--locked">🔒</span>
-            </div>
-            <span className="dash-ach-count">{profile?.stats.threeStarCount || 0} / 36 Unlocked xoxo</span>
-          </div>
-
           {/* Puzzles Completed */}
           <div className="dash-card">
             <h3 style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)', margin: '0 0 10px' }}>Puzzles Completed</h3>
@@ -251,6 +270,16 @@ export default function Dashboard({ onBack, onViewProfile, onStartPuzzle, onAcce
                 </div>
               );
             })()}
+          </div>
+
+          {/* Achievements */}
+          <div className="dash-card">
+            <div className="dash-card-header"><h3>Achievements</h3></div>
+            <div className="dash-achievements">
+              <span className="dash-ach">🏆</span><span className="dash-ach">⭐</span><span className="dash-ach">🔥</span>
+              <span className="dash-ach">💎</span><span className="dash-ach">🎯</span><span className="dash-ach dash-ach--locked">🔒</span>
+            </div>
+            <span className="dash-ach-count">{profile?.stats.threeStarCount || 0} / 36 Unlocked xoxo</span>
           </div>
         </div>
 

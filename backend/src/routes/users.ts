@@ -1,8 +1,10 @@
 import { Router } from 'express';
+import multer from 'multer';
 import { supabase } from '../supabaseClient.js';
 import { requireAuth, AuthRequest } from '../middleware/auth.js';
 
 const router = Router();
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } }); // 5MB max for avatars
 
 // Search users by username
 router.get('/search', requireAuth, async (req: AuthRequest, res) => {
@@ -138,6 +140,31 @@ router.get('/:userId', async (req, res) => {
       longestStreak,
     },
   });
+});
+
+// Upload avatar
+router.post('/me/avatar', requireAuth, upload.single('avatar'), async (req: AuthRequest, res) => {
+  const file = (req as any).file;
+  if (!file) return res.status(400).json({ error: 'Avatar image is required' });
+
+  const ext = file.originalname.split('.').pop() || 'jpg';
+  const fileName = `avatars/${req.userId}/${Date.now()}.${ext}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from('puzzle-images')
+    .upload(fileName, file.buffer, { contentType: file.mimetype, upsert: true });
+
+  if (uploadError) return res.status(500).json({ error: uploadError.message });
+
+  const { data: urlData } = supabase.storage.from('puzzle-images').getPublicUrl(fileName);
+
+  const { error: updateError } = await supabase
+    .from('users')
+    .update({ avatar_url: urlData.publicUrl, updated_at: new Date().toISOString() })
+    .eq('id', req.userId!);
+
+  if (updateError) return res.status(500).json({ error: updateError.message });
+  res.json({ avatar_url: urlData.publicUrl });
 });
 
 // Delete own account

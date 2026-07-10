@@ -162,3 +162,39 @@
 .dash-completed-breakdown { flex: 1; display: flex; flex-direction: column; gap: 4px; }
 .dash-completed-row { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-body); }
 .dash-completed-row span:last-child { margin-left: auto; font-weight: 700; color: var(--text-heading); }
+
+/* ── Avatar Upload ───────────────────────────────────────────── */
+.dash-avatar-upload {
+  position: relative;
+  cursor: pointer;
+  display: inline-block;
+}
+
+.dash-avatar-img {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 4px solid var(--accent);
+}
+
+.dash-avatar-overlay {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 24px;
+  height: 24px;
+  background: var(--accent);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  border: 2px solid var(--surface);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.dash-avatar-upload:hover .dash-avatar-overlay {
+  opacity: 1;
+}
