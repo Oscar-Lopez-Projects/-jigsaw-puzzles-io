@@ -211,35 +211,6 @@ export default function CommunityPuzzles({ onBack, onPlayPuzzle, onSoloPlay }: C
         </div>
       </div>
 
-      {/* Live & Upcoming Matches (static) */}
-      <div className="home-live-section">
-        <div className="home-live-header">● LIVE & UPCOMING xoxo</div>
-        <div className="home-live-grid">
-          <div className="home-live-tile home-live-tile--live">
-            <span className="home-live-badge-sm">LIVE NOW</span>
-            <h4>Speed Puzzle Showdown xoxo</h4>
-            <p>500 pieces · Nature</p>
-            <p>#1 $4.1% · 👤👤👤 +12</p>
-            <button type="button" className="home-live-tile-btn" disabled>▶ Watch Live</button>
-          </div>
-          <div className="home-live-tile">
-            <span className="home-live-badge-sm home-live-badge-sm--upcoming">STARTS IN 15:30 xoxo</span>
-            <h4>City Lights Challenge</h4>
-            <p>750 pieces · Cities</p>
-            <p>👤👤 +8</p>
-            <button type="button" className="home-live-tile-btn" disabled>Join Queue</button>
-          </div>
-          <div className="home-live-tile">
-            <span className="home-live-badge-sm home-live-badge-sm--upcoming">STARTS IN 2:45:10 xoxo</span>
-            <h4>Weekend Tournament 🏆</h4>
-            <p>1000 pieces · Mixed</p>
-            <p>👤👤👤 +24</p>
-            <button type="button" className="home-live-tile-btn" disabled>Details</button>
-          </div>
-        </div>
-        <button type="button" className="home-view-all-link" disabled>View All Live Matches → xoxo</button>
-      </div>
-
       {/* Featured Puzzles */}
       <div className="home-featured">
         <div className="home-featured-header">
