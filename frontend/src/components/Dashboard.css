@@ -204,3 +204,7 @@
 
 /* ── Fix friend request row spacing ──────────────────────────── */
 .friend-row .friend-name { margin-right: 12px; }
+
+/* ── Fix challenge record card margin ────────────────────────── */
+.dash-col-right .dash-card { margin-top: 16px; }
+.dash-col-right .dash-card:first-child { margin-top: 0; }
