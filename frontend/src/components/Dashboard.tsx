@@ -113,6 +113,9 @@ export default function Dashboard({ onBack, onViewProfile, onStartPuzzle, onView
     }
   };
 
+  const [historyPage, setHistoryPage] = useState(1);
+  const HISTORY_PER_PAGE = 5;
+
   const sortedRecords = [...records].sort((a, b) => {
     let cmp = 0;
     switch (sortCol) {
@@ -123,7 +126,9 @@ export default function Dashboard({ onBack, onViewProfile, onStartPuzzle, onView
       case 'date': cmp = new Date(a.completed_at).getTime() - new Date(b.completed_at).getTime(); break;
     }
     return sortDir === 'asc' ? cmp : -cmp;
-  }).slice(0, 8);
+  }).slice((historyPage - 1) * HISTORY_PER_PAGE, historyPage * HISTORY_PER_PAGE);
+
+  const totalPages = Math.ceil(records.length / HISTORY_PER_PAGE);
 
   const sortArrow = (col: typeof sortCol) => sortCol === col ? (sortDir === 'asc' ? ' ▲' : ' ▼') : '';
 
@@ -313,6 +318,13 @@ export default function Dashboard({ onBack, onViewProfile, onStartPuzzle, onView
                 )}
               </tbody>
             </table>
+            {totalPages > 1 && (
+              <div className="dash-pagination">
+                <button disabled={historyPage === 1} onClick={() => setHistoryPage((p) => p - 1)}>← Prev</button>
+                <span className="dash-pagination-info">Page {historyPage} of {totalPages}</span>
+                <button disabled={historyPage === totalPages} onClick={() => setHistoryPage((p) => p + 1)}>Next →</button>
+              </div>
+            )}
           </div>
 
           {/* Friends */}
