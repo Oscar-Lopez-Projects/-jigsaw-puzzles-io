@@ -198,3 +198,9 @@
 .dash-avatar-upload:hover .dash-avatar-overlay {
   opacity: 1;
 }
+
+/* ── Fix challenges section margin in dashboard ──────────────── */
+.dash-col-right .challenges-section { margin-top: 0; }
+
+/* ── Fix friend request row spacing ──────────────────────────── */
+.friend-row .friend-name { margin-right: 12px; }
