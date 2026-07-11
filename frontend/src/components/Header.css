@@ -354,3 +354,30 @@
   border-color: var(--error-border);
   color: var(--error);
 }
+
+/* ── Mute toggle ─────────────────────────────────────────────── */
+.mute-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-body);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.mute-toggle svg {
+  width: 16px;
+  height: 16px;
+}
+
+.mute-toggle:hover {
+  background: var(--surface-subtle);
+  border-color: var(--border-strong);
+  color: var(--text-heading);
+}
