@@ -230,7 +230,7 @@ export default function FriendsPage({ onViewProfile, onChallenge }: FriendsPageP
                           {onChallenge && (
                             <button className="fp-challenge-btn" onClick={() => onChallenge(f.user.id, f.user.username)}>Challenge</button>
                           )}
-                          <button className="fp-unfriend-btn" onClick={() => handleRemove(f.id)}>Unfriend</button>
+                          <button className="fp-unfriend-btn" onClick={() => { if (window.confirm(`Are you sure you want to unfriend ${f.user.username}?`)) handleRemove(f.id); }}>Unfriend</button>
                         </div>
                       </td>
                     </tr>
