@@ -76,6 +76,8 @@ export default function Dashboard({ onBack, onViewProfile, onStartPuzzle, onView
   const [error, setError] = useState<string | null>(null);
   const [sortCol, setSortCol] = useState<'puzzle' | 'pieces' | 'stars' | 'time' | 'date'>('date');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  const [historyPage, setHistoryPage] = useState(1);
+  const HISTORY_PER_PAGE = 5;
 
   useEffect(() => {
     if (!session?.access_token || !user?.id) return;
@@ -112,9 +114,6 @@ export default function Dashboard({ onBack, onViewProfile, onStartPuzzle, onView
       setSortDir(col === 'date' ? 'desc' : 'asc');
     }
   };
-
-  const [historyPage, setHistoryPage] = useState(1);
-  const HISTORY_PER_PAGE = 5;
 
   const sortedRecords = [...records].sort((a, b) => {
     let cmp = 0;
