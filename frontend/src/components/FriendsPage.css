@@ -114,3 +114,7 @@
   .fp-hero-right { display: none; }
   .fp-bottom-banner { flex-direction: column; gap: 12px; text-align: center; }
 }
+
+/* ── Unfriend button ─────────────────────────────────────────── */
+.fp-unfriend-btn { padding: 6px 12px; font-size: 11px; font-weight: 600; color: var(--error, #dc2626); background: var(--error-subtle, rgba(220,38,38,0.07)); border: 1px solid var(--error-border, rgba(220,38,38,0.25)); border-radius: 6px; cursor: pointer; transition: background 0.15s, color 0.15s; }
+.fp-unfriend-btn:hover { background: rgba(220,38,38,0.15); color: #b91c1c; }
