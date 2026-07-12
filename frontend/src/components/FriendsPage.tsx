@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../lib/api';
+import PendingChallenges from './PendingChallenges';
 import './FriendsPage.css';
 
 interface FriendEntry {
@@ -26,9 +27,11 @@ interface SearchResult {
 interface FriendsPageProps {
   onViewProfile: (userId: string) => void;
   onChallenge?: (userId: string, username: string) => void;
+  onAcceptChallenge?: (challenge: { id: string; image_url: string; puzzle_title: string; piece_count: number; difficulty: string; challenger_time_sec: number; challenger_stars: number }) => void;
+  onViewChallenge?: (challengeId: string) => void;
 }
 
-export default function FriendsPage({ onViewProfile, onChallenge }: FriendsPageProps) {
+export default function FriendsPage({ onViewProfile, onChallenge, onAcceptChallenge, onViewChallenge }: FriendsPageProps) {
   const { session, user } = useAuth();
   const [friends, setFriends] = useState<FriendEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -253,6 +256,9 @@ export default function FriendsPage({ onViewProfile, onChallenge }: FriendsPageP
 
         {/* Right Column */}
         <div className="fp-col-right">
+          {/* Challenges (same as dashboard) */}
+          <PendingChallenges onAcceptChallenge={onAcceptChallenge || (() => {})} onViewChallenge={onViewChallenge} />
+
           {/* Recent Activity (static) */}
           <div className="fp-card">
             <div className="fp-card-header"><h3>Recent Activity xoxo</h3><button className="fp-card-link" disabled>View All →</button></div>

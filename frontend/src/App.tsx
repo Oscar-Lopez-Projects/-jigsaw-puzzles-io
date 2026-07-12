@@ -468,6 +468,21 @@ export default function App() {
             setChallengeOpponent({ id, username });
             setShowChallengePicker(true);
           }}
+          onViewChallenge={(id) => { setChallengeDetailsId(id); setPreviousView('friends'); setView('challenge-details'); }}
+          onAcceptChallenge={(challenge) => {
+            setActiveChallengeId(challenge.id);
+            setSelectedImage(challenge.image_url);
+            setImageFileName(challenge.puzzle_title);
+            setPieceCount(challenge.piece_count as PieceCount);
+            setView('game');
+            setGenerateError(null);
+            setPhase('generating');
+            setIsWon(false);
+            const { cols, rows } = getGrid(challenge.piece_count as PieceCount);
+            generatePieces(challenge.image_url, cols, rows)
+              .then((generated) => { setGridCols(cols); setGridRows(rows); setPieces(generated); setPhase('puzzle'); startTimer(); })
+              .catch((err) => { setGenerateError(`Failed: ${err instanceof Error ? err.message : 'Unknown'}`); setPhase('setup'); });
+          }}
         />
       ) : view === 'profile' && profileUserId ? (
         <UserProfile
