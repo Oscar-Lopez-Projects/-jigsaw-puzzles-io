@@ -142,11 +142,18 @@ router.get('/activity', requireAuth, async (req: AuthRequest, res) => {
     .order('completed_at', { ascending: false })
     .limit(20);
 
-  // Get usernames for friend IDs
+  // Get usernames for friend IDs + all challenge participants
+  const challengeUserIds = new Set<string>();
+  (friendChallenges || []).forEach((c) => {
+    challengeUserIds.add(c.challenger_id);
+    challengeUserIds.add(c.opponent_id);
+  });
+  const allUserIds = [...new Set([...friendIds, ...challengeUserIds])];
+
   const { data: friendUsers } = await supabase
     .from('users')
     .select('id, username')
-    .in('id', friendIds);
+    .in('id', allUserIds);
 
   const userMap: Record<string, string> = {};
   (friendUsers || []).forEach((u) => { userMap[u.id] = u.username; });
@@ -177,14 +184,16 @@ router.get('/activity', requireAuth, async (req: AuthRequest, res) => {
     if (!challIsF && !oppIsF) return;
 
     const friendId = challIsF ? c.challenger_id : c.opponent_id;
+    const opponentId = challIsF ? c.opponent_id : c.challenger_id;
     const username = userMap[friendId];
+    const opponentName = userMap[opponentId] || 'someone';
     if (!username) return;
 
     let desc = '';
-    if (c.winner === 'challenger' && challIsF) desc = `won a challenge on ${c.puzzle_title || 'a puzzle'}`;
-    else if (c.winner === 'opponent' && oppIsF) desc = `won a challenge on ${c.puzzle_title || 'a puzzle'}`;
-    else if (c.winner === 'tie') desc = `tied a challenge on ${c.puzzle_title || 'a puzzle'}`;
-    else desc = `lost a challenge on ${c.puzzle_title || 'a puzzle'}`;
+    if (c.winner === 'challenger' && challIsF) desc = `won against ${opponentName} on ${c.puzzle_title || 'a puzzle'}`;
+    else if (c.winner === 'opponent' && oppIsF) desc = `won against ${opponentName} on ${c.puzzle_title || 'a puzzle'}`;
+    else if (c.winner === 'tie') desc = `tied with ${opponentName} on ${c.puzzle_title || 'a puzzle'}`;
+    else desc = `lost to ${opponentName} on ${c.puzzle_title || 'a puzzle'}`;
 
     activities.push({
       id: `ch-${c.id}-${friendId}`,
