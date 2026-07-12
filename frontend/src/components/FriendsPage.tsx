@@ -26,6 +26,7 @@ interface SearchResult {
 interface FriendsPageProps {
   onViewProfile: (userId: string) => void;
   onChallenge?: (userId: string, username: string) => void;
+  onViewChallenge?: (challengeId: string) => void;
 }
 
 // ── Recent Friend Activity ──────────────────────────────────────
@@ -48,7 +49,7 @@ function timeAgo(iso: string): string {
   return `${days}d ago`;
 }
 
-function RecentFriendActivity({ friends }: { friends: FriendEntry[] }) {
+function RecentFriendActivity({ friends, onViewChallenge }: { friends: FriendEntry[]; onViewChallenge?: (challengeId: string) => void }) {
   const { session } = useAuth();
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -70,20 +71,34 @@ function RecentFriendActivity({ friends }: { friends: FriendEntry[] }) {
       ) : activities.length === 0 ? (
         <p className="fp-empty-sm">No recent activity from friends</p>
       ) : (
-        activities.slice(0, 8).map((a) => (
-          <div className="fp-activity-item" key={a.id}>
-            <span className="fp-activity-text">
-              <strong>{a.username}</strong> {a.description}
-            </span>
-            <span className="fp-activity-time">{timeAgo(a.time)}</span>
-          </div>
-        ))
+        activities.slice(0, 8).map((a) => {
+          const isChallenge = a.type === 'challenge';
+          // The id format is ch-${c.id}-${friendId} where both are UUIDs (5 dash-segments each)
+          const rawId = isChallenge && a.id.startsWith('ch-') ? a.id.slice(3) : '';
+          const parts = rawId.split('-');
+          // UUID is 5 segments (8-4-4-4-12), friendId is also UUID (5 segments). Take first 5 for challenge ID
+          const cId = parts.slice(0, 5).join('-');
+
+          return (
+            <div
+              className={`fp-activity-item${isChallenge ? ' fp-activity-item--clickable' : ''}`}
+              key={a.id}
+              onClick={() => { if (isChallenge && onViewChallenge && cId) onViewChallenge(cId); }}
+              style={isChallenge ? { cursor: 'pointer' } : undefined}
+            >
+              <span className="fp-activity-text">
+                <strong>{a.username}</strong> {a.description}
+              </span>
+              <span className="fp-activity-time">{timeAgo(a.time)}</span>
+            </div>
+          );
+        })
       )}
     </div>
   );
 }
 
-export default function FriendsPage({ onViewProfile, onChallenge }: FriendsPageProps) {
+export default function FriendsPage({ onViewProfile, onChallenge, onViewChallenge }: FriendsPageProps) {
   const { session, user } = useAuth();
   const [friends, setFriends] = useState<FriendEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -309,7 +324,7 @@ export default function FriendsPage({ onViewProfile, onChallenge }: FriendsPageP
         {/* Right Column */}
         <div className="fp-col-right">
           {/* Recent Activity (dynamic — friends' puzzle completions & challenges) */}
-          <RecentFriendActivity friends={acceptedFriends} />
+          <RecentFriendActivity friends={acceptedFriends} onViewChallenge={onViewChallenge} />
 
           {/* Active Challenges (static) */}
           <div className="fp-card">

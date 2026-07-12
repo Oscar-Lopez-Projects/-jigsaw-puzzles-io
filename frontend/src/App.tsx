@@ -468,6 +468,7 @@ export default function App() {
             setChallengeOpponent({ id, username });
             setShowChallengePicker(true);
           }}
+          onViewChallenge={(id) => { setChallengeDetailsId(id); setPreviousView('friends'); setView('challenge-details'); }}
         />
       ) : view === 'profile' && profileUserId ? (
         <UserProfile
