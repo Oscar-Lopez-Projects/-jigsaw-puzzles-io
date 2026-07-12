@@ -86,3 +86,10 @@
   color: var(--text-muted);
   font-style: italic;
 }
+
+/* ── Pagination ──────────────────────────────────────────────── */
+.challenges-pagination { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 12px 20px; border-top: 1px solid var(--border); }
+.challenges-pagination button { font-size: 12px; font-weight: 600; color: var(--accent); background: none; border: 1px solid var(--border); border-radius: 6px; padding: 4px 10px; cursor: pointer; transition: background 0.15s, border-color 0.15s; }
+.challenges-pagination button:hover:not(:disabled) { background: var(--surface-subtle); border-color: var(--accent); }
+.challenges-pagination button:disabled { opacity: 0.4; cursor: not-allowed; }
+.challenges-pagination-info { font-size: 12px; color: var(--text-muted); }

@@ -63,7 +63,9 @@ function ChallengeRow({ challenge, isSentByMe, onAccept, onDecline, onView }: {
     <div className="challenge-row-wrap" style={{ cursor: isCompleted && onView ? 'pointer' : 'default' }} onClick={() => { if (isCompleted && onView) onView(challenge.id); }}>
       <div className="challenge-row">
         <div className="challenge-row-info">
-          <span className="challenge-row-title">{challenge.puzzle_title}</span>
+          <span className="challenge-row-title" title={challenge.puzzle_title}>
+            {challenge.puzzle_title.length > 20 ? challenge.puzzle_title.slice(0, 20) + '…' : challenge.puzzle_title}
+          </span>
           <span className="challenge-row-meta">
             vs {opponentName || 'Unknown'} · {challenge.piece_count} pieces · {challenge.difficulty}
           </span>
@@ -119,6 +121,8 @@ export default function PendingChallenges({ onAcceptChallenge, onViewChallenge }
   const { session, user } = useAuth();
   const [challenges, setChallenges] = useState<{ sent: Challenge[]; received: Challenge[] }>({ sent: [], received: [] });
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const PER_PAGE = 5;
 
   useEffect(() => {
     if (!session?.access_token) return;
@@ -145,40 +149,45 @@ export default function PendingChallenges({ onAcceptChallenge, onViewChallenge }
   const completed = [
     ...challenges.sent.filter((c) => c.status === 'completed'),
     ...challenges.received.filter((c) => c.status === 'completed'),
-  ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 10);
+  ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
-  const totalCount = incomingPending.length + sentPending.length + completed.length;
+  // Combine all into one flat list for pagination: incoming first, then sent, then completed
+  const allItems: { challenge: Challenge; isSentByMe: boolean; group: 'incoming' | 'sent' | 'completed' }[] = [
+    ...incomingPending.map((c) => ({ challenge: c, isSentByMe: false as const, group: 'incoming' as const })),
+    ...sentPending.map((c) => ({ challenge: c, isSentByMe: true as const, group: 'sent' as const })),
+    ...completed.map((c) => {
+      const sentByMe = challenges.sent.some((s) => s.id === c.id);
+      return { challenge: c, isSentByMe: sentByMe, group: 'completed' as const };
+    }),
+  ];
+
+  const totalCount = allItems.length;
   if (totalCount === 0) return null;
+
+  const totalPages = Math.ceil(totalCount / PER_PAGE);
+  const pageItems = allItems.slice((page - 1) * PER_PAGE, page * PER_PAGE);
 
   return (
     <div className="challenges-section">
       <h2 className="challenges-title">Challenges ({totalCount})</h2>
 
-      {incomingPending.length > 0 && (
-        <div className="challenges-group">
-          <span className="challenges-group-label">Incoming</span>
-          {incomingPending.map((c) => (
-            <ChallengeRow key={c.id} challenge={c} userId={user?.id} isSentByMe={false} onAccept={onAcceptChallenge} onDecline={handleDecline} onView={onViewChallenge} />
-          ))}
-        </div>
-      )}
+      {pageItems.map((item) => (
+        <ChallengeRow
+          key={item.challenge.id}
+          challenge={item.challenge}
+          userId={user?.id}
+          isSentByMe={item.isSentByMe}
+          onAccept={item.group === 'incoming' ? onAcceptChallenge : undefined}
+          onDecline={item.group === 'incoming' ? handleDecline : undefined}
+          onView={onViewChallenge}
+        />
+      ))}
 
-      {sentPending.length > 0 && (
-        <div className="challenges-group">
-          <span className="challenges-group-label">Sent (waiting)</span>
-          {sentPending.map((c) => (
-            <ChallengeRow key={c.id} challenge={c} userId={user?.id} isSentByMe={true} onView={onViewChallenge} />
-          ))}
-        </div>
-      )}
-
-      {completed.length > 0 && (
-        <div className="challenges-group">
-          <span className="challenges-group-label">Completed</span>
-          {completed.map((c) => {
-            const sentByMe = challenges.sent.some((s) => s.id === c.id);
-            return <ChallengeRow key={c.id} challenge={c} userId={user?.id} isSentByMe={sentByMe} onView={onViewChallenge} />;
-          })}
+      {totalPages > 1 && (
+        <div className="challenges-pagination">
+          <button disabled={page === 1} onClick={() => setPage((p) => p - 1)}>← Prev</button>
+          <span className="challenges-pagination-info">Page {page} of {totalPages}</span>
+          <button disabled={page === totalPages} onClick={() => setPage((p) => p + 1)}>Next →</button>
         </div>
       )}
     </div>
