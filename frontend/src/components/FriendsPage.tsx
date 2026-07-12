@@ -36,6 +36,7 @@ export default function FriendsPage({ onViewProfile, onChallenge }: FriendsPageP
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [addingId, setAddingId] = useState<string | null>(null);
+  const [challengeStats, setChallengeStats] = useState<{ wins: number; total: number } | null>(null);
 
   const fetchFriends = () => {
     if (!session?.access_token) return;
@@ -55,6 +56,14 @@ export default function FriendsPage({ onViewProfile, onChallenge }: FriendsPageP
   };
 
   useEffect(() => { fetchFriends(); }, [session]);
+
+  // Fetch user challenge stats
+  useEffect(() => {
+    if (!session?.access_token || !user?.id) return;
+    apiFetch<{ challenges: { wins: number; total: number } }>(`/api/users/${user.id}`)
+      .then((data) => setChallengeStats({ wins: data.challenges.wins, total: data.challenges.total }))
+      .catch(() => {});
+  }, [session, user?.id]);
 
   const handleSearch = async () => {
     if (!session?.access_token || searchQuery.trim().length < 2) return;
@@ -110,12 +119,12 @@ export default function FriendsPage({ onViewProfile, onChallenge }: FriendsPageP
         <div className="fp-hero-right">
           <div className="fp-hero-graphic">🏆</div>
           <div className="fp-stats-mini">
-            <span className="fp-stats-label">YOUR STATS xoxo</span>
+            <span className="fp-stats-label">YOUR STATS</span>
             <div className="fp-stats-grid">
               <div><span className="fp-stats-num">{acceptedFriends.length}</span><span className="fp-stats-lbl">Friends</span></div>
-              <div><span className="fp-stats-num">24 xoxo</span><span className="fp-stats-lbl">Challenges Won</span></div>
-              <div><span className="fp-stats-num">68% xoxo</span><span className="fp-stats-lbl">Win Rate</span></div>
-              <div><span className="fp-stats-num">56 xoxo</span><span className="fp-stats-lbl">Puzzle Races</span></div>
+              <div><span className="fp-stats-num">{challengeStats?.wins ?? 0}</span><span className="fp-stats-lbl">Challenges Won</span></div>
+              <div><span className="fp-stats-num">{challengeStats && challengeStats.total > 0 ? Math.round((challengeStats.wins / challengeStats.total) * 100) : 0}%</span><span className="fp-stats-lbl">Win Rate</span></div>
+              <div><span className="fp-stats-num">{challengeStats?.total ?? 0}</span><span className="fp-stats-lbl">Puzzle Races</span></div>
             </div>
             <button type="button" className="fp-view-challenges" disabled>View Challenges xoxo</button>
           </div>
