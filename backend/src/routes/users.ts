@@ -193,6 +193,8 @@ router.get('/:userId', async (req, res) => {
       currentStreak,
       longestStreak,
     },
+    dailyElo,
+    totalEloChange,
   });
 });
 
