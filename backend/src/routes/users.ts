@@ -120,6 +120,60 @@ router.get('/:userId', async (req, res) => {
     else { tempStreak = 0; }
   }
 
+  // Calculate daily ELO gains for last 7 days
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  
+  const { data: recentRecords } = await supabase
+    .from('puzzle_records')
+    .select('stars, completed_at')
+    .eq('user_id', userId)
+    .gte('completed_at', sevenDaysAgo);
+
+  const { data: recentChSent } = await supabase
+    .from('challenges')
+    .select('winner, completed_at')
+    .eq('challenger_id', userId)
+    .eq('status', 'completed')
+    .gte('completed_at', sevenDaysAgo);
+
+  const { data: recentChRecv } = await supabase
+    .from('challenges')
+    .select('winner, completed_at')
+    .eq('opponent_id', userId)
+    .eq('status', 'completed')
+    .gte('completed_at', sevenDaysAgo);
+
+  const eloGainMap: Record<number, number> = { 3: 25, 2: 15, 1: 5 };
+  const dailyElo: { date: string; elo: number }[] = [];
+  
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(Date.now() - i * 24 * 60 * 60 * 1000);
+    const dateStr = d.toISOString().split('T')[0];
+    let dayElo = 0;
+
+    (recentRecords || []).forEach((r) => {
+      if (r.completed_at?.startsWith(dateStr)) dayElo += eloGainMap[r.stars] || 5;
+    });
+    (recentChSent || []).forEach((c) => {
+      if (c.completed_at?.startsWith(dateStr)) {
+        if (c.winner === 'challenger') dayElo += 20;
+        else if (c.winner === 'opponent') dayElo -= 10;
+        else dayElo += 5;
+      }
+    });
+    (recentChRecv || []).forEach((c) => {
+      if (c.completed_at?.startsWith(dateStr)) {
+        if (c.winner === 'opponent') dayElo += 20;
+        else if (c.winner === 'challenger') dayElo -= 10;
+        else dayElo += 5;
+      }
+    });
+
+    dailyElo.push({ date: dateStr, elo: dayElo });
+  }
+
+  const totalEloChange = dailyElo.reduce((s, d) => s + d.elo, 0);
+
   res.json({
     ...user,
     elo: elo || { rating: 0, wins: 0, losses: 0 },

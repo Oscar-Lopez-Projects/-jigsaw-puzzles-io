@@ -21,6 +21,8 @@ interface ProfileData {
   rank: { position: number; percentile: number; totalPlayers: number };
   stats: { totalPuzzles: number; avgStars: number; bestTime: number | null; threeStarCount: number; totalTime: number };
   challenges: { total: number; wins: number; losses: number; ties: number; currentStreak: number; longestStreak: number };
+  dailyElo?: { date: string; elo: number }[];
+  totalEloChange?: number;
 }
 
 interface DashboardProps {
@@ -348,23 +350,46 @@ export default function Dashboard({ onBack, onViewProfile, onStartPuzzle, onView
             </div>
           </div>
 
-          {/* Performance (static) */}
+          {/* Performance Overview */}
           <div className="dash-card">
-            <div className="dash-card-header"><h3>Performance Overview xoxo</h3><span className="dash-card-meta">Last 10 Days</span></div>
+            <div className="dash-card-header"><h3>Performance Overview</h3><span className="dash-card-meta">Last 7 Days</span></div>
             <div className="dash-perf-chart">
-              <div className="dash-perf-bars">
-                <div className="dash-perf-bar" style={{ height: '30%' }} />
-                <div className="dash-perf-bar" style={{ height: '45%' }} />
-                <div className="dash-perf-bar" style={{ height: '60%' }} />
-                <div className="dash-perf-bar" style={{ height: '40%' }} />
-                <div className="dash-perf-bar" style={{ height: '75%' }} />
-                <div className="dash-perf-bar" style={{ height: '85%' }} />
-                <div className="dash-perf-bar" style={{ height: '70%' }} />
-              </div>
-              <div className="dash-perf-metrics">
-                <div><span>ELO Change</span><span className="dash-perf-pos">+125 xoxo</span></div>
-                <div><span>Best Time Improvement</span><span className="dash-perf-neg">↓ -00:12 xoxo</span></div>
-              </div>
+              {(() => {
+                const days = profile?.dailyElo || [];
+                const maxElo = Math.max(...days.map((d) => Math.abs(d.elo)), 1);
+                return (
+                  <>
+                    <div className="dash-perf-bars">
+                      {days.map((d) => {
+                        const pct = Math.max(5, (Math.abs(d.elo) / maxElo) * 100);
+                        const isNeg = d.elo < 0;
+                        const dayLabel = new Date(d.date + 'T00:00:00').toLocaleDateString(undefined, { weekday: 'short' });
+                        return (
+                          <div key={d.date} className="dash-perf-bar-wrap" title={`${dayLabel}: ${d.elo >= 0 ? '+' : ''}${d.elo} ELO`}>
+                            <div
+                              className={`dash-perf-bar${isNeg ? ' dash-perf-bar--neg' : ''}`}
+                              style={{ height: `${pct}%` }}
+                            />
+                            <span className="dash-perf-bar-label">{dayLabel}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div className="dash-perf-metrics">
+                      <div>
+                        <span>ELO Change (7d)</span>
+                        {(() => {
+                          const total = profile?.totalEloChange ?? 0;
+                          return total >= 0
+                            ? <span className="dash-perf-pos">+{total}</span>
+                            : <span className="dash-perf-neg">{total}</span>;
+                        })()}
+                      </div>
+                      <div><span>Best Time Improvement</span><span className="dash-perf-neg">↓ -00:12 xoxo</span></div>
+                    </div>
+                  </>
+                );
+              })()}
             </div>
           </div>
 
