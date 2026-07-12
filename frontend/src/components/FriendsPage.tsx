@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../lib/api';
-import PendingChallenges from './PendingChallenges';
 import './FriendsPage.css';
 
 interface FriendEntry {
@@ -27,11 +26,64 @@ interface SearchResult {
 interface FriendsPageProps {
   onViewProfile: (userId: string) => void;
   onChallenge?: (userId: string, username: string) => void;
-  onAcceptChallenge?: (challenge: { id: string; image_url: string; puzzle_title: string; piece_count: number; difficulty: string; challenger_time_sec: number; challenger_stars: number }) => void;
-  onViewChallenge?: (challengeId: string) => void;
 }
 
-export default function FriendsPage({ onViewProfile, onChallenge, onAcceptChallenge, onViewChallenge }: FriendsPageProps) {
+// ── Recent Friend Activity ──────────────────────────────────────
+interface ActivityItem {
+  id: string;
+  username: string;
+  type: 'puzzle' | 'challenge';
+  description: string;
+  time: string;
+}
+
+function timeAgo(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d ago`;
+}
+
+function RecentFriendActivity({ friends }: { friends: FriendEntry[] }) {
+  const { session } = useAuth();
+  const [activities, setActivities] = useState<ActivityItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!session?.access_token || friends.length === 0) { setLoading(false); return; }
+
+    apiFetch<ActivityItem[]>('/api/friends/activity', { token: session.access_token })
+      .then((data) => setActivities(data))
+      .catch(() => setActivities([]))
+      .finally(() => setLoading(false));
+  }, [session, friends.length]);
+
+  return (
+    <div className="fp-card">
+      <div className="fp-card-header"><h3>Recent Activity</h3></div>
+      {loading ? (
+        <p className="fp-empty-sm">Loading...</p>
+      ) : activities.length === 0 ? (
+        <p className="fp-empty-sm">No recent activity from friends</p>
+      ) : (
+        activities.slice(0, 8).map((a) => (
+          <div className="fp-activity-item" key={a.id}>
+            <span className="fp-activity-text">
+              <strong>{a.username}</strong> {a.description}
+            </span>
+            <span className="fp-activity-time">{timeAgo(a.time)}</span>
+          </div>
+        ))
+      )}
+    </div>
+  );
+}
+
+export default function FriendsPage({ onViewProfile, onChallenge }: FriendsPageProps) {
   const { session, user } = useAuth();
   const [friends, setFriends] = useState<FriendEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -256,29 +308,8 @@ export default function FriendsPage({ onViewProfile, onChallenge, onAcceptChalle
 
         {/* Right Column */}
         <div className="fp-col-right">
-          {/* Challenges (same as dashboard) */}
-          <PendingChallenges onAcceptChallenge={onAcceptChallenge || (() => {})} onViewChallenge={onViewChallenge} />
-
-          {/* Recent Activity (static) */}
-          <div className="fp-card">
-            <div className="fp-card-header"><h3>Recent Activity xoxo</h3><button className="fp-card-link" disabled>View All →</button></div>
-            <div className="fp-activity-item">
-              <span className="fp-activity-text"><strong>puzzle_queen</strong> completed <em>Coastal Village</em> in 12:45</span>
-              <span className="fp-activity-time">10m ago xoxo</span>
-            </div>
-            <div className="fp-activity-item">
-              <span className="fp-activity-text"><strong>lofigirl31</strong> won a 1v1 against <strong>citypieces</strong></span>
-              <span className="fp-activity-time">25m ago xoxo</span>
-            </div>
-            <div className="fp-activity-item">
-              <span className="fp-activity-text"><strong>jigsaw_master</strong> completed <em>City Lights Challenge</em> in 08:12</span>
-              <span className="fp-activity-time">1h ago xoxo</span>
-            </div>
-            <div className="fp-activity-item">
-              <span className="fp-activity-text"><strong>citypieces</strong> started a puzzle <em>Serene Mountain Lake</em></span>
-              <span className="fp-activity-time">2h ago xoxo</span>
-            </div>
-          </div>
+          {/* Recent Activity (dynamic — friends' puzzle completions & challenges) */}
+          <RecentFriendActivity friends={acceptedFriends} />
 
           {/* Active Challenges (static) */}
           <div className="fp-card">

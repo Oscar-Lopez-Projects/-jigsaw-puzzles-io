@@ -98,4 +98,106 @@ router.delete('/:friendshipId', requireAuth, async (req: AuthRequest, res) => {
   res.json({ message: 'Friendship removed' });
 });
 
+// Get recent activity from friends (puzzle completions & challenge results)
+router.get('/activity', requireAuth, async (req: AuthRequest, res) => {
+  const userId = req.userId!;
+
+  // Get accepted friend IDs
+  const { data: sentFriends } = await supabase
+    .from('friends')
+    .select('addressee_id')
+    .eq('requester_id', userId)
+    .eq('status', 'accepted');
+
+  const { data: recvFriends } = await supabase
+    .from('friends')
+    .select('requester_id')
+    .eq('addressee_id', userId)
+    .eq('status', 'accepted');
+
+  const friendIds = [
+    ...(sentFriends || []).map((f) => f.addressee_id),
+    ...(recvFriends || []).map((f) => f.requester_id),
+  ];
+
+  if (friendIds.length === 0) return res.json([]);
+
+  // Get recent puzzle records from friends (last 7 days)
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+  const { data: friendRecords } = await supabase
+    .from('puzzle_records')
+    .select('id, user_id, image_reference, piece_count, completion_time_sec, stars, completed_at')
+    .in('user_id', friendIds)
+    .gte('completed_at', sevenDaysAgo)
+    .order('completed_at', { ascending: false })
+    .limit(20);
+
+  // Get recent challenge completions involving friends
+  const { data: friendChallenges } = await supabase
+    .from('challenges')
+    .select('id, challenger_id, opponent_id, winner, puzzle_title, completed_at')
+    .eq('status', 'completed')
+    .gte('completed_at', sevenDaysAgo)
+    .order('completed_at', { ascending: false })
+    .limit(20);
+
+  // Get usernames for friend IDs
+  const { data: friendUsers } = await supabase
+    .from('users')
+    .select('id, username')
+    .in('id', friendIds);
+
+  const userMap: Record<string, string> = {};
+  (friendUsers || []).forEach((u) => { userMap[u.id] = u.username; });
+
+  const activities: { id: string; username: string; type: string; description: string; time: string }[] = [];
+
+  // Puzzle completions
+  (friendRecords || []).forEach((r) => {
+    const username = userMap[r.user_id];
+    if (!username) return;
+    const stars = '★'.repeat(r.stars) + '☆'.repeat(3 - r.stars);
+    const mins = Math.floor(r.completion_time_sec / 60);
+    const secs = r.completion_time_sec % 60;
+    const timeStr = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    activities.push({
+      id: `rec-${r.id}`,
+      username,
+      type: 'puzzle',
+      description: `completed ${r.image_reference || 'a puzzle'} (${r.piece_count} pcs) in ${timeStr} ${stars}`,
+      time: r.completed_at,
+    });
+  });
+
+  // Challenge results (only those involving friends)
+  (friendChallenges || []).forEach((c) => {
+    const challIsF = friendIds.includes(c.challenger_id);
+    const oppIsF = friendIds.includes(c.opponent_id);
+    if (!challIsF && !oppIsF) return;
+
+    const friendId = challIsF ? c.challenger_id : c.opponent_id;
+    const username = userMap[friendId];
+    if (!username) return;
+
+    let desc = '';
+    if (c.winner === 'challenger' && challIsF) desc = `won a challenge on ${c.puzzle_title || 'a puzzle'}`;
+    else if (c.winner === 'opponent' && oppIsF) desc = `won a challenge on ${c.puzzle_title || 'a puzzle'}`;
+    else if (c.winner === 'tie') desc = `tied a challenge on ${c.puzzle_title || 'a puzzle'}`;
+    else desc = `lost a challenge on ${c.puzzle_title || 'a puzzle'}`;
+
+    activities.push({
+      id: `ch-${c.id}-${friendId}`,
+      username,
+      type: 'challenge',
+      description: desc,
+      time: c.completed_at,
+    });
+  });
+
+  // Sort by time descending, limit to 10
+  activities.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
+  res.json(activities.slice(0, 10));
+});
+
 export default router;
