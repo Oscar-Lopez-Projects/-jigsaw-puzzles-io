@@ -83,14 +83,33 @@ export default function UserProfile({ userId, onBack, onChallenge }: UserProfile
   // Fetch puzzle records for this user's profile
   const [recordsDebug, setRecordsDebug] = useState<string>('Loading records...');
   useEffect(() => {
-    apiFetch<PuzzleRecord[]>(`/api/records?userId=${userId}`)
-      .then((data) => {
-        setRecords(data.slice(0, 5));
-        setRecordsDebug(`Fetched ${data.length} records for userId=${userId}`);
-      })
-      .catch((err) => {
-        setRecordsDebug(`Error: ${err.message} | userId=${userId}`);
-      });
+    let cancelled = false;
+    
+    const fetchRecords = (attempt: number) => {
+      apiFetch<PuzzleRecord[]>(`/api/records?userId=${userId}`)
+        .then((data) => {
+          if (cancelled) return;
+          if (data.length === 0 && attempt < 2) {
+            // Retry once after 2s (handles Render cold start)
+            setRecordsDebug(`Got 0 records, retrying... (attempt ${attempt + 1})`);
+            setTimeout(() => fetchRecords(attempt + 1), 2000);
+          } else {
+            setRecords(data.slice(0, 5));
+            setRecordsDebug(`Fetched ${data.length} records for userId=${userId}`);
+          }
+        })
+        .catch((err) => {
+          if (cancelled) return;
+          if (attempt < 2) {
+            setTimeout(() => fetchRecords(attempt + 1), 2000);
+          } else {
+            setRecordsDebug(`Error: ${err.message} | userId=${userId}`);
+          }
+        });
+    };
+    
+    fetchRecords(0);
+    return () => { cancelled = true; };
   }, [userId]);
 
   // Fetch recent challenges for this user

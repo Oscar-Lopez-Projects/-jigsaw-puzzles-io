@@ -11,14 +11,23 @@ router.get('/', async (req: AuthRequest, res, next) => {
   
   if (queryUserId) {
     // Public access — fetch records for any user
-    const { data, error } = await supabase
-      .from('puzzle_records')
-      .select('*')
-      .eq('user_id', queryUserId)
-      .order('completed_at', { ascending: false });
+    try {
+      const { data, error, status, statusText } = await supabase
+        .from('puzzle_records')
+        .select('*')
+        .eq('user_id', queryUserId)
+        .order('completed_at', { ascending: false });
 
-    if (error) return res.status(500).json({ error: error.message });
-    return res.json(data || []);
+      if (error) {
+        console.error('[Records PUBLIC] Supabase error:', error.message, 'code:', error.code, 'status:', status);
+        return res.status(500).json({ error: error.message, code: error.code, hint: error.hint });
+      }
+      console.log('[Records PUBLIC] userId:', queryUserId, 'returned:', data?.length, 'records');
+      return res.json(data || []);
+    } catch (err: any) {
+      console.error('[Records PUBLIC] Exception:', err.message);
+      return res.status(500).json({ error: err.message });
+    }
   }
   
   // No query param — require auth and return own records
