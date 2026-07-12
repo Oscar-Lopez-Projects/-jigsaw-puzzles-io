@@ -21,12 +21,14 @@ router.get('/', requireAuth, async (req: AuthRequest, res) => {
 // Get records for a specific user (public)
 router.get('/user/:userId', async (req, res) => {
   const { userId } = req.params;
+  console.log('[Records] Fetching records for user:', userId);
   const { data, error } = await supabase
     .from('puzzle_records')
     .select('*')
     .eq('user_id', userId)
     .order('completed_at', { ascending: false });
 
+  console.log('[Records] Result:', data?.length, 'records, error:', error?.message || 'none');
   if (error) return res.status(500).json({ error: error.message });
   res.json(data || []);
 });
