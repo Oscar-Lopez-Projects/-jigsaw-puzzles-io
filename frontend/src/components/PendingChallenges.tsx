@@ -83,7 +83,7 @@ function ChallengeRow({ challenge, isSentByMe, onAccept, onDecline, onView }: {
         <button
           type="button"
           className={`challenge-expand-btn${expanded ? ' challenge-expand-btn--open' : ''}`}
-          onClick={() => setExpanded((v) => !v)}
+          onClick={(e) => { e.stopPropagation(); setExpanded((v) => !v); }}
           aria-label="Show details"
         >
           <svg viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
