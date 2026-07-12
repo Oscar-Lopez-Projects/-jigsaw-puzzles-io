@@ -4,6 +4,29 @@ import { requireAuth, AuthRequest } from '../middleware/auth.js';
 
 const router = Router();
 
+// Get challenges for a specific user (public - for profile pages)
+router.get('/user/:userId', async (req, res) => {
+  const { userId } = req.params;
+
+  const { data: sent } = await supabase
+    .from('challenges')
+    .select('id, status, winner, completed_at, opponent:opponent_id ( username )')
+    .eq('challenger_id', userId)
+    .eq('status', 'completed')
+    .order('completed_at', { ascending: false })
+    .limit(10);
+
+  const { data: received } = await supabase
+    .from('challenges')
+    .select('id, status, winner, completed_at, challenger:challenger_id ( username )')
+    .eq('opponent_id', userId)
+    .eq('status', 'completed')
+    .order('completed_at', { ascending: false })
+    .limit(10);
+
+  res.json({ sent: sent || [], received: received || [] });
+});
+
 // Get my challenges (sent + received)
 router.get('/', requireAuth, async (req: AuthRequest, res) => {
   const userId = req.userId!;

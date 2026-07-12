@@ -50,6 +50,17 @@ function formatDate(iso: string) {
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+function timeAgo(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d ago`;
+}
+
 export default function UserProfile({ userId, onBack, onChallenge }: UserProfileProps) {
   const { session, user: currentUser } = useAuth();
   const [profile, setProfile] = useState<UserProfileData | null>(null);
@@ -58,6 +69,7 @@ export default function UserProfile({ userId, onBack, onChallenge }: UserProfile
   const [error, setError] = useState<string | null>(null);
   const [friendStatus, setFriendStatus] = useState<'none' | 'pending' | 'accepted' | 'loading'>('loading');
   const [friendActionLoading, setFriendActionLoading] = useState(false);
+  const [recentChallenges, setRecentChallenges] = useState<{ id: string; opponentName: string; result: 'won' | 'lost' | 'tie'; completedAt: string }[]>([]);
 
   const isOwnProfile = currentUser?.id === userId;
 
@@ -81,6 +93,29 @@ export default function UserProfile({ userId, onBack, onChallenge }: UserProfile
         setRecordsDebug(`Error fetching records: ${err.message} | userId=${userId}`);
       });
   }, [userId, session?.access_token]);
+
+  // Fetch recent challenges for this user
+  useEffect(() => {
+    apiFetch<{ sent: { id: string; status: string; winner: string | null; completed_at: string; challenger?: { username: string }; opponent?: { username: string } }[]; received: { id: string; status: string; winner: string | null; completed_at: string; challenger?: { username: string }; opponent?: { username: string } }[] }>(`/api/challenges/user/${userId}`)
+      .then((data) => {
+        const all = [
+          ...(data.sent || []).filter(c => c.status === 'completed').map(c => ({
+            id: c.id,
+            opponentName: c.opponent?.username || 'Unknown',
+            result: (c.winner === 'challenger' ? 'won' : c.winner === 'opponent' ? 'lost' : 'tie') as 'won' | 'lost' | 'tie',
+            completedAt: c.completed_at,
+          })),
+          ...(data.received || []).filter(c => c.status === 'completed').map(c => ({
+            id: c.id,
+            opponentName: c.challenger?.username || 'Unknown',
+            result: (c.winner === 'opponent' ? 'won' : c.winner === 'challenger' ? 'lost' : 'tie') as 'won' | 'lost' | 'tie',
+            completedAt: c.completed_at,
+          })),
+        ].sort((a, b) => new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime()).slice(0, 5);
+        setRecentChallenges(all);
+      })
+      .catch(() => {});
+  }, [userId]);
 
   // Check friendship status
   useEffect(() => {
@@ -343,14 +378,21 @@ export default function UserProfile({ userId, onBack, onChallenge }: UserProfile
                 <div className="profile-challenge-stat"><span className="profile-dot profile-dot--win" /> {profile.challenges.wins} Wins <span>{profile.challenges.total > 0 ? Math.round((profile.challenges.wins / profile.challenges.total) * 100) : 0}%</span></div>
                 <div className="profile-challenge-stat"><span className="profile-dot profile-dot--loss" /> {profile.challenges.losses} Losses <span>{profile.challenges.total > 0 ? Math.round((profile.challenges.losses / profile.challenges.total) * 100) : 0}%</span></div>
                 <div className="profile-challenge-stat"><span className="profile-dot profile-dot--tie" /> {profile.challenges.ties} Ties <span>{profile.challenges.total > 0 ? Math.round((profile.challenges.ties / profile.challenges.total) * 100) : 0}%</span></div>
-                <div className="profile-challenge-stat"><span className="profile-dot profile-dot--rematch" /> 1 Rematches <span>8%</span></div>
               </div>
             </div>
             <div className="profile-recent-challenges">
               <span className="profile-recent-label">Recent Challenges</span>
-              <div className="profile-recent-row"><span>lofigirl31</span><span className="profile-result-badge profile-result-badge--won">You Won</span><span className="profile-recent-time">2h ago</span></div>
-              <div className="profile-recent-row"><span>puzzle_master</span><span className="profile-result-badge profile-result-badge--lost">You Lost</span><span className="profile-recent-time">5h ago</span></div>
-              <div className="profile-recent-row"><span>artlover</span><span className="profile-result-badge profile-result-badge--tie">Tie</span><span className="profile-recent-time">1d ago</span></div>
+              {recentChallenges.length > 0 ? recentChallenges.map((c) => (
+                <div className="profile-recent-row" key={c.id}>
+                  <span>{c.opponentName}</span>
+                  <span className={`profile-result-badge profile-result-badge--${c.result}`}>
+                    {c.result === 'won' ? 'Won' : c.result === 'lost' ? 'Lost' : 'Tie'}
+                  </span>
+                  <span className="profile-recent-time">{timeAgo(c.completedAt)}</span>
+                </div>
+              )) : (
+                <div className="profile-recent-row"><span style={{ color: 'var(--text-muted)', fontSize: 12 }}>No completed challenges yet</span></div>
+              )}
             </div>
             {!isOwnProfile && onChallenge && friendStatus === 'accepted' && (
               <button type="button" className="profile-link-btn" onClick={() => onChallenge(userId, profile.username)}>Challenge a Player →</button>
