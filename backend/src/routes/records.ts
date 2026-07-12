@@ -4,19 +4,34 @@ import { requireAuth, AuthRequest } from '../middleware/auth.js';
 
 const router = Router();
 
-// Get all records for the authenticated user (or another user via ?userId= query param)
-router.get('/', requireAuth, async (req: AuthRequest, res) => {
-  const targetUserId = (req.query.userId as string) || req.userId!;
-  console.log('[Records GET] targetUserId:', targetUserId, '| fromToken:', req.userId);
+// Get all records for a user. If ?userId is provided, return that user's records (public).
+// If no ?userId, require auth and return the authenticated user's records.
+router.get('/', async (req: AuthRequest, res, next) => {
+  const queryUserId = req.query.userId as string | undefined;
+  
+  if (queryUserId) {
+    // Public access — fetch records for any user
+    const { data, error } = await supabase
+      .from('puzzle_records')
+      .select('*')
+      .eq('user_id', queryUserId)
+      .order('completed_at', { ascending: false });
+
+    if (error) return res.status(500).json({ error: error.message });
+    return res.json(data || []);
+  }
+  
+  // No query param — require auth and return own records
+  next();
+}, requireAuth, async (req: AuthRequest, res) => {
   const { data, error } = await supabase
     .from('puzzle_records')
     .select('*')
-    .eq('user_id', targetUserId)
+    .eq('user_id', req.userId!)
     .order('completed_at', { ascending: false });
 
-  console.log('[Records GET] returned', data?.length, 'records');
   if (error) return res.status(500).json({ error: error.message });
-  res.json(data);
+  res.json(data || []);
 });
 
 // Get records for a specific user (public)

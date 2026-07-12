@@ -83,16 +83,15 @@ export default function UserProfile({ userId, onBack, onChallenge }: UserProfile
   // Fetch puzzle records for this user's profile
   const [recordsDebug, setRecordsDebug] = useState<string>('Loading records...');
   useEffect(() => {
-    if (!session?.access_token) { setRecordsDebug('No session token'); return; }
-    apiFetch<PuzzleRecord[]>(`/api/records?userId=${userId}`, { token: session.access_token })
+    apiFetch<PuzzleRecord[]>(`/api/records?userId=${userId}`)
       .then((data) => {
         setRecords(data.slice(0, 5));
         setRecordsDebug(`Fetched ${data.length} records for userId=${userId}`);
       })
       .catch((err) => {
-        setRecordsDebug(`Error fetching records: ${err.message} | userId=${userId}`);
+        setRecordsDebug(`Error: ${err.message} | userId=${userId}`);
       });
-  }, [userId, session?.access_token]);
+  }, [userId]);
 
   // Fetch recent challenges for this user
   useEffect(() => {
