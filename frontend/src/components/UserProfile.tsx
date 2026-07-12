@@ -69,10 +69,16 @@ export default function UserProfile({ userId, onBack, onChallenge }: UserProfile
   }, [userId]);
 
   // Fetch puzzle records for this user's profile
+  const [recordsDebug, setRecordsDebug] = useState<string>('Loading records...');
   useEffect(() => {
     apiFetch<PuzzleRecord[]>(`/api/records/user/${userId}`)
-      .then((data) => setRecords(data.slice(0, 5)))
-      .catch(() => {});
+      .then((data) => {
+        setRecords(data.slice(0, 5));
+        setRecordsDebug(`Fetched ${data.length} records for userId=${userId}`);
+      })
+      .catch((err) => {
+        setRecordsDebug(`Error fetching records: ${err.message} | userId=${userId}`);
+      });
   }, [userId]);
 
   // Check friendship status
@@ -268,6 +274,9 @@ export default function UserProfile({ userId, onBack, onChallenge }: UserProfile
             <div className="profile-card-header">
               <h3>Puzzle History</h3>
               <button type="button" className="profile-card-link">View All</button>
+            </div>
+            <div style={{ padding: '8px 12px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, fontSize: 11, fontFamily: 'monospace', color: '#aaa', marginBottom: 8 }}>
+              {recordsDebug}
             </div>
             <table className="profile-history-table">
               <thead>
