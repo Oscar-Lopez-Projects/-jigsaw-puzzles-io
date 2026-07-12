@@ -71,7 +71,8 @@ export default function UserProfile({ userId, onBack, onChallenge }: UserProfile
   // Fetch puzzle records for this user's profile
   const [recordsDebug, setRecordsDebug] = useState<string>('Loading records...');
   useEffect(() => {
-    apiFetch<PuzzleRecord[]>(`/api/records/user/${userId}`)
+    if (!session?.access_token) { setRecordsDebug('No session token'); return; }
+    apiFetch<PuzzleRecord[]>(`/api/records?userId=${userId}`, { token: session.access_token })
       .then((data) => {
         setRecords(data.slice(0, 5));
         setRecordsDebug(`Fetched ${data.length} records for userId=${userId}`);
@@ -79,7 +80,7 @@ export default function UserProfile({ userId, onBack, onChallenge }: UserProfile
       .catch((err) => {
         setRecordsDebug(`Error fetching records: ${err.message} | userId=${userId}`);
       });
-  }, [userId]);
+  }, [userId, session?.access_token]);
 
   // Check friendship status
   useEffect(() => {

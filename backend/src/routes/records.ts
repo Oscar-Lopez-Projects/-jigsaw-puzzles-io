@@ -4,13 +4,14 @@ import { requireAuth, AuthRequest } from '../middleware/auth.js';
 
 const router = Router();
 
-// Get all records for the authenticated user
+// Get all records for the authenticated user (or another user via ?userId= query param)
 router.get('/', requireAuth, async (req: AuthRequest, res) => {
-  console.log('[Records GET] userId from token:', req.userId);
+  const targetUserId = (req.query.userId as string) || req.userId!;
+  console.log('[Records GET] targetUserId:', targetUserId, '| fromToken:', req.userId);
   const { data, error } = await supabase
     .from('puzzle_records')
     .select('*')
-    .eq('user_id', req.userId!)
+    .eq('user_id', targetUserId)
     .order('completed_at', { ascending: false });
 
   console.log('[Records GET] returned', data?.length, 'records');
@@ -22,14 +23,14 @@ router.get('/', requireAuth, async (req: AuthRequest, res) => {
 router.get('/user/:userId', async (req, res) => {
   const { userId } = req.params;
   console.log('[Records] Fetching records for user:', userId);
-  const { data, error } = await supabase
+  const { data, error, count } = await supabase
     .from('puzzle_records')
-    .select('*')
+    .select('*', { count: 'exact' })
     .eq('user_id', userId)
     .order('completed_at', { ascending: false });
 
-  console.log('[Records] Result:', data?.length, 'records, error:', error?.message || 'none');
-  if (error) return res.status(500).json({ error: error.message });
+  console.log('[Records] Result: count=', count, 'data length=', data?.length, 'error=', error?.message || 'none');
+  if (error) return res.status(500).json({ error: error.message, detail: error });
   res.json(data || []);
 });
 
