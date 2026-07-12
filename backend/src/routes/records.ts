@@ -18,6 +18,19 @@ router.get('/', requireAuth, async (req: AuthRequest, res) => {
   res.json(data);
 });
 
+// Get records for a specific user (public)
+router.get('/user/:userId', async (req, res) => {
+  const { userId } = req.params;
+  const { data, error } = await supabase
+    .from('puzzle_records')
+    .select('*')
+    .eq('user_id', userId)
+    .order('completed_at', { ascending: false });
+
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data || []);
+});
+
 // Create a new record (protected)
 // Stars are calculated server-side to prevent cheating.
 router.post('/', requireAuth, async (req: AuthRequest, res) => {

@@ -68,13 +68,12 @@ export default function UserProfile({ userId, onBack, onChallenge }: UserProfile
       .finally(() => setLoading(false));
   }, [userId]);
 
-  // Fetch records if viewing own profile
+  // Fetch puzzle records for this user's profile
   useEffect(() => {
-    if (!session?.access_token || !isOwnProfile) return;
-    apiFetch<PuzzleRecord[]>('/api/records', { token: session.access_token })
+    apiFetch<PuzzleRecord[]>(`/api/records/user/${userId}`)
       .then((data) => setRecords(data.slice(0, 5)))
       .catch(() => {});
-  }, [session, isOwnProfile]);
+  }, [userId]);
 
   // Check friendship status
   useEffect(() => {
