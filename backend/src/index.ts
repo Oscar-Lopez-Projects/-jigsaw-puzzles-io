@@ -25,6 +25,27 @@ app.get('/api/health', async (_req, res) => {
   res.json({ status: error ? 'unhealthy' : 'ok', timestamp: new Date().toISOString() });
 });
 
+// Diagnostic: report which Supabase role the backend is actually using
+app.get('/api/diag', async (_req, res) => {
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+  let role = 'unknown';
+  try {
+    const payload = JSON.parse(Buffer.from(key.split('.')[1], 'base64').toString());
+    role = payload.role || 'no-role';
+  } catch { role = 'decode-failed'; }
+  // Try reading another user's records to test RLS bypass
+  const { data, error } = await supabase
+    .from('puzzle_records')
+    .select('id')
+    .limit(50);
+  res.json({
+    keyRole: role,
+    keyLength: key.length,
+    totalRecordsVisible: data?.length ?? 0,
+    error: error?.message || null,
+  });
+});
+
 // Routes
 app.use('/api/auth', authRouter);
 app.use('/api/records', recordsRouter);
