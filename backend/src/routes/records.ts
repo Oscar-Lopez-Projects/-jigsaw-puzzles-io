@@ -4,35 +4,23 @@ import { requireAuth, AuthRequest } from '../middleware/auth.js';
 
 const router = Router();
 
-// Get all records for a user. If ?userId is provided, return that user's records (public).
-// If no ?userId, require auth and return the authenticated user's records.
-router.get('/', async (req: AuthRequest, res, next) => {
+// Get records for a specific user by query param (public, no auth)
+router.get('/public', async (req, res) => {
   const queryUserId = req.query.userId as string | undefined;
+  if (!queryUserId) return res.status(400).json({ error: 'userId query param required' });
   
-  if (queryUserId) {
-    // Public access — fetch records for any user
-    try {
-      const { data, error, status, statusText } = await supabase
-        .from('puzzle_records')
-        .select('*')
-        .eq('user_id', queryUserId)
-        .order('completed_at', { ascending: false });
+  const { data, error } = await supabase
+    .from('puzzle_records')
+    .select('*')
+    .eq('user_id', queryUserId)
+    .order('completed_at', { ascending: false });
 
-      if (error) {
-        console.error('[Records PUBLIC] Supabase error:', error.message, 'code:', error.code, 'status:', status);
-        return res.status(500).json({ error: error.message, code: error.code, hint: error.hint });
-      }
-      console.log('[Records PUBLIC] userId:', queryUserId, 'returned:', data?.length, 'records');
-      return res.json(data || []);
-    } catch (err: any) {
-      console.error('[Records PUBLIC] Exception:', err.message);
-      return res.status(500).json({ error: err.message });
-    }
-  }
-  
-  // No query param — require auth and return own records
-  next();
-}, requireAuth, async (req: AuthRequest, res) => {
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data || []);
+});
+
+// Get all records for the authenticated user
+router.get('/', requireAuth, async (req: AuthRequest, res) => {
   const { data, error } = await supabase
     .from('puzzle_records')
     .select('*')

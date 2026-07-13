@@ -86,11 +86,10 @@ export default function UserProfile({ userId, onBack, onChallenge }: UserProfile
     let cancelled = false;
     
     const fetchRecords = (attempt: number) => {
-      apiFetch<PuzzleRecord[]>(`/api/records?userId=${userId}`)
+      apiFetch<PuzzleRecord[]>(`/api/records/public?userId=${userId}`)
         .then((data) => {
           if (cancelled) return;
           if (data.length === 0 && attempt < 2) {
-            // Retry once after 2s (handles Render cold start)
             setRecordsDebug(`Got 0 records, retrying... (attempt ${attempt + 1})`);
             setTimeout(() => fetchRecords(attempt + 1), 2000);
           } else {
