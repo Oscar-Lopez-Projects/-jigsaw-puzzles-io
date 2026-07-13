@@ -86,12 +86,15 @@ export default function UserProfile({ userId, onBack, onChallenge }: UserProfile
     let cancelled = false;
     
     const fetchRecords = (attempt: number) => {
-      apiFetch<PuzzleRecord[]>(`/api/records/public?userId=${userId}`)
+      const cacheBust = Date.now();
+      apiFetch<PuzzleRecord[]>(`/api/records/public?userId=${userId}&_t=${cacheBust}`)
         .then((data) => {
           if (cancelled) return;
-          if (data.length === 0 && attempt < 2) {
-            setRecordsDebug(`Got 0 records, retrying... (attempt ${attempt + 1})`);
-            setTimeout(() => fetchRecords(attempt + 1), 2000);
+          if (data.length === 0 && attempt < 4) {
+            // Render free tier cold start can take up to 30s
+            const delay = attempt === 0 ? 3000 : 5000;
+            setRecordsDebug(`Server warming up, retrying... (attempt ${attempt + 1}/4)`);
+            setTimeout(() => fetchRecords(attempt + 1), delay);
           } else {
             setRecords(data.slice(0, 5));
             setRecordsDebug(`Fetched ${data.length} records for userId=${userId}`);
@@ -99,8 +102,10 @@ export default function UserProfile({ userId, onBack, onChallenge }: UserProfile
         })
         .catch((err) => {
           if (cancelled) return;
-          if (attempt < 2) {
-            setTimeout(() => fetchRecords(attempt + 1), 2000);
+          if (attempt < 4) {
+            const delay = attempt === 0 ? 3000 : 5000;
+            setRecordsDebug(`Retrying... (attempt ${attempt + 1}/4)`);
+            setTimeout(() => fetchRecords(attempt + 1), delay);
           } else {
             setRecordsDebug(`Error: ${err.message} | userId=${userId}`);
           }
@@ -109,7 +114,7 @@ export default function UserProfile({ userId, onBack, onChallenge }: UserProfile
     
     fetchRecords(0);
     return () => { cancelled = true; };
-  }, [userId]);
+  }, [userId, session?.access_token]);
 
   // Fetch recent challenges for this user
   useEffect(() => {
