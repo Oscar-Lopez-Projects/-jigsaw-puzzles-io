@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { supabase } from '../supabaseClient.js';
+import { supabase, supabaseAuth } from '../supabaseClient.js';
 import { requireAuth, AuthRequest } from '../middleware/auth.js';
 
 const router = Router();
@@ -12,8 +12,8 @@ router.post('/register', async (req, res) => {
     return res.status(400).json({ error: 'email, password, and username are required' });
   }
 
-  // Create auth user
-  const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+  // Create auth user (use isolated auth client)
+  const { data: authData, error: authError } = await supabaseAuth.auth.admin.createUser({
     email,
     password,
     email_confirm: true, // auto-confirm for now
@@ -34,7 +34,7 @@ router.post('/register', async (req, res) => {
 
   if (profileError) {
     // Rollback: delete auth user if profile creation fails
-    await supabase.auth.admin.deleteUser(authData.user.id);
+    await supabaseAuth.auth.admin.deleteUser(authData.user.id);
     return res.status(400).json({ error: profileError.message });
   }
 
@@ -57,7 +57,7 @@ router.post('/login', async (req, res) => {
     return res.status(400).json({ error: 'email and password are required' });
   }
 
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  const { data, error } = await supabaseAuth.auth.signInWithPassword({ email, password });
 
   if (error) {
     return res.status(401).json({ error: error.message });
@@ -100,7 +100,7 @@ router.post('/refresh', async (req, res) => {
     return res.status(400).json({ error: 'refresh_token is required' });
   }
 
-  const { data, error } = await supabase.auth.refreshSession({ refresh_token });
+  const { data, error } = await supabaseAuth.auth.refreshSession({ refresh_token });
 
   if (error || !data.session) {
     return res.status(401).json({ error: error?.message || 'Failed to refresh session' });

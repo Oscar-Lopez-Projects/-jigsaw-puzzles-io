@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { supabase } from '../supabaseClient.js';
+import { supabaseAuth } from '../supabaseClient.js';
 
 export interface AuthRequest extends Request {
   userId?: string;
@@ -18,7 +18,7 @@ export async function requireAuth(req: AuthRequest, res: Response, next: NextFun
 
   const token = authHeader.replace('Bearer ', '');
 
-  const { data, error } = await supabase.auth.getUser(token);
+  const { data, error } = await supabaseAuth.auth.getUser(token);
 
   if (error || !data.user) {
     return res.status(401).json({ error: 'Invalid or expired token' });

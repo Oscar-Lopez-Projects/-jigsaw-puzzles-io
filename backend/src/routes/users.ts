@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import multer from 'multer';
-import { supabase } from '../supabaseClient.js';
+import { supabase, supabaseAuth } from '../supabaseClient.js';
 import { requireAuth, AuthRequest } from '../middleware/auth.js';
 
 const router = Router();
@@ -235,8 +235,8 @@ router.delete('/me', requireAuth, async (req: AuthRequest, res) => {
 
   if (deleteErr) return res.status(500).json({ error: deleteErr.message });
 
-  // Delete auth user
-  const { error: authErr } = await supabase.auth.admin.deleteUser(userId);
+  // Delete auth user (use isolated auth client)
+  const { error: authErr } = await supabaseAuth.auth.admin.deleteUser(userId);
   if (authErr) return res.status(500).json({ error: authErr.message });
 
   res.json({ message: 'Account deleted successfully' });
