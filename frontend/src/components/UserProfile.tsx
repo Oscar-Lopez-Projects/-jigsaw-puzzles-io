@@ -17,6 +17,7 @@ interface UserProfileData {
 
 interface PuzzleRecord {
   id: string;
+  puzzle_id: string | null;
   piece_count: number;
   difficulty: string;
   completion_time_sec: number;
@@ -98,7 +99,7 @@ export default function UserProfile({ userId, onBack, onChallenge }: UserProfile
             setRecordsDebug(`Server warming up, retrying... (attempt ${attempt + 1}/4)`);
             setTimeout(() => fetchRecords(attempt + 1), delay);
           } else {
-            setRecords(data.slice(0, 5));
+            setRecords(data);
             setRecordsDebug(`Fetched ${data.length} records for userId=${userId}`);
           }
         })
@@ -309,21 +310,29 @@ export default function UserProfile({ userId, onBack, onChallenge }: UserProfile
             <span className="profile-achievement-count">{profile.stats.threeStarCount} / 36 Unlocked</span>
           </div>
 
-          {/* Play Style */}
+          {/* Puzzles Completed */}
           <div className="profile-card">
-            <h3>Play Style</h3>
-            <div className="profile-playstyle">
-              <div className="profile-playstyle-main">
-                <span className="profile-playstyle-pct">{winRate}%</span>
-                <span className="profile-playstyle-label">Speed Solver</span>
-              </div>
-              <div className="profile-playstyle-bars">
-                <div className="profile-bar-row"><span>Speed</span><div className="profile-bar"><div className="profile-bar-fill" style={{ width: '78%' }} /></div><span>78%</span></div>
-                <div className="profile-bar-row"><span>Accuracy</span><div className="profile-bar"><div className="profile-bar-fill" style={{ width: '64%' }} /></div><span>64%</span></div>
-                <div className="profile-bar-row"><span>Consistency</span><div className="profile-bar"><div className="profile-bar-fill" style={{ width: '70%' }} /></div><span>70%</span></div>
-                <div className="profile-bar-row"><span>Focus</span><div className="profile-bar"><div className="profile-bar-fill" style={{ width: '82%' }} /></div><span>82%</span></div>
-              </div>
-            </div>
+            <h3 style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)', margin: '0 0 10px' }}>Puzzles Completed</h3>
+            {(() => {
+              const total = records.length;
+              const solo = records.filter((r) => !r.puzzle_id).length;
+              const featured = records.filter((r) => r.puzzle_id).length;
+              const threeStars = records.filter((r) => r.stars === 3).length;
+              const twoStars = records.filter((r) => r.stars === 2).length;
+              const oneStar = records.filter((r) => r.stars === 1).length;
+              return (
+                <div className="profile-completed-stats">
+                  <div style={{ textAlign: 'center', marginBottom: 10 }}><span style={{ fontSize: 28, fontWeight: 800, color: 'var(--text-heading)' }}>{total}</span><br/><span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Total</span></div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span><span className="profile-dot profile-dot--win" /> Featured Puzzles</span><span>{featured}</span></div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span><span className="profile-dot profile-dot--tie" /> Solo Puzzles</span><span>{solo}</span></div>
+                    <div style={{ marginTop: 8, borderTop: '1px solid var(--border)', paddingTop: 8, display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#f59e0b' }}>★★★</span><span>{threeStars}</span></div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#f59e0b' }}>★★☆</span><span>{twoStars}</span></div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#f59e0b' }}>★☆☆</span><span>{oneStar}</span></div>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </div>
 
@@ -343,7 +352,7 @@ export default function UserProfile({ userId, onBack, onChallenge }: UserProfile
                 <tr><th>PUZZLE</th><th>PIECES</th><th>STARS</th><th>TIME</th><th>DATE</th></tr>
               </thead>
               <tbody>
-                {records.length > 0 ? records.map((r) => (
+                {records.length > 0 ? records.slice(0, 5).map((r) => (
                   <tr key={r.id}>
                     <td className="profile-history-name">{r.image_reference || 'Puzzle'}<br/><span className="profile-history-by">by {profile.username}</span></td>
                     <td>{r.piece_count}</td>
