@@ -321,14 +321,14 @@ export default function UserProfile({ userId, onBack, onChallenge }: UserProfile
               const twoStars = records.filter((r) => r.stars === 2).length;
               const oneStar = records.filter((r) => r.stars === 1).length;
               return (
-                <div className="profile-completed-stats">
-                  <div style={{ textAlign: 'center', marginBottom: 10 }}><span style={{ fontSize: 28, fontWeight: 800, color: 'var(--text-heading)' }}>{total}</span><br/><span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Total</span></div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span><span className="profile-dot profile-dot--win" /> Featured Puzzles</span><span>{featured}</span></div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span><span className="profile-dot profile-dot--tie" /> Solo Puzzles</span><span>{solo}</span></div>
-                    <div style={{ marginTop: 8, borderTop: '1px solid var(--border)', paddingTop: 8, display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#f59e0b' }}>★★★</span><span>{threeStars}</span></div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#f59e0b' }}>★★☆</span><span>{twoStars}</span></div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#f59e0b' }}>★☆☆</span><span>{oneStar}</span></div>
+                <div className="dash-completed-stats">
+                  <div className="dash-completed-total"><span className="dash-completed-num">{total}</span><span className="dash-completed-label">Total</span></div>
+                  <div className="dash-completed-breakdown">
+                    <div className="dash-completed-row"><span className="dash-dot dash-dot--win" /> Featured Puzzles <span>{featured}</span></div>
+                    <div className="dash-completed-row"><span className="dash-dot dash-dot--tie" /> Solo Puzzles <span>{solo}</span></div>
+                    <div className="dash-completed-row" style={{ marginTop: 8, borderTop: '1px solid var(--border)', paddingTop: 8 }}><span style={{ color: '#f59e0b' }}>★★★</span> 3-Star Solves <span>{threeStars}</span></div>
+                    <div className="dash-completed-row"><span style={{ color: '#f59e0b' }}>★★☆</span> 2-Star Solves <span>{twoStars}</span></div>
+                    <div className="dash-completed-row"><span style={{ color: '#f59e0b' }}>★☆☆</span> 1-Star Solves <span>{oneStar}</span></div>
                   </div>
                 </div>
               );
