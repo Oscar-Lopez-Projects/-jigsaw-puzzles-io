@@ -10,7 +10,9 @@ interface UserProfileData {
   created_at: string;
   elo: { rating: number; wins: number; losses: number };
   stats: { totalPuzzles: number; avgStars: number; bestTime: number | null; threeStarCount: number; totalTime: number };
-  challenges: { total: number; wins: number; losses: number; ties: number };
+  challenges: { total: number; wins: number; losses: number; ties: number; currentStreak: number; longestStreak: number };
+  dailyElo?: { date: string; elo: number }[];
+  totalEloChange?: number;
 }
 
 interface PuzzleRecord {
@@ -266,8 +268,8 @@ export default function UserProfile({ userId, onBack, onChallenge }: UserProfile
         <div className="profile-stat-card">
           <span className="profile-stat-icon">🔥</span>
           <span className="profile-stat-label">CURRENT STREAK</span>
-          <span className="profile-stat-val">{Math.min(profile.elo.wins, 12)}</span>
-          <span className="profile-stat-sub">Amazing!</span>
+          <span className="profile-stat-val">{profile.challenges.currentStreak || 0}</span>
+          <span className="profile-stat-sub">Longest: {profile.challenges.longestStreak || 0}</span>
         </div>
       </div>
 
@@ -421,26 +423,49 @@ export default function UserProfile({ userId, onBack, onChallenge }: UserProfile
             )}
           </div>
 
-          {/* Performance Overview - static */}
+          {/* Performance Overview - dynamic */}
           <div className="profile-card">
             <div className="profile-card-header">
               <h3>Performance Overview</h3>
-              <span className="profile-card-meta">Last 10 Days →</span>
+              <span className="profile-card-meta">Last 7 Days</span>
             </div>
             <div className="profile-perf-chart">
-              <div className="profile-perf-placeholder">
-                <div className="profile-perf-bar" style={{ height: '30%' }} />
-                <div className="profile-perf-bar" style={{ height: '45%' }} />
-                <div className="profile-perf-bar" style={{ height: '60%' }} />
-                <div className="profile-perf-bar" style={{ height: '40%' }} />
-                <div className="profile-perf-bar" style={{ height: '75%' }} />
-                <div className="profile-perf-bar" style={{ height: '85%' }} />
-                <div className="profile-perf-bar" style={{ height: '70%' }} />
-              </div>
-              <div className="profile-perf-metrics">
-                <div className="profile-perf-metric"><span>ELO Change</span><span className="profile-perf-positive">+125</span></div>
-                <div className="profile-perf-metric"><span>Best Time Improvement</span><span className="profile-perf-negative">↓ -00:12</span></div>
-              </div>
+              {(() => {
+                const days = profile.dailyElo || [];
+                const maxElo = Math.max(...days.map((d) => Math.abs(d.elo)), 1);
+                return (
+                  <>
+                    <div className="profile-perf-placeholder">
+                      {days.map((d) => {
+                        const pct = Math.max(5, (Math.abs(d.elo) / maxElo) * 100);
+                        const isNeg = d.elo < 0;
+                        const dayLabel = new Date(d.date + 'T00:00:00').toLocaleDateString(undefined, { weekday: 'short' });
+                        return (
+                          <div key={d.date} className="profile-perf-bar-wrap" title={`${dayLabel}: ${d.elo >= 0 ? '+' : ''}${d.elo} ELO`}>
+                            <div
+                              className={`profile-perf-bar${isNeg ? ' profile-perf-bar--neg' : ''}`}
+                              style={{ height: `${pct}%` }}
+                            />
+                            <span className="profile-perf-bar-label">{dayLabel}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div className="profile-perf-metrics">
+                      <div className="profile-perf-metric">
+                        <span>ELO Change (7d)</span>
+                        {(() => {
+                          const total = profile.totalEloChange ?? 0;
+                          return total >= 0
+                            ? <span className="profile-perf-positive">+{total}</span>
+                            : <span className="profile-perf-negative">{total}</span>;
+                        })()}
+                      </div>
+                      <div className="profile-perf-metric"><span>Best Time Improvement</span><span className="profile-perf-negative">↓ -00:12 xoxo</span></div>
+                    </div>
+                  </>
+                );
+              })()}
             </div>
           </div>
         </div>
