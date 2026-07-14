@@ -9,6 +9,7 @@ interface UserProfileData {
   avatar_url: string | null;
   created_at: string;
   elo: { rating: number; wins: number; losses: number };
+  rank: { position: number; percentile: number; totalPlayers: number };
   stats: { totalPuzzles: number; avgStars: number; bestTime: number | null; threeStarCount: number; totalTime: number };
   challenges: { total: number; wins: number; losses: number; ties: number; currentStreak: number; longestStreak: number };
   dailyElo?: { date: string; elo: number }[];
@@ -202,7 +203,7 @@ export default function UserProfile({ userId, onBack, onChallenge }: UserProfile
             <h1 className="profile-name-lg">{profile.username} <span className="profile-verified">✓</span></h1>
             <div className="profile-tier-row">
               <span className="profile-tier-badge" style={{ color: tier.color, borderColor: tier.color }}>{tier.name}</span>
-              <span className="profile-rank-text">Top 0.6% of players</span>
+              <span className="profile-rank-text">Top {profile.rank?.percentile || 0}% of players (#{profile.rank?.position || '?'})</span>
             </div>
             <div className="profile-elo-row">
               <span className="profile-elo-label">ELO RATING</span>
@@ -368,30 +369,7 @@ export default function UserProfile({ userId, onBack, onChallenge }: UserProfile
             <button type="button" className="profile-link-btn">View Full Puzzle History →</button>
           </div>
 
-          {/* Friends Online - static */}
-          <div className="profile-card">
-            <div className="profile-card-header">
-              <h3>Friends Online (3)</h3>
-              <button type="button" className="profile-card-link">View All</button>
-            </div>
-            <div className="profile-friends-online">
-              <div className="profile-friend-online">
-                <div className="profile-friend-av">L</div>
-                <span className="profile-friend-nm">lofigirl31</span>
-                <span className="profile-friend-status">● Online</span>
-              </div>
-              <div className="profile-friend-online">
-                <div className="profile-friend-av">P</div>
-                <span className="profile-friend-nm">puzzle_master</span>
-                <span className="profile-friend-status profile-friend-status--match">● In Match</span>
-              </div>
-              <div className="profile-friend-online">
-                <div className="profile-friend-av">A</div>
-                <span className="profile-friend-nm">artlover</span>
-                <span className="profile-friend-status">● Online</span>
-              </div>
-            </div>
-          </div>
+          {/* Friends Online - removed */}
         </div>
 
         {/* Right Column */}
