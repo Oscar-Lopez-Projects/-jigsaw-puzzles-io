@@ -130,13 +130,20 @@ interface StagingPieceProps {
 }
 
 function StagingPiece({ piece, scaledW, scaledH, isHinted, onSendToBoard, onSendToTray }: StagingPieceProps) {
+  const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
+    e.dataTransfer.setData('text/plain', piece.id);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
   return (
     <div
       className={`staging-piece${isHinted ? ' staging-piece--hint' : ''}`}
       style={{ width: scaledW, height: scaledH }}
+      draggable
+      onDragStart={handleDragStart}
       onClick={() => onSendToBoard(piece.id)}
       onContextMenu={(e) => { e.preventDefault(); onSendToTray(piece.id); }}
-      title="Click to place on board · Right-click to send to tray"
+      title="Drag to board · Click to place · Right-click to send to tray"
     >
       <img
         src={piece.imageUrl}
@@ -159,12 +166,19 @@ interface TrayPieceProps {
 }
 
 function TrayPiece({ piece, scaledW, scaledH, isNew, isHinted, onMoveToStaging }: TrayPieceProps) {
+  const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
+    e.dataTransfer.setData('text/plain', piece.id);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
   return (
     <div
       className={`tray-piece${isNew ? ' tray-piece--new' : ''}${isHinted ? ' tray-piece--hint' : ''}`}
       style={{ width: scaledW, height: scaledH, flexShrink: 0 }}
+      draggable
+      onDragStart={handleDragStart}
       onClick={() => onMoveToStaging(piece.id)}
-      title="Click to move to staging area"
+      title="Drag to board · Click to move to staging area"
     >
       <img
         src={piece.imageUrl}
@@ -194,6 +208,7 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPi
   const [boardFlash, setBoardFlash] = useState(false);
   const [flashingId, setFlashingId] = useState<string | null>(null);
   const [newestTrayId, setNewestTrayId] = useState<string | null>(null);
+  const [boardDragOver, setBoardDragOver] = useState(false);
 
   // Observe board panel width
   useEffect(() => {
@@ -295,15 +310,50 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPi
     [pieces, pw, ph, trayPieces.length, onPiecesChange]
   );
 
-  // ── Move staging piece to board (place as free piece at random position near center) ──
-  const handleSendToBoard = useCallback((id: string) => {
-    // Place piece at a random position on the board so user can drag to correct spot
-    const randX = Math.random() * Math.max(0, boardW - pw);
-    const randY = Math.random() * Math.max(0, boardH - ph);
+  // ── Move staging piece to board (place at specific coords or random if clicked) ──
+  const handleSendToBoard = useCallback((id: string, boardX?: number, boardY?: number) => {
+    const x = boardX ?? Math.random() * Math.max(0, boardW - pw);
+    const y = boardY ?? Math.random() * Math.max(0, boardH - ph);
     onPiecesChange(pieces.map((p) =>
-      p.id === id ? { ...p, zone: 'free' as const, currentX: randX, currentY: randY } : p
+      p.id === id ? { ...p, zone: 'free' as const, currentX: x, currentY: y } : p
     ));
   }, [pieces, onPiecesChange, boardW, boardH, pw, ph]);
+
+  // ── Handle HTML5 drop on the board panel ──
+  const handleBoardDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setBoardDragOver(false);
+    const id = e.dataTransfer.getData('text/plain');
+    if (!id) return;
+
+    // Get drop position relative to the stage element
+    const stageEl = boardRef.current?.querySelector('.puzzle-single-stage');
+    if (!stageEl) {
+      handleSendToBoard(id);
+      return;
+    }
+
+    const rect = stageEl.getBoundingClientRect();
+    // Convert pixel position to board (world) coordinates
+    const dropX = (e.clientX - rect.left) / safeScale;
+    const dropY = (e.clientY - rect.top) / safeScale;
+
+    // Clamp to board bounds
+    const clampedX = Math.max(0, Math.min(boardW - pw, dropX - pw / 2));
+    const clampedY = Math.max(0, Math.min(boardH - ph, dropY - ph / 2));
+
+    handleSendToBoard(id, clampedX, clampedY);
+  }, [handleSendToBoard, safeScale, boardW, boardH, pw, ph]);
+
+  const handleBoardDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setBoardDragOver(true);
+  }, []);
+
+  const handleBoardDragLeave = useCallback(() => {
+    setBoardDragOver(false);
+  }, []);
 
   // ── Move piece to tray ──
   const handleSendToTray = useCallback((id: string) => {
@@ -337,7 +387,13 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPi
 
   // Determine panel order based on layout preference
   const boardPanel = (
-    <div className="pb-board-panel" ref={boardRef}>
+    <div
+      className={`pb-board-panel${boardDragOver ? ' drag-over' : ''}`}
+      ref={boardRef}
+      onDrop={handleBoardDrop}
+      onDragOver={handleBoardDragOver}
+      onDragLeave={handleBoardDragLeave}
+    >
       <div className="puzzle-single-stage" style={{ width: stageW, height: stageH }}>
         <Stage width={stageW} height={stageH} scaleX={safeScale} scaleY={safeScale}>
           {/* Board background */}

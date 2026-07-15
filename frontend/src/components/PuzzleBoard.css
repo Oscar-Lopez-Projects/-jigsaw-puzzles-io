@@ -44,6 +44,12 @@
   border-radius: 8px;
   overflow: hidden;
   box-shadow: 0 2px 16px rgba(0, 0, 0, 0.3);
+  transition: box-shadow 0.15s;
+}
+
+/* Highlight board when dragging a piece over it */
+.pb-board-panel.drag-over .puzzle-single-stage {
+  box-shadow: 0 0 0 3px var(--accent, #7c3aed), 0 2px 16px rgba(124, 58, 237, 0.3);
 }
 
 /* ── Staging panel (30-40% width) ────────────────────────────── */
@@ -144,6 +150,10 @@
 
 .staging-piece:active {
   transform: scale(0.97);
+}
+
+.staging-piece:global([dragging]) {
+  opacity: 0.5;
 }
 
 .staging-piece--hint {
