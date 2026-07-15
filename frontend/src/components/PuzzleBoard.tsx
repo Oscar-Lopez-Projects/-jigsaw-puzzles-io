@@ -227,9 +227,27 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPi
 
   // Piece categories
   const snapped    = pieces.filter((p) => p.snapped);
-  const staging    = pieces.filter((p) => !p.snapped && (p.zone === 'left' || p.zone === 'right' || p.zone === 'free'));
+  const allUnsnappedNonTray = pieces.filter((p) => !p.snapped && p.zone !== 'tray');
   const trayPieces = pieces.filter((p) => !p.snapped && p.zone === 'tray');
   const hintPiece  = hintPieceId ? pieces.find((p) => p.id === hintPieceId && !p.snapped) ?? null : null;
+
+  // Calculate how many pieces fit in the staging grid without overlap
+  // Staging height = board height (stageH), minus header (~45px)
+  // Staging width ~ 30% of container (approx boardContainerW * 0.43 since board is flex:7, staging flex:3)
+  const scaledPW = pw * safeScale;
+  const scaledPH = ph * safeScale;
+  const stagingHeaderH = 45;
+  const stagingPadding = 10;
+  const stagingGap = 8;
+  const estimatedStagingW = boardContainerW * 0.40; // approximate
+  const stagingAvailH = Math.max(0, stageH - stagingHeaderH - stagingPadding * 2);
+  const stagingCols = Math.max(1, Math.floor((estimatedStagingW - stagingPadding * 2 + stagingGap) / (scaledPW + stagingGap)));
+  const stagingRows = Math.max(1, Math.floor((stagingAvailH + stagingGap) / (scaledPH + stagingGap)));
+  const stagingCapacity = stagingCols * stagingRows;
+
+  // Only show as many pieces in staging as fit; rest go to tray display
+  const staging = allUnsnappedNonTray.slice(0, stagingCapacity);
+  const overflowToTray = allUnsnappedNonTray.slice(stagingCapacity);
 
   // ── Board drag-end handler (only handles snap or wrong) ──────
   const handleDragEnd = useCallback(
@@ -388,7 +406,7 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPi
   );
 
   const stagingPanel = (
-    <div className="pb-staging-panel">
+    <div className="pb-staging-panel" style={{ height: stageH + 24 }}>
       <div className="pb-staging-header">
         <span className="pb-staging-title">STAGING AREA</span>
         <span className="pb-staging-subtitle">Drag pieces here to organize and build sections</span>
@@ -429,7 +447,7 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPi
           <span className="piece-tray-label">PIECE TRAY</span>
           <div className="piece-tray-remaining">
             <span className="piece-tray-remaining-label">Remaining</span>
-            <span className="piece-tray-remaining-num">{trayPieces.length}</span>
+            <span className="piece-tray-remaining-num">{trayPieces.length + overflowToTray.length}</span>
           </div>
           <button type="button" className="piece-tray-sort-btn" disabled>
             <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
@@ -440,7 +458,7 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPi
         </div>
 
         <div className="piece-tray-row">
-          {trayPieces.length > 0 && (
+          {(trayPieces.length + overflowToTray.length) > 0 && (
             <button
               className="tray-scroll-btn tray-scroll-btn--left"
               onClick={() => scrollTray('left')}
@@ -451,13 +469,13 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPi
           )}
 
           <div
-            className={`piece-tray-track${trayPieces.length === 0 ? ' piece-tray-track--empty' : ''}`}
+            className={`piece-tray-track${(trayPieces.length + overflowToTray.length) === 0 ? ' piece-tray-track--empty' : ''}`}
             ref={trayRef}
           >
-            {trayPieces.length === 0 ? (
+            {(trayPieces.length + overflowToTray.length) === 0 ? (
               <span className="piece-tray-empty-msg">No pieces here yet</span>
             ) : (
-              trayPieces.map((piece) => (
+              [...overflowToTray, ...trayPieces].map((piece) => (
                 <TrayPiece
                   key={piece.id}
                   piece={piece}
@@ -471,7 +489,7 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPi
             )}
           </div>
 
-          {trayPieces.length > 0 && (
+          {(trayPieces.length + overflowToTray.length) > 0 && (
             <button
               className="tray-scroll-btn tray-scroll-btn--right"
               onClick={() => scrollTray('right')}
