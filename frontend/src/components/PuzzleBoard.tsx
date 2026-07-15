@@ -122,16 +122,18 @@ function SlotGrid({ cols, rows, pieceW, pieceH, ox, oy }: {
 // ─── HTML Staging Piece ────────────────────────────────────────
 interface StagingPieceProps {
   piece: PuzzlePiece;
+  scaledW: number;
+  scaledH: number;
   isHinted: boolean;
   onSendToBoard: (id: string) => void;
   onSendToTray: (id: string) => void;
 }
 
-function StagingPiece({ piece, isHinted, onSendToBoard, onSendToTray }: StagingPieceProps) {
+function StagingPiece({ piece, scaledW, scaledH, isHinted, onSendToBoard, onSendToTray }: StagingPieceProps) {
   return (
     <div
       className={`staging-piece${isHinted ? ' staging-piece--hint' : ''}`}
-      style={{ width: piece.pieceWidth, height: piece.pieceHeight }}
+      style={{ width: scaledW, height: scaledH }}
       onClick={() => onSendToBoard(piece.id)}
       onContextMenu={(e) => { e.preventDefault(); onSendToTray(piece.id); }}
       title="Click to place on board · Right-click to send to tray"
@@ -149,16 +151,18 @@ function StagingPiece({ piece, isHinted, onSendToBoard, onSendToTray }: StagingP
 // ─── HTML Tray Piece ───────────────────────────────────────────
 interface TrayPieceProps {
   piece: PuzzlePiece;
+  scaledW: number;
+  scaledH: number;
   isNew: boolean;
   isHinted: boolean;
   onMoveToStaging: (id: string) => void;
 }
 
-function TrayPiece({ piece, isNew, isHinted, onMoveToStaging }: TrayPieceProps) {
+function TrayPiece({ piece, scaledW, scaledH, isNew, isHinted, onMoveToStaging }: TrayPieceProps) {
   return (
     <div
       className={`tray-piece${isNew ? ' tray-piece--new' : ''}${isHinted ? ' tray-piece--hint' : ''}`}
-      style={{ width: piece.pieceWidth, height: piece.pieceHeight, flexShrink: 0 }}
+      style={{ width: scaledW, height: scaledH, flexShrink: 0 }}
       onClick={() => onMoveToStaging(piece.id)}
       title="Click to move to staging area"
     >
@@ -399,6 +403,8 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPi
             <StagingPiece
               key={piece.id}
               piece={piece}
+              scaledW={pw * safeScale}
+              scaledH={ph * safeScale}
               isHinted={piece.id === hintPieceId}
               onSendToBoard={handleSendToBoard}
               onSendToTray={handleSendToTray}
@@ -455,6 +461,8 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPi
                 <TrayPiece
                   key={piece.id}
                   piece={piece}
+                  scaledW={pw * safeScale}
+                  scaledH={ph * safeScale}
                   isNew={piece.id === newestTrayId}
                   isHinted={piece.id === hintPieceId}
                   onMoveToStaging={handleTrayToStaging}
