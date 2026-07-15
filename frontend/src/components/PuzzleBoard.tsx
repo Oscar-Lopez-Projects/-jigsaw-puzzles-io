@@ -320,30 +320,58 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPi
   }, [pieces, onPiecesChange, boardW, boardH, pw, ph]);
 
   // ── Handle HTML5 drop on the board panel ──
+  // One-step: drop snaps if correct, otherwise sends piece back to tray
   const handleBoardDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setBoardDragOver(false);
     const id = e.dataTransfer.getData('text/plain');
     if (!id) return;
 
+    const piece = pieces.find((p) => p.id === id);
+    if (!piece) return;
+
     // Get drop position relative to the stage element
     const stageEl = boardRef.current?.querySelector('.puzzle-single-stage');
-    if (!stageEl) {
-      handleSendToBoard(id);
-      return;
-    }
+    if (!stageEl) return;
 
     const rect = stageEl.getBoundingClientRect();
     // Convert pixel position to board (world) coordinates
     const dropX = (e.clientX - rect.left) / safeScale;
     const dropY = (e.clientY - rect.top) / safeScale;
 
-    // Clamp to board bounds
-    const clampedX = Math.max(0, Math.min(boardW - pw, dropX - pw / 2));
-    const clampedY = Math.max(0, Math.min(boardH - ph, dropY - ph / 2));
+    // Center of the dropped piece
+    const pCX = dropX;
+    const pCY = dropY;
+    // Center of the correct slot
+    const sCX = piece.correctX + pw / 2;
+    const sCY = piece.correctY + ph / 2;
+    const dist = Math.hypot(pCX - sCX, pCY - sCY);
 
-    handleSendToBoard(id, clampedX, clampedY);
-  }, [handleSendToBoard, safeScale, boardW, boardH, pw, ph]);
+    if (dist <= pw * SNAP_THRESHOLD) {
+      // Correct! Snap it in place
+      playSnapSound();
+      onPiecesChange(pieces.map((p) =>
+        p.id === id
+          ? { ...p, currentX: piece.correctX, currentY: piece.correctY, snapped: true, zone: 'free' as const }
+          : p
+      ));
+    } else {
+      // Wrong — flash board red and send piece to tray
+      playWrongSound();
+      setBoardFlash(true);
+      setTimeout(() => setBoardFlash(false), WRONG_FLASH_MS);
+
+      const currentTrayCount = pieces.filter((p) => p.zone === 'tray' && !p.snapped && p.id !== id).length;
+      setNewestTrayId(id);
+      onPiecesChange(pieces.map((p) =>
+        p.id === id ? { ...p, zone: 'tray' as const, slotIndex: currentTrayCount } : p
+      ));
+      setTimeout(() => {
+        if (trayRef.current) trayRef.current.scrollLeft = trayRef.current.scrollWidth;
+      }, 50);
+      setTimeout(() => setNewestTrayId(null), 800);
+    }
+  }, [pieces, pw, ph, safeScale, onPiecesChange]);
 
   const handleBoardDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
