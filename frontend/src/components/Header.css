@@ -51,9 +51,9 @@
 /* ── Nav links ───────────────────────────────────────────────── */
 .header-nav {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   gap: 2px;
-  padding: 4px;
+  padding: 0 4px;
   height: 45px;
   border-radius: 12px;
   background: var(--surface-subtle);
@@ -65,14 +65,13 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 7px 13px;
-  height: 100%;
+  padding: 0 13px;
   font-size: 13px;
   font-weight: 600;
   color: var(--text-muted);
   background: transparent;
   border: none;
-  border-radius: 9px;
+  border-radius: 10px;
   cursor: pointer;
   transition: background 0.15s, color 0.15s, box-shadow 0.15s;
   white-space: nowrap;
@@ -87,8 +86,7 @@
   background: #7c3aed;
   color: #fff;
   box-shadow: 0 2px 12px rgba(124, 58, 237, 0.5);
-  border-radius: 9px;
-  height: 100%;
+  border-radius: 10px;
 }
 
 .header-nav-link--active:hover {
