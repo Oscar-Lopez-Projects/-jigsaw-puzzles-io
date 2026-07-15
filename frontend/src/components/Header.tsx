@@ -29,6 +29,7 @@ export default function Header({ activeView, onDashboard, onLeaderboard, onFrien
   const { user, session, logout, isLoading } = useAuth();
   const [showAuth, setShowAuth] = useState(false);
   const [showNotifs, setShowNotifs] = useState(false);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [seenIds, setSeenIds] = useState<Set<string>>(new Set());
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(() => {
@@ -37,6 +38,7 @@ export default function Header({ activeView, onDashboard, onLeaderboard, onFrien
   });
   const [userElo, setUserElo] = useState<number | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const mobileMenuRef = useRef<HTMLDivElement>(null);
 
   // Fetch notifications
   useEffect(() => {
@@ -109,6 +111,9 @@ export default function Header({ activeView, onDashboard, onLeaderboard, onFrien
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setShowNotifs(false);
       }
+      if (mobileMenuRef.current && !mobileMenuRef.current.contains(e.target as Node) && !(e.target as HTMLElement).closest('.header-hamburger')) {
+        setShowMobileMenu(false);
+      }
     };
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
@@ -156,6 +161,19 @@ export default function Header({ activeView, onDashboard, onLeaderboard, onFrien
     <>
       <header className="header">
         <div className="header-inner">
+          {/* Hamburger button — visible on tablet/mobile only */}
+          <button
+            type="button"
+            className="header-hamburger"
+            onClick={() => setShowMobileMenu((v) => !v)}
+            aria-label="Open menu"
+            aria-expanded={showMobileMenu}
+          >
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+          </button>
+
           {/* Logo */}
           <div className="header-logo" onClick={onHome} style={{ cursor: onHome ? 'pointer' : 'default' }}>
             <svg className="puzzle-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -165,7 +183,7 @@ export default function Header({ activeView, onDashboard, onLeaderboard, onFrien
             <span className="header-title">Jigsaw Puzzles I.O</span>
           </div>
 
-          {/* Nav links */}
+          {/* Nav links — hidden on tablet/mobile, shown in desktop */}
           <nav className="header-nav">
             {onHome && (
               <button type="button" className={`header-nav-link${activeView === 'game' ? ' header-nav-link--active' : ''}`} onClick={onHome}>
@@ -198,7 +216,7 @@ export default function Header({ activeView, onDashboard, onLeaderboard, onFrien
             )}
           </nav>
 
-          {/* Search */}
+          {/* Search — full input on desktop */}
           <div className="header-search">
             <svg className="header-search-icon" viewBox="0 0 16 16" fill="none">
               <circle cx="7" cy="7" r="4.5" stroke="currentColor" strokeWidth="1.4"/>
@@ -207,12 +225,16 @@ export default function Header({ activeView, onDashboard, onLeaderboard, onFrien
             <input type="text" className="header-search-input" placeholder="Search puzzles, players..." disabled />
           </div>
 
-          {/* Right controls */}
-          <div className="header-controls">
-            <ThemeToggle />
-            <MuteToggle />
+          {/* Mobile right icons — search icon, bell, avatar (visible on tablet/mobile only) */}
+          <div className="header-mobile-right">
+            <button type="button" className="header-mobile-search-btn" aria-label="Search" disabled>
+              <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <circle cx="7" cy="7" r="4.5" stroke="currentColor" strokeWidth="1.4"/>
+                <path d="M10.5 10.5L14 14" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+              </svg>
+            </button>
 
-            {/* Notification bell */}
+            {/* Notification bell (mobile) */}
             {!isLoading && user && (
               <div className="header-notif-wrap" ref={dropdownRef}>
                 <button type="button" className="header-notif-btn" onClick={handleBellClick} aria-label={`Notifications (${notifCount})`}>
@@ -242,9 +264,61 @@ export default function Header({ activeView, onDashboard, onLeaderboard, onFrien
                 )}
               </div>
             )}
+
+            {/* Avatar (mobile) */}
+            {!isLoading && user && (
+              <div className="header-mobile-avatar" onClick={onDashboard} style={{ cursor: 'pointer' }}>
+                {user.avatar_url ? (
+                  <img src={user.avatar_url} alt={user.username} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                ) : (
+                  user.username.charAt(0).toUpperCase()
+                )}
+              </div>
+            )}
+
+            {!isLoading && !user && (
+              <button type="button" className="header-login-btn header-login-btn--mobile" onClick={() => setShowAuth(true)}>Sign In</button>
+            )}
           </div>
 
-          {/* User section */}
+          {/* Right controls — desktop only */}
+          <div className="header-controls">
+            <ThemeToggle />
+            <MuteToggle />
+
+            {/* Notification bell (desktop) */}
+            {!isLoading && user && (
+              <div className="header-notif-wrap">
+                <button type="button" className="header-notif-btn" onClick={handleBellClick} aria-label={`Notifications (${notifCount})`}>
+                  <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                    <path d="M8 1.5a4 4 0 0 0-4 4v3l-1 2h10l-1-2v-3a4 4 0 0 0-4-4Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+                    <path d="M6.5 12.5a1.5 1.5 0 0 0 3 0" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+                  </svg>
+                  {notifCount > 0 && <span className="header-notif-badge">{notifCount}</span>}
+                </button>
+
+                {showNotifs && (
+                  <div className="header-notif-dropdown">
+                    {notifications.length === 0 ? (
+                      <div className="notif-empty">No new notifications</div>
+                    ) : (
+                      notifications.map((n) => (
+                        <button key={n.id} type="button" className="notif-item" onClick={() => handleNotifClick(n)}>
+                          <span className="notif-icon">{n.type === 'challenge' ? '⚔️' : n.type === 'challenge_result' ? '🏆' : '👋'}</span>
+                          <div className="notif-text">
+                            <span className="notif-title">{n.title}</span>
+                            <span className="notif-subtitle">{n.subtitle}</span>
+                          </div>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* User section — desktop only */}
           {!isLoading && (
             user ? (
               <div className="header-user-section">
@@ -267,6 +341,89 @@ export default function Header({ activeView, onDashboard, onLeaderboard, onFrien
               <button type="button" className="header-login-btn" onClick={() => setShowAuth(true)}>Sign In</button>
             )
           )}
+        </div>
+
+        {/* Mobile slide-out menu */}
+        {showMobileMenu && (
+          <div className="header-mobile-backdrop" onClick={() => setShowMobileMenu(false)} />
+        )}
+        <div className={`header-mobile-menu${showMobileMenu ? ' header-mobile-menu--open' : ''}`} ref={mobileMenuRef}>
+          <div className="header-mobile-menu-header">
+            <span className="header-mobile-menu-title">Menu</span>
+            <button type="button" className="header-mobile-menu-close" onClick={() => setShowMobileMenu(false)} aria-label="Close menu">
+              <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path d="M3 3l10 10M13 3L3 13" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Mobile user info */}
+          {user && (
+            <div className="header-mobile-user">
+              <div className="header-mobile-user-avatar">
+                {user.avatar_url ? (
+                  <img src={user.avatar_url} alt={user.username} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                ) : (
+                  user.username.charAt(0).toUpperCase()
+                )}
+              </div>
+              <div className="header-mobile-user-info">
+                <span className="header-mobile-user-name">{user.username}</span>
+                <span className="header-mobile-user-elo">⚡ {userElo !== null ? userElo.toLocaleString() : '—'}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Mobile nav links */}
+          <nav className="header-mobile-nav">
+            {onHome && (
+              <button type="button" className={`header-mobile-nav-link${activeView === 'game' ? ' header-mobile-nav-link--active' : ''}`} onClick={() => { onHome(); setShowMobileMenu(false); }}>
+                <svg viewBox="0 0 16 16" fill="none"><path d="M2 8.5l6-6 6 6M3.5 7.5V14h3.5v-3.5h2V14H12.5V7.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                <span>Home</span>
+              </button>
+            )}
+            <button type="button" className="header-mobile-nav-link" disabled>
+              <svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="3" fill="currentColor" opacity="0.8"/><circle cx="8" cy="8" r="5.5" stroke="currentColor" strokeWidth="1.2"/></svg>
+              <span>Live Matches</span>
+              <span className="nav-live-badge">LIVE</span>
+            </button>
+            {onLeaderboard && (
+              <button type="button" className={`header-mobile-nav-link${activeView === 'leaderboard' ? ' header-mobile-nav-link--active' : ''}`} onClick={() => { onLeaderboard(); setShowMobileMenu(false); }}>
+                <svg viewBox="0 0 16 16" fill="none"><path d="M2 14h3V8H2v6ZM6.5 14h3V4h-3v10ZM11 14h3V6h-3v8Z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/></svg>
+                <span>Leaderboards</span>
+              </button>
+            )}
+            {onFriends && (
+              <button type="button" className={`header-mobile-nav-link${activeView === 'friends' ? ' header-mobile-nav-link--active' : ''}`} onClick={() => { onFriends(); setShowMobileMenu(false); }}>
+                <svg viewBox="0 0 16 16" fill="none"><circle cx="6" cy="5" r="2.5" stroke="currentColor" strokeWidth="1.3"/><path d="M1.5 14c0-2.5 2-4.5 4.5-4.5s4.5 2 4.5 4.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/><circle cx="12" cy="5.5" r="1.8" stroke="currentColor" strokeWidth="1.2"/><path d="M14.5 13c0-1.8-1.2-3.2-2.8-3.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
+                <span>Friends</span>
+              </button>
+            )}
+            {onDashboard && (
+              <button type="button" className={`header-mobile-nav-link${activeView === 'dashboard' ? ' header-mobile-nav-link--active' : ''}`} onClick={() => { onDashboard(); setShowMobileMenu(false); }}>
+                <svg viewBox="0 0 16 16" fill="none"><rect x="1.5" y="1.5" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3"/><rect x="9.5" y="1.5" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3"/><rect x="1.5" y="9.5" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3"/><rect x="9.5" y="9.5" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3"/></svg>
+                <span>Dashboard</span>
+              </button>
+            )}
+          </nav>
+
+          {/* Mobile controls */}
+          <div className="header-mobile-controls">
+            <ThemeToggle />
+            <MuteToggle />
+          </div>
+
+          {/* Mobile logout / sign in */}
+          <div className="header-mobile-footer">
+            {user ? (
+              <button type="button" className="header-mobile-logout" onClick={() => { logout(); setShowMobileMenu(false); }}>
+                <svg viewBox="0 0 16 16" fill="none"><path d="M6 2H3.5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1H6M10.5 11.5L14 8l-3.5-3.5M14 8H6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                <span>Sign Out</span>
+              </button>
+            ) : (
+              <button type="button" className="header-mobile-login" onClick={() => { setShowAuth(true); setShowMobileMenu(false); }}>Sign In</button>
+            )}
+          </div>
         </div>
       </header>
 
