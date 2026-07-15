@@ -66,6 +66,7 @@
   align-items: center;
   gap: 5px;
   padding: 7px 13px;
+  height: 100%;
   font-size: 13px;
   font-weight: 600;
   color: var(--text-muted);
@@ -83,13 +84,15 @@
 }
 
 .header-nav-link--active {
-  background: var(--accent);
+  background: #7c3aed;
   color: #fff;
-  box-shadow: 0 2px 10px rgba(124, 58, 237, 0.4);
+  box-shadow: 0 2px 12px rgba(124, 58, 237, 0.5);
+  border-radius: 9px;
+  height: 100%;
 }
 
 .header-nav-link--active:hover {
-  background: var(--accent-hover);
+  background: #6d28d9;
   color: #fff;
 }
 
