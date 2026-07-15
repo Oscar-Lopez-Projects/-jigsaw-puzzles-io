@@ -54,9 +54,11 @@
   align-items: center;
   gap: 2px;
   padding: 4px;
+  height: 45px;
   border-radius: 12px;
   background: var(--surface-subtle);
   border: 1px solid #4F6FAE;
+  box-shadow: 0 0 8px rgba(79, 111, 174, 0.3), inset 0 1px 0 rgba(79, 111, 174, 0.1);
 }
 
 .header-nav-link {
@@ -127,6 +129,7 @@
   color: var(--text-heading);
   outline: none;
   transition: border-color 0.15s, box-shadow 0.15s;
+  box-shadow: 0 0 8px rgba(79, 111, 174, 0.3), inset 0 1px 0 rgba(79, 111, 174, 0.1);
 }
 
 .header-search-input::placeholder {
@@ -167,6 +170,7 @@
   border-radius: 12px;
   background: var(--surface-subtle);
   border: 1px solid #4F6FAE;
+  box-shadow: 0 0 8px rgba(79, 111, 174, 0.3), inset 0 1px 0 rgba(79, 111, 174, 0.1);
 }
 
 .header-user-avatar {
@@ -239,6 +243,7 @@
   color: var(--text-body);
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s;
+  box-shadow: 0 0 8px rgba(79, 111, 174, 0.3), inset 0 1px 0 rgba(79, 111, 174, 0.1);
 }
 
 .header-notif-btn svg {
@@ -388,6 +393,7 @@
   color: var(--text-body);
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s, color 0.15s;
+  box-shadow: 0 0 8px rgba(79, 111, 174, 0.3), inset 0 1px 0 rgba(79, 111, 174, 0.1);
 }
 
 .mute-toggle svg {
