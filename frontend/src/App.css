@@ -372,6 +372,16 @@
   color: var(--accent);
 }
 
+/* Layout toggle button */
+.toolbar-action-btn--layout {
+  padding: 7px 10px;
+}
+
+.toolbar-action-btn--layout:not(:disabled):hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 /* ── Responsive tweaks ───────────────────────────────────────── */
 @media (max-width: 560px) {
   .main-content {

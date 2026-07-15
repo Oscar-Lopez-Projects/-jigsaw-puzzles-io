@@ -18,6 +18,7 @@ import UserProfile from './components/UserProfile';
 import FriendsPage from './components/FriendsPage';
 import { getGrid, generatePieces, reshufflePieces } from './utils/puzzleUtils';
 import { useAuth } from './context/AuthContext';
+import { usePuzzleLayout } from './context/PuzzleLayoutContext';
 import { apiFetch } from './lib/api';
 import { playWinSound, playClickSound } from './lib/sounds';
 import type { PuzzlePiece } from './types/puzzle';
@@ -29,6 +30,7 @@ type View = 'game' | 'dashboard' | 'community' | 'leaderboard' | 'profile' | 'fr
 export default function App() {
   // ── Auth ─────────────────────────────────────────────────────
   const { session } = useAuth();
+  const { prefs, toggleBoardPosition } = usePuzzleLayout();
 
   // ── View (game vs dashboard vs community) ────────────────────
   const [view, setViewState] = useState<View>('game');
@@ -603,6 +605,22 @@ export default function App() {
                   </svg>
                   Reset
                 </button>
+
+                {/* Layout toggle — swap board/staging sides */}
+                {session?.access_token && (
+                  <button
+                    type="button"
+                    className="toolbar-action-btn toolbar-action-btn--layout"
+                    onClick={toggleBoardPosition}
+                    aria-label={`Board on ${prefs.boardPosition === 'left' ? 'right' : 'left'}`}
+                    title={`Move board to ${prefs.boardPosition === 'left' ? 'right' : 'left'}`}
+                  >
+                    <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                      <rect x="1" y="2" width="6" height="12" rx="1" stroke="currentColor" strokeWidth="1.4" fill={prefs.boardPosition === 'left' ? 'currentColor' : 'none'} opacity={prefs.boardPosition === 'left' ? '0.3' : '1'} />
+                      <rect x="9" y="2" width="6" height="12" rx="1" stroke="currentColor" strokeWidth="1.4" fill={prefs.boardPosition === 'right' ? 'currentColor' : 'none'} opacity={prefs.boardPosition === 'right' ? '0.3' : '1'} />
+                    </svg>
+                  </button>
+                )}
               </div>
             </div>
 
