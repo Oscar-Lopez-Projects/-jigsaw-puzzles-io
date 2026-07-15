@@ -53,7 +53,7 @@
   display: flex;
   align-items: stretch;
   gap: 2px;
-  padding: 0 4px;
+  padding: 0;
   height: 45px;
   border-radius: 12px;
   background: var(--surface-subtle);
@@ -78,19 +78,19 @@
 }
 
 .header-nav-link:hover {
-  background: var(--surface);
+  background: rgb(124 58 237 / 23%);
   color: var(--text-heading);
 }
 
 .header-nav-link--active {
-  background: #7c3aed;
+  background: #622ada82;
   color: #fff;
   box-shadow: 0 2px 12px rgba(124, 58, 237, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1);
   border-radius: 10px;
 }
 
 .header-nav-link--active:hover {
-  background: #6d28d9;
+  background: #622ada82;
   color: #fff;
 }
 
