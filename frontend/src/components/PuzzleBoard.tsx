@@ -518,15 +518,17 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPi
         <div className="piece-tray-header">
           <span className="piece-tray-label">
             PIECE TRAY
-            {trayPieces.length > 0 && (
-              <span className="piece-tray-count">{trayPieces.length}</span>
-            )}
           </span>
-          <span className="piece-tray-hint">
-            {trayPieces.length === 0
-              ? 'Wrong placements will appear here'
-              : 'Drag a piece back to the staging area or board'}
-          </span>
+          <div className="piece-tray-remaining">
+            <span className="piece-tray-remaining-label">Remaining</span>
+            <span className="piece-tray-remaining-num">{trayPieces.length}</span>
+          </div>
+          <button type="button" className="piece-tray-sort-btn" disabled>
+            <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M2 4h12M4 8h8M6 12h4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+            </svg>
+            Sort
+          </button>
         </div>
 
         <div className="piece-tray-row">

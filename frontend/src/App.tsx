@@ -500,116 +500,110 @@ export default function App() {
           <div className="puzzle-screen">
             {/* Toolbar */}
             <div className="puzzle-toolbar">
-              <button type="button" className="back-btn" onClick={handleBackToSetup}>
-                <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                  <path d="M10 3L5 8l5 5" stroke="currentColor" strokeWidth="1.75"
-                    strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-                New Puzzle
-              </button>
+              {/* Left section: back + puzzle info */}
+              <div className="puzzle-toolbar-left">
+                <button type="button" className="back-btn" onClick={handleBackToSetup}>
+                  <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                    <path d="M10 3L5 8l5 5" stroke="currentColor" strokeWidth="1.75"
+                      strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  Back to Puzzles
+                </button>
 
-              <div className="puzzle-meta">
-                <span className="puzzle-meta-label">{imageFileName ?? 'Puzzle'}</span>
-                <span className="puzzle-meta-pill">
-                  {gridCols * gridRows} pieces &middot; {gridCols}&times;{gridRows}
-                </span>
-              </div>
-
-              {/* Live timer */}
-              <div className="puzzle-timer" aria-label="Elapsed time" aria-live="off">
-                <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                  <circle cx="8" cy="9" r="5.5" stroke="currentColor" strokeWidth="1.4" />
-                  <path d="M8 6v3.5l2 1.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-                  <path d="M6.5 2h3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-                </svg>
-                {formatTime(elapsedSec)}
-              </div>
-
-              {/* Progress */}
-              <div className="puzzle-progress">
-                <div className="progress-bar-track">
-                  <div
-                    className="progress-bar-fill"
-                    style={{ width: `${(snappedCount / pieces.length) * 100}%` }}
-                    aria-valuenow={snappedCount}
-                    aria-valuemax={pieces.length}
-                    role="progressbar"
-                    aria-label="Puzzle progress"
-                  />
+                <div className="puzzle-meta">
+                  <span className="puzzle-meta-label">{imageFileName ?? 'Puzzle'}</span>
+                  <span className="puzzle-meta-pill">
+                    {gridCols * gridRows} pieces &middot; {gridCols}&times;{gridRows}
+                    &middot;
+                    <svg className="puzzle-meta-timer-icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                      <circle cx="8" cy="9" r="5.5" stroke="currentColor" strokeWidth="1.4" />
+                      <path d="M8 6v3.5l2 1.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+                      <path d="M6.5 2h3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+                    </svg>
+                    <span className="puzzle-meta-time">{formatTime(elapsedSec)}</span>
+                    <span className="puzzle-meta-progress-wrap">
+                      <span className="puzzle-meta-progress-track">
+                        <span className="puzzle-meta-progress-fill" style={{ width: `${(snappedCount / pieces.length) * 100}%` }} />
+                      </span>
+                      <span className="puzzle-meta-progress-pct">{Math.round((snappedCount / pieces.length) * 100)}%</span>
+                    </span>
+                  </span>
                 </div>
-                <span className="progress-label">{Math.round((snappedCount / pieces.length) * 100)}%</span>
               </div>
 
-              {selectedImage && (
+              {/* Right section: action buttons */}
+              <div className="puzzle-toolbar-right">
+                {selectedImage && (
+                  <button
+                    type="button"
+                    className={`toolbar-action-btn toolbar-action-btn--preview${showPreview ? ' toolbar-action-btn--active' : ''}`}
+                    onClick={() => {
+                      if (!showPreview) setPreviewPos({ x: 20, y: 80 });
+                      setShowPreview((v) => !v);
+                    }}
+                    aria-label={showPreview ? 'Hide reference image' : 'Show reference image'}
+                    title={showPreview ? 'Hide preview' : 'Preview image'}
+                  >
+                    <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                      <path
+                        d="M1.5 10S4.5 4 10 4s8.5 6 8.5 6-3 6-8.5 6S1.5 10 1.5 10Z"
+                        stroke="currentColor"
+                        strokeWidth="1.6"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      <circle cx="10" cy="10" r="2.5" stroke="currentColor" strokeWidth="1.6" />
+                    </svg>
+                    Preview
+                  </button>
+                )}
+
                 <button
                   type="button"
-                  className={`preview-btn${showPreview ? ' preview-btn--active' : ''}`}
-                  onClick={() => {
-                    if (!showPreview) setPreviewPos({ x: 20, y: 80 });
-                    setShowPreview((v) => !v);
-                  }}
-                  aria-label={showPreview ? 'Hide reference image' : 'Show reference image'}
-                  title={showPreview ? 'Hide preview' : 'Preview image'}
+                  className={`toolbar-action-btn toolbar-action-btn--hint${hintPieceId ? ' toolbar-action-btn--active' : ''}`}
+                  onClick={handleHint}
+                  disabled={pieces.filter((p) => !p.snapped).length === 0}
+                  aria-label="Show a hint"
+                  title="Hint"
                 >
                   <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                    <circle cx="10" cy="8" r="5" stroke="currentColor" strokeWidth="1.6" />
+                    <path d="M7.5 8a2.5 2.5 0 0 1 5 0c0 1.2-.8 2-1.5 2.5V12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                    <circle cx="10" cy="14.5" r="1" fill="currentColor" />
+                  </svg>
+                  Hint
+                </button>
+
+                <button
+                  type="button"
+                  className="toolbar-action-btn toolbar-action-btn--collect"
+                  onClick={handleCollectAll}
+                  disabled={pieces.filter((p) => !p.snapped && p.zone !== 'tray').length === 0}
+                  aria-label="Collect all loose pieces into tray"
+                  title="Collect all pieces into tray"
+                >
+                  <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                    <path d="M3 13h14" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+                    <path d="M5 13V7a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M2 13h16v2a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-2Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round"/>
+                    <path d="M8 6V4M12 6V4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+                  </svg>
+                  Collect
+                </button>
+
+                <button type="button" className="toolbar-action-btn toolbar-action-btn--reset" onClick={handleReset}>
+                  <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
                     <path
-                      d="M1.5 10S4.5 4 10 4s8.5 6 8.5 6-3 6-8.5 6S1.5 10 1.5 10Z"
+                      d="M13.5 8A5.5 5.5 0 1 1 8 2.5M13.5 2.5v3.5H10"
                       stroke="currentColor"
                       strokeWidth="1.6"
                       strokeLinecap="round"
                       strokeLinejoin="round"
                     />
-                    <circle cx="10" cy="10" r="2.5" stroke="currentColor" strokeWidth="1.6" />
                   </svg>
-                  Preview
+                  Reset
                 </button>
-              )}
-
-              <button
-                type="button"
-                className={`hint-btn${hintPieceId ? ' hint-btn--active' : ''}`}
-                onClick={handleHint}
-                disabled={pieces.filter((p) => !p.snapped).length === 0}
-                aria-label="Show a hint"
-                title="Hint"
-              >
-                <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
-                  <circle cx="10" cy="8" r="5" stroke="currentColor" strokeWidth="1.6" />
-                  <path d="M7.5 8a2.5 2.5 0 0 1 5 0c0 1.2-.8 2-1.5 2.5V12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-                  <circle cx="10" cy="14.5" r="1" fill="currentColor" />
-                </svg>
-                Hint
-              </button>
-
-              <button
-                type="button"
-                className="collect-btn"
-                onClick={handleCollectAll}
-                disabled={pieces.filter((p) => !p.snapped && p.zone !== 'tray').length === 0}
-                aria-label="Collect all loose pieces into tray"
-                title="Collect all pieces into tray"
-              >
-                <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
-                  <path d="M3 13h14" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
-                  <path d="M5 13V7a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-                  <path d="M2 13h16v2a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-2Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round"/>
-                  <path d="M8 6V4M12 6V4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
-                </svg>
-                Collect
-              </button>
-
-              <button type="button" className="reset-btn" onClick={handleReset}>
-                <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                  <path
-                    d="M13.5 8A5.5 5.5 0 1 1 8 2.5M13.5 2.5v3.5H10"
-                    stroke="currentColor"
-                    strokeWidth="1.6"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-                Reset
-              </button>
+              </div>
             </div>
 
             {/* Board */}

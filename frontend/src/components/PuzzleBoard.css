@@ -4,22 +4,27 @@
   display: flex;
   flex-direction: column;
   gap: 0;
+  background: var(--surface, #1a1730);
+  border: 1px solid var(--border, rgba(255,255,255,0.08));
+  border-radius: 14px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
 }
 
 /* ── Konva stage wrapper ─────────────────────────────────────── */
 .puzzle-single-stage {
   width: 100%;
   line-height: 0;
-  border-radius: 8px 8px 0 0;
+  border-radius: 0;
   overflow: hidden;
 }
 
 /* ── Piece tray section ──────────────────────────────────────── */
 .piece-tray-section {
-  background: #1c192c;
-  border-top: 1px solid rgba(255,255,255,0.08);
-  border-radius: 0 0 8px 8px;
-  padding: 10px 0 12px;
+  background: #16132a;
+  border-top: 1px solid rgba(255,255,255,0.06);
+  border-radius: 0;
+  padding: 10px 0 14px;
 }
 
 /* ── Tray header ─────────────────────────────────────────────── */
@@ -34,7 +39,7 @@
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.8px;
-  color: rgba(255,255,255,0.40);
+  color: var(--accent, #7c3aed);
   text-transform: uppercase;
   display: flex;
   align-items: center;
@@ -49,11 +54,34 @@
   min-width: 18px;
   height: 18px;
   padding: 0 5px;
-  background: rgba(220,38,38,0.75);
-  color: #fff;
+  background: rgba(124, 58, 237, 0.25);
+  color: var(--accent, #7c3aed);
   font-size: 10px;
   font-weight: 700;
   border-radius: 99px;
+  border: 1px solid rgba(124, 58, 237, 0.4);
+}
+
+.piece-tray-remaining {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-left: 4px;
+}
+
+.piece-tray-remaining-label {
+  font-size: 10px;
+  font-weight: 500;
+  color: rgba(255,255,255,0.35);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.piece-tray-remaining-num {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--text-heading, #fff);
+  line-height: 1.1;
 }
 
 .piece-tray-hint {
@@ -62,6 +90,36 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  margin-left: auto;
+}
+
+.piece-tray-sort-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted, rgba(255,255,255,0.5));
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  margin-left: auto;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.piece-tray-sort-btn svg {
+  width: 12px;
+  height: 12px;
+}
+
+.piece-tray-sort-btn:hover {
+  background: rgba(255,255,255,0.08);
+  border-color: rgba(255,255,255,0.15);
+  color: var(--text-heading, #fff);
 }
 
 /* ── Scroll row (buttons + track) ───────────────────────────── */
@@ -75,16 +133,16 @@
 /* ── Scroll buttons ──────────────────────────────────────────── */
 .tray-scroll-btn {
   flex-shrink: 0;
-  width: 32px;
+  width: 36px;
   height: 100%;
-  min-height: 48px;
+  min-height: 52px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 22px;
-  font-weight: 300;
-  color: rgba(255,255,255,0.50);
-  background: #1c192c;
+  font-size: 18px;
+  font-weight: 400;
+  color: rgba(255,255,255,0.55);
+  background: rgba(255,255,255,0.03);
   border: none;
   cursor: pointer;
   transition: color 0.15s, background 0.15s;
@@ -93,12 +151,12 @@
   padding: 0;
 }
 
-.tray-scroll-btn--left  { border-right: 1px solid rgba(255,255,255,0.07); }
-.tray-scroll-btn--right { border-left:  1px solid rgba(255,255,255,0.07); }
+.tray-scroll-btn--left  { border-right: 1px solid rgba(255,255,255,0.06); border-radius: 0 0 0 0; }
+.tray-scroll-btn--right { border-left:  1px solid rgba(255,255,255,0.06); border-radius: 0 0 0 0; }
 
 .tray-scroll-btn:hover {
   color: #fff;
-  background: rgba(255,255,255,0.06);
+  background: rgba(255,255,255,0.08);
 }
 
 .tray-scroll-btn:focus-visible {
@@ -142,15 +200,15 @@
   flex-shrink: 0;
   border-radius: 4px;
   overflow: hidden;
-  border: 2px solid rgba(220,38,38,0.50);
+  border: 2px solid rgba(124, 58, 237, 0.40);
   cursor: pointer;
   transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
   position: relative;
 }
 
 .tray-piece:hover {
-  border-color: rgba(220,38,38,0.90);
-  box-shadow: 0 0 10px rgba(220,38,38,0.40);
+  border-color: rgba(124, 58, 237, 0.80);
+  box-shadow: 0 0 10px rgba(124, 58, 237, 0.35);
   transform: scale(1.06);
   z-index: 2;
 }
@@ -159,15 +217,15 @@
   transform: scale(0.97);
 }
 
-/* New piece animation — slides in and pulses red briefly */
+/* New piece animation — slides in and pulses briefly */
 .tray-piece--new {
   animation: trayPieceIn 0.5s ease forwards;
 }
 
 @keyframes trayPieceIn {
-  0%   { transform: scale(0.7); opacity: 0; border-color: rgba(220,38,38,1); box-shadow: 0 0 16px rgba(220,38,38,0.8); }
+  0%   { transform: scale(0.7); opacity: 0; border-color: rgba(124, 58, 237, 1); box-shadow: 0 0 16px rgba(124, 58, 237, 0.8); }
   60%  { transform: scale(1.08); opacity: 1; }
-  100% { transform: scale(1);    opacity: 1; border-color: rgba(220,38,38,0.50); box-shadow: none; }
+  100% { transform: scale(1);    opacity: 1; border-color: rgba(124, 58, 237, 0.40); box-shadow: none; }
 }
 
 /* ── Hinted tray piece ───────────────────────────────────────── */
