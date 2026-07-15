@@ -1,4 +1,5 @@
 import { useRef, useState, useCallback } from 'react';
+import { validateImageDimensions, getImageDimensions, MIN_LONG_SIDE, MIN_SHORT_SIDE } from '../utils/imageValidation';
 import './ImageUploader.css';
 
 interface ImageUploaderProps {
@@ -43,13 +44,28 @@ export default function ImageUploader({
           `"${file.name}" is not a supported image. Please choose a JPG, PNG, WEBP, or GIF file.`
         );
         resetInput();
-        // If a previous image was selected, keep it — only clear if there was nothing before
         return;
       }
 
       const reader = new FileReader();
-      reader.onload = (e) => {
+      reader.onload = async (e) => {
         const result = e.target?.result as string;
+
+        // Validate image dimensions
+        try {
+          const dims = await getImageDimensions(result);
+          const validation = validateImageDimensions(dims);
+          if (!validation.valid) {
+            setError(validation.error!);
+            resetInput();
+            return;
+          }
+        } catch {
+          setError('Could not read image dimensions. Please try a different file.');
+          resetInput();
+          return;
+        }
+
         onImageSelected(result, file.name);
       };
       reader.onerror = () => {
@@ -195,7 +211,7 @@ export default function ImageUploader({
             <p className="drop-secondary">
               or <span className="drop-link">browse your files</span>
             </p>
-            <p className="drop-hint">JPG, PNG, WEBP, GIF supported</p>
+            <p className="drop-hint">JPG, PNG, WEBP, GIF · Min {MIN_LONG_SIDE}×{MIN_SHORT_SIDE}px</p>
           </div>
         )}
       </div>

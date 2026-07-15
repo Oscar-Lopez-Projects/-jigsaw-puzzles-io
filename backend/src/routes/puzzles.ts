@@ -1,10 +1,15 @@
 import { Router } from 'express';
 import multer from 'multer';
+import imageSize from 'image-size';
 import { supabase } from '../supabaseClient.js';
 import { requireAuth, AuthRequest } from '../middleware/auth.js';
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } }); // 10MB max
+
+// Minimum image dimensions for puzzle generation
+const MIN_LONG_SIDE = 800;
+const MIN_SHORT_SIDE = 600;
 
 // Get community puzzles (public, no auth needed)
 router.get('/', async (req, res) => {
@@ -54,6 +59,22 @@ router.post('/upload', requireAuth, upload.single('image'), async (req: AuthRequ
   const pieceCountNum = parseInt(piece_count);
   if (isNaN(pieceCountNum) || pieceCountNum <= 0) {
     return res.status(400).json({ error: 'piece_count must be a positive number' });
+  }
+
+  // Validate image dimensions
+  try {
+    const dims = imageSize(file.buffer);
+    if (dims.width && dims.height) {
+      const shortSide = Math.min(dims.width, dims.height);
+      const longSide = Math.max(dims.width, dims.height);
+      if (longSide < MIN_LONG_SIDE || shortSide < MIN_SHORT_SIDE) {
+        return res.status(400).json({
+          error: `Image is too small (${dims.width}×${dims.height}). Minimum size is ${MIN_LONG_SIDE}×${MIN_SHORT_SIDE}px.`,
+        });
+      }
+    }
+  } catch {
+    // If we can't read dimensions, allow the upload (non-critical)
   }
 
   // Generate a unique filename

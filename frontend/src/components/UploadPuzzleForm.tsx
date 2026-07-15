@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { validateImageDimensions, getImageDimensions } from '../utils/imageValidation';
 import './UploadPuzzleForm.css';
 
 interface UploadPuzzleFormProps {
@@ -19,11 +20,31 @@ export default function UploadPuzzleForm({ onClose, onSuccess }: UploadPuzzleFor
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (f) {
+      setError(null);
+      const objectUrl = URL.createObjectURL(f);
+
+      // Validate dimensions
+      try {
+        const dims = await getImageDimensions(objectUrl);
+        const validation = validateImageDimensions(dims);
+        if (!validation.valid) {
+          setError(validation.error!);
+          URL.revokeObjectURL(objectUrl);
+          e.target.value = '';
+          return;
+        }
+      } catch {
+        setError('Could not read image dimensions. Please try a different file.');
+        URL.revokeObjectURL(objectUrl);
+        e.target.value = '';
+        return;
+      }
+
       setFile(f);
-      setPreview(URL.createObjectURL(f));
+      setPreview(objectUrl);
     }
   };
 
