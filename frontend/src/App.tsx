@@ -211,7 +211,7 @@ export default function App() {
       setDebugMsg(msg);
 
       if (session?.access_token && pieceCount) {
-        const difficultyMap: Record<number, string> = { 5: 'beginner', 25: 'beginner', 50: 'easy', 100: 'medium', 150: 'hard' };
+        const difficultyMap: Record<number, string> = { 10: 'beginner', 25: 'beginner', 50: 'easy', 100: 'medium', 150: 'hard', 300: 'hard' };
 
         (async () => {
           try {

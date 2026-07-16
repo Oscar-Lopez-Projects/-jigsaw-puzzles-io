@@ -2,13 +2,14 @@ import type { PuzzlePiece, GridDimensions } from '../types/puzzle';
 
 // ── Grid sizing ───────────────────────────────────────────────
 
-export function getGrid(pieceCount: 5 | 25 | 50 | 100 | 150): GridDimensions {
+export function getGrid(pieceCount: 10 | 25 | 50 | 100 | 150 | 300): GridDimensions {
   const presets: Record<number, GridDimensions> = {
-    5:   { cols: 5,  rows: 1  },
+    10:  { cols: 5,  rows: 2  },
     25:  { cols: 5,  rows: 5  },
     50:  { cols: 10, rows: 5  },
     100: { cols: 10, rows: 10 },
     150: { cols: 15, rows: 10 },
+    300: { cols: 20, rows: 15 },
   };
   return presets[pieceCount];
 }

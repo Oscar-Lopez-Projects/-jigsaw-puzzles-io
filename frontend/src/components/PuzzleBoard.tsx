@@ -422,7 +422,12 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPi
       onDragOver={handleBoardDragOver}
       onDragLeave={handleBoardDragLeave}
     >
-      <div className="puzzle-single-stage" style={{ width: stageW, height: stageH }}>
+      <div
+        className="puzzle-single-stage"
+        style={{ width: stageW, height: stageH }}
+        onDrop={handleBoardDrop}
+        onDragOver={handleBoardDragOver}
+      >
         <Stage width={stageW} height={stageH} scaleX={safeScale} scaleY={safeScale}>
           {/* Board background */}
           <Layer listening={false}>
