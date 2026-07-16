@@ -158,7 +158,7 @@ function findGroups(pieces: PuzzlePiece[], gridCellW: number, gridCellH: number)
           const expectedDy = (other.correctRow - curr.correctRow) * gridCellH;
           const actualDx = other.currentX - curr.currentX;
           const actualDy = other.currentY - curr.currentY;
-          if (Math.abs(actualDx - expectedDx) < 2 && Math.abs(actualDy - expectedDy) < 2) {
+          if (Math.abs(actualDx - expectedDx) < 5 && Math.abs(actualDy - expectedDy) < 5) {
             visited.add(other.id);
             queue.push(other);
           }
@@ -287,47 +287,140 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPi
   const unsnapped = pieces.filter((p) => !p.snapped);
   const hintPiece = hintPieceId ? pieces.find((p) => p.id === hintPieceId && !p.snapped) ?? null : null;
 
-  // Single piece drag end
+  // Single piece drag end — check board snap AND piece-to-piece snap
   const handleDragEnd = useCallback(
     (id: string, wx: number, wy: number) => {
       const piece = pieces.find((p) => p.id === id);
       if (!piece) return;
 
-      // Snap check relative to target area
+      // 1. Check snap to target area (final board position)
       const correctWorldX = targetOX + piece.correctX;
       const correctWorldY = targetOY + piece.correctY;
       const pCX = wx + pw / 2;
       const pCY = wy + ph / 2;
       const sCX = correctWorldX + pw / 2;
       const sCY = correctWorldY + ph / 2;
-      const dist = Math.hypot(pCX - sCX, pCY - sCY);
+      const distToTarget = Math.hypot(pCX - sCX, pCY - sCY);
 
-      if (dist <= gridCellW * SNAP_THRESHOLD) {
+      if (distToTarget <= gridCellW * SNAP_THRESHOLD) {
         playSnapSound();
         onPiecesChange(pieces.map((p) =>
           p.id === id
             ? { ...p, currentX: correctWorldX, currentY: correctWorldY, snapped: true }
             : p
         ));
-      } else {
-        onPiecesChange(pieces.map((p) =>
-          p.id === id ? { ...p, currentX: wx, currentY: wy } : p
-        ));
+        return;
       }
+
+      // 2. Check piece-to-piece snap (connect with any neighbor)
+      // Find all other pieces (snapped or not) that are grid-adjacent to this one
+      const neighbors = pieces.filter((other) => {
+        if (other.id === id) return false;
+        const colDiff = Math.abs(piece.correctCol - other.correctCol);
+        const rowDiff = Math.abs(piece.correctRow - other.correctRow);
+        return (colDiff === 1 && rowDiff === 0) || (colDiff === 0 && rowDiff === 1);
+      });
+
+      // Check if dropped position is close enough to any neighbor's expected relative position
+      for (const neighbor of neighbors) {
+        // Where should 'piece' be relative to 'neighbor' based on grid positions?
+        const expectedDx = (piece.correctCol - neighbor.correctCol) * gridCellW;
+        const expectedDy = (piece.correctRow - neighbor.correctRow) * gridCellH;
+        const expectedX = neighbor.currentX + expectedDx;
+        const expectedY = neighbor.currentY + expectedDy;
+
+        const snapDist = Math.hypot(wx - expectedX, wy - expectedY);
+
+        if (snapDist <= gridCellW * SNAP_THRESHOLD) {
+          // Snap to the correct relative position next to this neighbor
+          playSnapSound();
+          onPiecesChange(pieces.map((p) =>
+            p.id === id
+              ? { ...p, currentX: expectedX, currentY: expectedY, snapped: true }
+              : p
+          ));
+          return;
+        }
+      }
+
+      // 3. No snap — leave piece where dropped
+      onPiecesChange(pieces.map((p) =>
+        p.id === id ? { ...p, currentX: wx, currentY: wy } : p
+      ));
     },
-    [pieces, pw, ph, gridCellW, targetOX, targetOY, onPiecesChange]
+    [pieces, pw, ph, gridCellW, gridCellH, targetOX, targetOY, onPiecesChange]
   );
 
-  // Group drag end: move all pieces in the group by the delta
+  // Group drag end: move all pieces in the group by the delta, then check snaps
   const handleGroupDragEnd = useCallback(
     (ids: string[], dx: number, dy: number) => {
-      onPiecesChange(pieces.map((p) =>
+      // Calculate new positions for all pieces in the group
+      const updatedPieces = pieces.map((p) =>
         ids.includes(p.id)
           ? { ...p, currentX: p.currentX + dx, currentY: p.currentY + dy }
           : p
-      ));
+      );
+
+      // Check if any piece in the group is now at its correct board position
+      const groupPieces = updatedPieces.filter((p) => ids.includes(p.id));
+      const refPiece = groupPieces[0];
+      if (refPiece) {
+        const correctWorldX = targetOX + refPiece.correctX;
+        const correctWorldY = targetOY + refPiece.correctY;
+        const distToTarget = Math.hypot(refPiece.currentX - correctWorldX, refPiece.currentY - correctWorldY);
+
+        if (distToTarget <= gridCellW * SNAP_THRESHOLD) {
+          // Snap entire group to the board
+          playSnapSound();
+          const finalPieces = updatedPieces.map((p) => {
+            if (!ids.includes(p.id)) return p;
+            const correctWX = targetOX + p.correctX;
+            const correctWY = targetOY + p.correctY;
+            return { ...p, currentX: correctWX, currentY: correctWY, snapped: true };
+          });
+          onPiecesChange(finalPieces);
+          return;
+        }
+      }
+
+      // Check if any piece in this group can connect to a neighboring piece outside the group
+      for (const gPiece of groupPieces) {
+        const neighbors = updatedPieces.filter((other) => {
+          if (ids.includes(other.id)) return false; // skip pieces in same group
+          const colDiff = Math.abs(gPiece.correctCol - other.correctCol);
+          const rowDiff = Math.abs(gPiece.correctRow - other.correctRow);
+          return (colDiff === 1 && rowDiff === 0) || (colDiff === 0 && rowDiff === 1);
+        });
+
+        for (const neighbor of neighbors) {
+          const expectedDx = (gPiece.correctCol - neighbor.correctCol) * gridCellW;
+          const expectedDy = (gPiece.correctRow - neighbor.correctRow) * gridCellH;
+          const expectedX = neighbor.currentX + expectedDx;
+          const expectedY = neighbor.currentY + expectedDy;
+          const snapDist = Math.hypot(gPiece.currentX - expectedX, gPiece.currentY - expectedY);
+
+          if (snapDist <= gridCellW * SNAP_THRESHOLD) {
+            // Snap: move entire group so this piece aligns with the neighbor
+            const offsetX = expectedX - gPiece.currentX;
+            const offsetY = expectedY - gPiece.currentY;
+            playSnapSound();
+            const finalPieces = updatedPieces.map((p) => {
+              if (!ids.includes(p.id)) return p;
+              return { ...p, currentX: p.currentX + offsetX, currentY: p.currentY + offsetY, snapped: true };
+            });
+            // Also mark the neighbor as snapped so they form a group
+            onPiecesChange(finalPieces.map((p) =>
+              p.id === neighbor.id ? { ...p, snapped: true } : p
+            ));
+            return;
+          }
+        }
+      }
+
+      // No snap — just move
+      onPiecesChange(updatedPieces);
     },
-    [pieces, onPiecesChange]
+    [pieces, gridCellW, gridCellH, targetOX, targetOY, onPiecesChange]
   );
 
   if (!ready) {
