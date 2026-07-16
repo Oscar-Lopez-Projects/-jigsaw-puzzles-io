@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { Stage, Layer, Image as KonvaImage, Rect, Line, Group } from 'react-konva';
+import { Stage, Layer, Image as KonvaImage, Rect, Group } from 'react-konva';
 import type Konva from 'konva';
 import type { PuzzlePiece } from '../types/puzzle';
 import { playSnapSound } from '../lib/sounds';
 import './PuzzleBoard.css';
 
 // ─── layout constants ─────────────────────────────────────────
-const SNAP_THRESHOLD  = 0.5;
-const MARGIN_RATIO    = 0.25; // extra space around target for scattered pieces
+const SNAP_THRESHOLD = 0.5;
+const MARGIN_RATIO   = 0.22;
 
 // ─── useImage hook ─────────────────────────────────────────────
 function useImage(src: string): HTMLImageElement | null {
@@ -44,14 +44,7 @@ function DraggablePieceTile({ piece, x, y, onDragEnd }: PieceTileProps) {
     [piece.id, onDragEnd]
   );
 
-  if (!img) {
-    return (
-      <Rect x={x} y={y}
-        width={piece.pieceWidth} height={piece.pieceHeight}
-        fill="rgba(0,0,0,0)" listening={false}
-      />
-    );
-  }
+  if (!img) return null;
 
   return (
     <Group
@@ -75,29 +68,110 @@ function DraggablePieceTile({ piece, x, y, onDragEnd }: PieceTileProps) {
         width={piece.pieceWidth} height={piece.pieceHeight}
         listening={true}
       />
-      {/* Green highlight when correctly snapped */}
-      {piece.snapped && (
-        <Rect x={0} y={0} width={piece.pieceWidth} height={piece.pieceHeight}
-          stroke="rgba(34,197,94,0.70)" strokeWidth={2} fill="rgba(34,197,94,0.10)" listening={false} />
-      )}
     </Group>
   );
 }
 
-// ─── SlotGrid (target area grid lines) ────────────────────────
-function SlotGrid({ cols, rows, pieceW, pieceH, ox, oy }: {
-  cols: number; rows: number; pieceW: number; pieceH: number; ox: number; oy: number;
-}) {
-  const lines: React.ReactNode[] = [];
-  for (let c = 0; c <= cols; c++)
-    lines.push(<Line key={`v${c}`}
-      points={[ox + c * pieceW, oy, ox + c * pieceW, oy + rows * pieceH]}
-      stroke="rgba(255,255,255,0.12)" strokeWidth={1} listening={false} />);
-  for (let r = 0; r <= rows; r++)
-    lines.push(<Line key={`h${r}`}
-      points={[ox, oy + r * pieceH, ox + cols * pieceW, oy + r * pieceH]}
-      stroke="rgba(255,255,255,0.12)" strokeWidth={1} listening={false} />);
-  return <>{lines}</>;
+// ─── Piece Group (multiple snapped pieces that move together) ──
+interface PieceGroupProps {
+  groupPieces: PuzzlePiece[];
+  offsetX: number;
+  offsetY: number;
+  onGroupDragEnd: (ids: string[], dx: number, dy: number) => void;
+}
+
+function DraggablePieceGroup({ groupPieces, offsetX, offsetY, onGroupDragEnd }: PieceGroupProps) {
+  const startPos = useRef({ x: offsetX, y: offsetY });
+
+  const handleDragStart = useCallback((e: Konva.KonvaEventObject<DragEvent>) => {
+    startPos.current = { x: e.target.x(), y: e.target.y() };
+    e.target.moveToTop();
+    e.target.getStage()!.container().style.cursor = 'grabbing';
+  }, []);
+
+  const handleDragEnd = useCallback((e: Konva.KonvaEventObject<DragEvent>) => {
+    const dx = e.target.x() - startPos.current.x;
+    const dy = e.target.y() - startPos.current.y;
+    onGroupDragEnd(groupPieces.map((p) => p.id), dx, dy);
+    e.target.getStage()!.container().style.cursor = 'default';
+  }, [groupPieces, onGroupDragEnd]);
+
+  return (
+    <Group
+      x={offsetX} y={offsetY}
+      draggable
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+      onMouseEnter={(e) => {
+        const stage = e.target.getStage();
+        if (stage) stage.container().style.cursor = 'grab';
+      }}
+      onMouseLeave={(e) => {
+        const stage = e.target.getStage();
+        if (stage) stage.container().style.cursor = 'default';
+      }}
+    >
+      {groupPieces.map((piece) => (
+        <PieceImage key={piece.id} piece={piece} relX={piece.currentX - offsetX} relY={piece.currentY - offsetY} />
+      ))}
+    </Group>
+  );
+}
+
+function PieceImage({ piece, relX, relY }: { piece: PuzzlePiece; relX: number; relY: number }) {
+  const img = useImage(piece.imageUrl);
+  if (!img) return null;
+  return (
+    <KonvaImage image={img} x={relX} y={relY} width={piece.pieceWidth} height={piece.pieceHeight} listening={true} />
+  );
+}
+
+// ─── Group detection: find connected snapped pieces ───────────
+function findGroups(pieces: PuzzlePiece[], gridCellW: number, gridCellH: number): PuzzlePiece[][] {
+  const snapped = pieces.filter((p) => p.snapped);
+  if (snapped.length < 2) return [];
+
+  const visited = new Set<string>();
+  const groups: PuzzlePiece[][] = [];
+
+  for (const piece of snapped) {
+    if (visited.has(piece.id)) continue;
+
+    // BFS to find connected pieces
+    const group: PuzzlePiece[] = [];
+    const queue = [piece];
+    visited.add(piece.id);
+
+    while (queue.length > 0) {
+      const curr = queue.shift()!;
+      group.push(curr);
+
+      // Find adjacent snapped pieces (share an edge in the grid)
+      for (const other of snapped) {
+        if (visited.has(other.id)) continue;
+        const colDiff = Math.abs(curr.correctCol - other.correctCol);
+        const rowDiff = Math.abs(curr.correctRow - other.correctRow);
+        // Adjacent if exactly 1 cell apart in one direction
+        if ((colDiff === 1 && rowDiff === 0) || (colDiff === 0 && rowDiff === 1)) {
+          // Check they're actually placed correctly relative to each other
+          const expectedDx = (other.correctCol - curr.correctCol) * gridCellW;
+          const expectedDy = (other.correctRow - curr.correctRow) * gridCellH;
+          const actualDx = other.currentX - curr.currentX;
+          const actualDy = other.currentY - curr.currentY;
+          if (Math.abs(actualDx - expectedDx) < 2 && Math.abs(actualDy - expectedDy) < 2) {
+            visited.add(other.id);
+            queue.push(other);
+          }
+        }
+      }
+    }
+
+    if (group.length >= 2) {
+      groups.push(group);
+    }
+  }
+
+  return groups;
 }
 
 // ─── PuzzleBoard ───────────────────────────────────────────────
@@ -126,86 +200,102 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPi
   const pw = pieces[0]?.pieceWidth  ?? 0;
   const ph = pieces[0]?.pieceHeight ?? 0;
 
-  // Derive grid cell size from piece correctX positions
+  // Derive grid cell size
   const piece0 = pieces.find((p) => p.correctCol === 0 && p.correctRow === 0);
   const piece1 = pieces.find((p) => p.correctCol === 1 && p.correctRow === 0);
   const piece0r1 = pieces.find((p) => p.correctCol === 0 && p.correctRow === 1);
   const gridCellW = piece0 && piece1 ? piece1.correctX - piece0.correctX : pw;
   const gridCellH = piece0 && piece0r1 ? piece0r1.correctY - piece0.correctY : ph;
 
-  // Target area (where the puzzle image goes)
+  // Target area dimensions
   const targetW = cols * gridCellW;
   const targetH = rows * gridCellH;
 
-  // World dimensions: target area + margins for scattered pieces
-  const marginX = Math.max(pw * 2, targetW * MARGIN_RATIO);
-  const marginY = Math.max(ph * 2, targetH * MARGIN_RATIO);
+  // World: target + margins
+  const marginX = Math.max(pw * 3, targetW * MARGIN_RATIO);
+  const marginY = Math.max(ph * 3, targetH * MARGIN_RATIO);
   const worldW = targetW + marginX * 2;
   const worldH = targetH + marginY * 2;
-
-  // Target area origin within the world (centered)
   const targetOX = marginX;
   const targetOY = marginY;
 
   const ready = pieces.length > 0 && containerW > 0 && pw > 0 && ph > 0;
 
-  // Scale: always fill the full container width; height adjusts accordingly
+  // Scale: fill full container width
   const safeScale = ready ? containerW / worldW : 1;
   const stageW = containerW;
   const stageH = worldH * safeScale;
 
-  // Scatter pieces around the margins on first render
+  // Scatter pieces in a non-overlapping grid pattern around the margins
   useEffect(() => {
     if (!ready || hasScattered || pieces.some((p) => p.snapped)) return;
-
-    // Only scatter if all pieces are at (0,0) — initial state
     const allAtOrigin = pieces.every((p) => p.currentX === 0 && p.currentY === 0 && !p.snapped);
     if (!allAtOrigin) return;
 
-    const scattered = pieces.map((p) => {
-      // Place randomly in the margins (around the target, not on top of it)
-      let x: number, y: number;
-      const side = Math.floor(Math.random() * 4); // 0=top, 1=right, 2=bottom, 3=left
-      switch (side) {
-        case 0: // top margin
-          x = Math.random() * (worldW - pw);
-          y = Math.random() * (marginY - ph);
-          break;
-        case 1: // right margin
-          x = targetOX + targetW + Math.random() * (marginX - pw);
-          y = Math.random() * (worldH - ph);
-          break;
-        case 2: // bottom margin
-          x = Math.random() * (worldW - pw);
-          y = targetOY + targetH + Math.random() * (marginY - ph);
-          break;
-        default: // left margin
-          x = Math.random() * (marginX - pw);
-          y = Math.random() * (worldH - ph);
-          break;
+    // Lay out pieces in a grid pattern within the available margin space
+    // Avoid the center target area
+    const gap = 4;
+    const cellW = pw + gap;
+    const cellH = ph + gap;
+
+    // Available positions: anywhere in worldW×worldH EXCEPT the target center
+    const positions: { x: number; y: number }[] = [];
+
+    // Top band
+    for (let y = gap; y + ph < targetOY - gap; y += cellH) {
+      for (let x = gap; x + pw < worldW - gap; x += cellW) {
+        positions.push({ x, y });
       }
-      return { ...p, currentX: Math.max(0, x), currentY: Math.max(0, y), zone: 'free' as const };
+    }
+    // Bottom band
+    for (let y = targetOY + targetH + gap; y + ph < worldH - gap; y += cellH) {
+      for (let x = gap; x + pw < worldW - gap; x += cellW) {
+        positions.push({ x, y });
+      }
+    }
+    // Left band (between top and bottom)
+    for (let y = targetOY; y + ph < targetOY + targetH; y += cellH) {
+      for (let x = gap; x + pw < targetOX - gap; x += cellW) {
+        positions.push({ x, y });
+      }
+    }
+    // Right band (between top and bottom)
+    for (let y = targetOY; y + ph < targetOY + targetH; y += cellH) {
+      for (let x = targetOX + targetW + gap; x + pw < worldW - gap; x += cellW) {
+        positions.push({ x, y });
+      }
+    }
+
+    // Shuffle positions and assign to pieces
+    const shuffledPos = [...positions].sort(() => Math.random() - 0.5);
+
+    const scattered = pieces.map((p, i) => {
+      const pos = shuffledPos[i % shuffledPos.length];
+      return { ...p, currentX: pos?.x ?? 0, currentY: pos?.y ?? 0, zone: 'free' as const };
     });
 
     setHasScattered(true);
     onPiecesChange(scattered);
-  }, [ready, hasScattered, pieces, worldW, worldH, targetOX, targetOY, targetW, targetH, marginX, marginY, pw, ph, onPiecesChange]);
+  }, [ready, hasScattered, pieces, worldW, worldH, targetOX, targetOY, targetW, targetH, pw, ph, onPiecesChange]);
 
-  // Snapped pieces + unsnapped
-  const snapped = pieces.filter((p) => p.snapped);
+  // Groups of snapped pieces that should move together
+  const groups = findGroups(pieces, gridCellW, gridCellH);
+  const groupedIds = new Set(groups.flatMap((g) => g.map((p) => p.id)));
+
+  // Snapped but not in a group (solo snapped)
+  const soloSnapped = pieces.filter((p) => p.snapped && !groupedIds.has(p.id));
   const unsnapped = pieces.filter((p) => !p.snapped);
   const hintPiece = hintPieceId ? pieces.find((p) => p.id === hintPieceId && !p.snapped) ?? null : null;
 
-  // Drag end: check snap, otherwise leave piece where it is
+  // Single piece drag end
   const handleDragEnd = useCallback(
     (id: string, wx: number, wy: number) => {
       const piece = pieces.find((p) => p.id === id);
       if (!piece) return;
 
-      // Snap check: piece correct position is relative to the target area origin
+      // Snap check relative to target area
       const correctWorldX = targetOX + piece.correctX;
       const correctWorldY = targetOY + piece.correctY;
-
       const pCX = wx + pw / 2;
       const pCY = wy + ph / 2;
       const sCX = correctWorldX + pw / 2;
@@ -213,7 +303,6 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPi
       const dist = Math.hypot(pCX - sCX, pCY - sCY);
 
       if (dist <= gridCellW * SNAP_THRESHOLD) {
-        // Correct! Snap it
         playSnapSound();
         onPiecesChange(pieces.map((p) =>
           p.id === id
@@ -221,13 +310,24 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPi
             : p
         ));
       } else {
-        // Leave it where the user dropped it
         onPiecesChange(pieces.map((p) =>
           p.id === id ? { ...p, currentX: wx, currentY: wy } : p
         ));
       }
     },
     [pieces, pw, ph, gridCellW, targetOX, targetOY, onPiecesChange]
+  );
+
+  // Group drag end: move all pieces in the group by the delta
+  const handleGroupDragEnd = useCallback(
+    (ids: string[], dx: number, dy: number) => {
+      onPiecesChange(pieces.map((p) =>
+        ids.includes(p.id)
+          ? { ...p, currentX: p.currentX + dx, currentY: p.currentY + dy }
+          : p
+      ));
+    },
+    [pieces, onPiecesChange]
   );
 
   if (!ready) {
@@ -238,32 +338,12 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPi
     <div className="puzzle-board-wrap" ref={wrapRef}>
       <div className="puzzle-single-stage">
         <Stage width={stageW} height={stageH} scaleX={safeScale} scaleY={safeScale}>
-          {/* Background */}
+          {/* Background — single uniform color, no borders */}
           <Layer listening={false}>
             <Rect x={0} y={0} width={worldW} height={worldH} fill="#3d3b4a" />
-
-            {/* Target area background (slightly different shade) */}
+            {/* Target area: slightly different shade so user knows where to build */}
             <Rect x={targetOX} y={targetOY} width={targetW} height={targetH}
-              fill="#2a2740" />
-
-            {/* Grid lines in target area */}
-            <SlotGrid cols={cols} rows={rows} pieceW={gridCellW} pieceH={gridCellH} ox={targetOX} oy={targetOY} />
-
-            {/* Highlighted border around target area */}
-            <Rect x={targetOX} y={targetOY} width={targetW} height={targetH}
-              stroke="rgba(124, 58, 237, 0.6)" strokeWidth={3}
-              fill="transparent" listening={false}
-              dash={[10, 5]}
-            />
-          </Layer>
-
-          {/* Snapped pieces (at their correct world positions) */}
-          <Layer>
-            {snapped.map((piece) => (
-              <DraggablePieceTile key={piece.id} piece={piece}
-                x={piece.currentX} y={piece.currentY}
-                onDragEnd={handleDragEnd} />
-            ))}
+              fill="#2f2d3e" cornerRadius={4} listening={false} />
           </Layer>
 
           {/* Hint highlight */}
@@ -273,15 +353,41 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPi
                 x={targetOX + hintPiece.correctX}
                 y={targetOY + hintPiece.correctY}
                 width={pw} height={ph}
-                fill="rgba(34,197,94,0.22)"
-                stroke="rgba(34,197,94,1)"
-                strokeWidth={3}
+                fill="rgba(34,197,94,0.18)"
+                stroke="rgba(34,197,94,0.8)"
+                strokeWidth={2}
                 listening={false}
               />
             </Layer>
           )}
 
-          {/* Unsnapped pieces — freely draggable anywhere */}
+          {/* Solo snapped pieces (not part of a group) */}
+          <Layer>
+            {soloSnapped.map((piece) => (
+              <DraggablePieceTile key={piece.id} piece={piece}
+                x={piece.currentX} y={piece.currentY}
+                onDragEnd={handleDragEnd} />
+            ))}
+          </Layer>
+
+          {/* Grouped snapped pieces (move together) */}
+          <Layer>
+            {groups.map((group, gi) => {
+              const minX = Math.min(...group.map((p) => p.currentX));
+              const minY = Math.min(...group.map((p) => p.currentY));
+              return (
+                <DraggablePieceGroup
+                  key={`group-${gi}-${group[0].id}`}
+                  groupPieces={group}
+                  offsetX={minX}
+                  offsetY={minY}
+                  onGroupDragEnd={handleGroupDragEnd}
+                />
+              );
+            })}
+          </Layer>
+
+          {/* Unsnapped pieces */}
           <Layer>
             {unsnapped.map((piece) => (
               <DraggablePieceTile

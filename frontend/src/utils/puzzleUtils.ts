@@ -252,7 +252,7 @@ export function generatePieces(
 
         const pieceW = Math.floor(imgW / cols);
         const pieceH = Math.floor(imgH / rows);
-        const tabSize = Math.floor(Math.min(pieceW, pieceH) * 0.25); // tab protrusion size
+        const tabSize = Math.floor(Math.min(pieceW, pieceH) * 0.18); // tab protrusion size (kept small)
 
         // Generate random edge map
         const edgeMap = generateEdgeMap(cols, rows);
