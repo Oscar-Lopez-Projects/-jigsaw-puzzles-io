@@ -2,14 +2,13 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { Stage, Layer, Image as KonvaImage, Rect, Line, Group } from 'react-konva';
 import type Konva from 'konva';
 import type { PuzzlePiece } from '../types/puzzle';
-import { usePuzzleLayout } from '../context/PuzzleLayoutContext';
-import { playSnapSound, playWrongSound } from '../lib/sounds';
+import { playSnapSound } from '../lib/sounds';
 import './PuzzleBoard.css';
 
 // ─── layout constants ─────────────────────────────────────────
 const SNAP_THRESHOLD  = 0.5;
-const BOARD_VH_TARGET = 0.62;
-const WRONG_FLASH_MS  = 600;
+const BOARD_VH_TARGET = 0.75; // use more vertical space
+const MARGIN_RATIO    = 0.25; // extra space around target for scattered pieces
 
 // ─── useImage hook ─────────────────────────────────────────────
 function useImage(src: string): HTMLImageElement | null {
@@ -27,12 +26,10 @@ interface PieceTileProps {
   piece: PuzzlePiece;
   x: number;
   y: number;
-  flashRed?: boolean;
-  flashGreen?: boolean;
   onDragEnd: (id: string, wx: number, wy: number) => void;
 }
 
-function DraggablePieceTile({ piece, x, y, flashRed, flashGreen, onDragEnd }: PieceTileProps) {
+function DraggablePieceTile({ piece, x, y, onDragEnd }: PieceTileProps) {
   const img = useImage(piece.imageUrl);
 
   const handleDragStart = useCallback((e: Konva.KonvaEventObject<DragEvent>) => {
@@ -79,115 +76,29 @@ function DraggablePieceTile({ piece, x, y, flashRed, flashGreen, onDragEnd }: Pi
         width={piece.pieceWidth} height={piece.pieceHeight}
         listening={true}
       />
-      {flashRed && (
-        <Rect x={0} y={0} width={piece.pieceWidth} height={piece.pieceHeight}
-          fill="rgba(220,38,38,0.55)"
-          stroke="rgba(220,38,38,0.95)" strokeWidth={3}
-          listening={false} />
-      )}
-      {flashGreen && (
-        <Rect x={0} y={0} width={piece.pieceWidth} height={piece.pieceHeight}
-          fill="rgba(34,197,94,0.35)"
-          stroke="rgba(34,197,94,1)" strokeWidth={3}
-          listening={false} />
-      )}
+      {/* Green highlight when correctly snapped */}
       {piece.snapped && (
-        <>
-          <Rect x={0} y={0} width={piece.pieceWidth} height={piece.pieceHeight}
-            fill="rgba(34,197,94,0.25)" listening={false} />
-          <Rect x={0} y={0} width={piece.pieceWidth} height={piece.pieceHeight}
-            stroke="rgba(34,197,94,0.90)" strokeWidth={2} fill="transparent" listening={false} />
-        </>
+        <Rect x={0} y={0} width={piece.pieceWidth} height={piece.pieceHeight}
+          stroke="rgba(34,197,94,0.70)" strokeWidth={2} fill="rgba(34,197,94,0.10)" listening={false} />
       )}
     </Group>
   );
 }
 
-// ─── SlotGrid ──────────────────────────────────────────────────
+// ─── SlotGrid (target area grid lines) ────────────────────────
 function SlotGrid({ cols, rows, pieceW, pieceH, ox, oy }: {
   cols: number; rows: number; pieceW: number; pieceH: number; ox: number; oy: number;
 }) {
   const lines: React.ReactNode[] = [];
-  for (let c = 1; c < cols; c++)
+  for (let c = 0; c <= cols; c++)
     lines.push(<Line key={`v${c}`}
       points={[ox + c * pieceW, oy, ox + c * pieceW, oy + rows * pieceH]}
-      stroke="rgba(255,255,255,0.07)" strokeWidth={1} listening={false} />);
-  for (let r = 1; r < rows; r++)
+      stroke="rgba(255,255,255,0.12)" strokeWidth={1} listening={false} />);
+  for (let r = 0; r <= rows; r++)
     lines.push(<Line key={`h${r}`}
       points={[ox, oy + r * pieceH, ox + cols * pieceW, oy + r * pieceH]}
-      stroke="rgba(255,255,255,0.07)" strokeWidth={1} listening={false} />);
+      stroke="rgba(255,255,255,0.12)" strokeWidth={1} listening={false} />);
   return <>{lines}</>;
-}
-
-// ─── HTML Staging Piece ────────────────────────────────────────
-interface StagingPieceProps {
-  piece: PuzzlePiece;
-  scaledW: number;
-  scaledH: number;
-  isHinted: boolean;
-  onSendToBoard: (id: string) => void;
-  onSendToTray: (id: string) => void;
-}
-
-function StagingPiece({ piece, scaledW, scaledH, isHinted, onSendToBoard, onSendToTray }: StagingPieceProps) {
-  const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
-    e.dataTransfer.setData('text/plain', piece.id);
-    e.dataTransfer.effectAllowed = 'move';
-  };
-
-  return (
-    <div
-      className={`staging-piece${isHinted ? ' staging-piece--hint' : ''}`}
-      style={{ width: scaledW, height: scaledH }}
-      draggable
-      onDragStart={handleDragStart}
-      onClick={() => onSendToBoard(piece.id)}
-      onContextMenu={(e) => { e.preventDefault(); onSendToTray(piece.id); }}
-      title="Drag to board · Click to place · Right-click to send to tray"
-    >
-      <img
-        src={piece.imageUrl}
-        alt={`Piece ${piece.id}`}
-        style={{ width: '100%', height: '100%', display: 'block', pointerEvents: 'none', userSelect: 'none' }}
-        draggable={false}
-      />
-    </div>
-  );
-}
-
-// ─── HTML Tray Piece ───────────────────────────────────────────
-interface TrayPieceProps {
-  piece: PuzzlePiece;
-  scaledW: number;
-  scaledH: number;
-  isNew: boolean;
-  isHinted: boolean;
-  onMoveToStaging: (id: string) => void;
-}
-
-function TrayPiece({ piece, scaledW, scaledH, isNew, isHinted, onMoveToStaging }: TrayPieceProps) {
-  const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
-    e.dataTransfer.setData('text/plain', piece.id);
-    e.dataTransfer.effectAllowed = 'move';
-  };
-
-  return (
-    <div
-      className={`tray-piece${isNew ? ' tray-piece--new' : ''}${isHinted ? ' tray-piece--hint' : ''}`}
-      style={{ width: scaledW, height: scaledH, flexShrink: 0 }}
-      draggable
-      onDragStart={handleDragStart}
-      onClick={() => onMoveToStaging(piece.id)}
-      title="Drag to board · Click to move to staging area"
-    >
-      <img
-        src={piece.imageUrl}
-        alt={`Piece ${piece.id}`}
-        style={{ width: '100%', height: '100%', display: 'block', pointerEvents: 'none', userSelect: 'none' }}
-        draggable={false}
-      />
-    </div>
-  );
 }
 
 // ─── PuzzleBoard ───────────────────────────────────────────────
@@ -200,23 +111,17 @@ interface PuzzleBoardProps {
 }
 
 export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }: PuzzleBoardProps) {
-  const { prefs } = usePuzzleLayout();
-  const boardRef   = useRef<HTMLDivElement>(null);
-  const trayRef    = useRef<HTMLDivElement>(null);
-  const [boardContainerW, setBoardContainerW] = useState(0);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [containerW, setContainerW] = useState(0);
   const [viewportH, setViewportH] = useState(window.innerHeight);
-  const [boardFlash, setBoardFlash] = useState(false);
-  const [flashingId, setFlashingId] = useState<string | null>(null);
-  const [newestTrayId, setNewestTrayId] = useState<string | null>(null);
-  const [boardDragOver, setBoardDragOver] = useState(false);
+  const [hasScattered, setHasScattered] = useState(false);
 
-  // Observe board panel width
   useEffect(() => {
-    const el = boardRef.current;
+    const el = wrapRef.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => setBoardContainerW(el.clientWidth));
+    const ro = new ResizeObserver(() => setContainerW(el.clientWidth));
     ro.observe(el);
-    setBoardContainerW(el.clientWidth);
+    setContainerW(el.clientWidth);
     return () => ro.disconnect();
   }, []);
 
@@ -229,240 +134,155 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPi
   const pw = pieces[0]?.pieceWidth  ?? 0;
   const ph = pieces[0]?.pieceHeight ?? 0;
 
-  // Derive grid cell size: pieces include tab padding, grid cells don't
-  // correctX for col 0 is -tabSize, for col 1 is gridCellW - tabSize
-  // So gridCellW = correctX(col1) - correctX(col0) when both exist
-  // Alternatively: gridCellW = (imgW / cols), but we can compute from piece data
-  // tabSize = (pieceWidth - gridCellW) / 2 → gridCellW = (piece at col1).correctX - (piece at col0).correctX
+  // Derive grid cell size from piece correctX positions
   const piece0 = pieces.find((p) => p.correctCol === 0 && p.correctRow === 0);
   const piece1 = pieces.find((p) => p.correctCol === 1 && p.correctRow === 0);
   const piece0r1 = pieces.find((p) => p.correctCol === 0 && p.correctRow === 1);
   const gridCellW = piece0 && piece1 ? piece1.correctX - piece0.correctX : pw;
   const gridCellH = piece0 && piece0r1 ? piece0r1.correctY - piece0.correctY : ph;
 
-  const boardW = cols * gridCellW;
-  const boardH = rows * gridCellH;
-  const ready  = pieces.length > 0 && boardContainerW > 0 && pw > 0 && ph > 0;
+  // Target area (where the puzzle image goes)
+  const targetW = cols * gridCellW;
+  const targetH = rows * gridCellH;
 
-  // Scale board to fit its container
-  const scaleByH  = ready ? (viewportH * BOARD_VH_TARGET) / boardH : 1;
-  const scaleByW  = ready ? boardContainerW / boardW : 1;
-  const scale     = Math.min(scaleByH, scaleByW);
+  // World dimensions: target area + margins for scattered pieces
+  const marginX = Math.max(pw * 2, targetW * MARGIN_RATIO);
+  const marginY = Math.max(ph * 2, targetH * MARGIN_RATIO);
+  const worldW = targetW + marginX * 2;
+  const worldH = targetH + marginY * 2;
+
+  // Target area origin within the world (centered)
+  const targetOX = marginX;
+  const targetOY = marginY;
+
+  const ready = pieces.length > 0 && containerW > 0 && pw > 0 && ph > 0;
+
+  // Scale to fit container
+  const scaleByH = ready ? (viewportH * BOARD_VH_TARGET) / worldH : 1;
+  const scaleByW = ready ? containerW / worldW : 1;
+  const scale = Math.min(scaleByH, scaleByW);
   const safeScale = isFinite(scale) && scale > 0 ? scale : 1;
-  const stageW    = boardW * safeScale;
-  const stageH    = boardH * safeScale;
+  const stageW = worldW * safeScale;
+  const stageH = worldH * safeScale;
 
-  // Piece categories
-  const snapped    = pieces.filter((p) => p.snapped);
-  const allUnsnappedNonTray = pieces.filter((p) => !p.snapped && p.zone !== 'tray');
-  const trayPieces = pieces.filter((p) => !p.snapped && p.zone === 'tray');
-  const hintPiece  = hintPieceId ? pieces.find((p) => p.id === hintPieceId && !p.snapped) ?? null : null;
+  // Scatter pieces around the margins on first render
+  useEffect(() => {
+    if (!ready || hasScattered || pieces.some((p) => p.snapped)) return;
 
-  // Calculate how many pieces fit in the staging grid without overlap
-  // Staging height = board height (stageH), minus header (~45px)
-  // Staging width ~ 30% of container (approx boardContainerW * 0.43 since board is flex:7, staging flex:3)
-  const scaledPW = pw * safeScale;
-  const scaledPH = ph * safeScale;
-  const stagingHeaderH = 45;
-  const stagingPadding = 10;
-  const stagingGap = 8;
-  const estimatedStagingW = boardContainerW * 0.40; // approximate
-  const stagingAvailH = Math.max(0, stageH - stagingHeaderH - stagingPadding * 2);
-  const stagingCols = Math.max(1, Math.floor((estimatedStagingW - stagingPadding * 2 + stagingGap) / (scaledPW + stagingGap)));
-  const stagingRows = Math.max(1, Math.floor((stagingAvailH + stagingGap) / (scaledPH + stagingGap)));
-  const stagingCapacity = stagingCols * stagingRows;
+    // Only scatter if all pieces are at (0,0) — initial state
+    const allAtOrigin = pieces.every((p) => p.currentX === 0 && p.currentY === 0 && !p.snapped);
+    if (!allAtOrigin) return;
 
-  // Only show as many pieces in staging as fit; rest go to tray display
-  const staging = allUnsnappedNonTray.slice(0, stagingCapacity);
-  const overflowToTray = allUnsnappedNonTray.slice(stagingCapacity);
+    const scattered = pieces.map((p) => {
+      // Place randomly in the margins (around the target, not on top of it)
+      let x: number, y: number;
+      const side = Math.floor(Math.random() * 4); // 0=top, 1=right, 2=bottom, 3=left
+      switch (side) {
+        case 0: // top margin
+          x = Math.random() * (worldW - pw);
+          y = Math.random() * (marginY - ph);
+          break;
+        case 1: // right margin
+          x = targetOX + targetW + Math.random() * (marginX - pw);
+          y = Math.random() * (worldH - ph);
+          break;
+        case 2: // bottom margin
+          x = Math.random() * (worldW - pw);
+          y = targetOY + targetH + Math.random() * (marginY - ph);
+          break;
+        default: // left margin
+          x = Math.random() * (marginX - pw);
+          y = Math.random() * (worldH - ph);
+          break;
+      }
+      return { ...p, currentX: Math.max(0, x), currentY: Math.max(0, y), zone: 'free' as const };
+    });
 
-  // ── Board drag-end handler (only handles snap or wrong) ──────
+    setHasScattered(true);
+    onPiecesChange(scattered);
+  }, [ready, hasScattered, pieces, worldW, worldH, targetOX, targetOY, targetW, targetH, marginX, marginY, pw, ph, onPiecesChange]);
+
+  // Snapped pieces + unsnapped
+  const snapped = pieces.filter((p) => p.snapped);
+  const unsnapped = pieces.filter((p) => !p.snapped);
+  const hintPiece = hintPieceId ? pieces.find((p) => p.id === hintPieceId && !p.snapped) ?? null : null;
+
+  // Drag end: check snap, otherwise leave piece where it is
   const handleDragEnd = useCallback(
     (id: string, wx: number, wy: number) => {
       const piece = pieces.find((p) => p.id === id);
       if (!piece) return;
 
-      // Check snap (correct position)
-      const pCX  = wx + pw / 2;
-      const pCY  = wy + ph / 2;
-      const sCX  = piece.correctX + pw / 2;
-      const sCY  = piece.correctY + ph / 2;
+      // Snap check: piece correct position is relative to the target area origin
+      const correctWorldX = targetOX + piece.correctX;
+      const correctWorldY = targetOY + piece.correctY;
+
+      const pCX = wx + pw / 2;
+      const pCY = wy + ph / 2;
+      const sCX = correctWorldX + pw / 2;
+      const sCY = correctWorldY + ph / 2;
       const dist = Math.hypot(pCX - sCX, pCY - sCY);
 
       if (dist <= gridCellW * SNAP_THRESHOLD) {
+        // Correct! Snap it
         playSnapSound();
         onPiecesChange(pieces.map((p) =>
           p.id === id
-            ? { ...p, currentX: piece.correctX, currentY: piece.correctY, snapped: true, zone: 'free' as const }
+            ? { ...p, currentX: correctWorldX, currentY: correctWorldY, snapped: true }
             : p
         ));
-        return;
-      }
-
-      // Wrong placement — flash red, then send to tray
-      playWrongSound();
-      setBoardFlash(true);
-      setTimeout(() => setBoardFlash(false), WRONG_FLASH_MS);
-
-      setFlashingId(id);
-      setTimeout(() => {
-        setFlashingId(null);
-        setNewestTrayId(id);
+      } else {
+        // Leave it where the user dropped it
         onPiecesChange(pieces.map((p) =>
-          p.id === id
-            ? { ...p, zone: 'tray' as const, slotIndex: trayPieces.length, currentX: wx, currentY: wy }
-            : p
+          p.id === id ? { ...p, currentX: wx, currentY: wy } : p
         ));
-        setTimeout(() => {
-          if (trayRef.current) trayRef.current.scrollLeft = trayRef.current.scrollWidth;
-        }, 50);
-        setTimeout(() => setNewestTrayId(null), 800);
-      }, WRONG_FLASH_MS);
+      }
     },
-    [pieces, pw, ph, gridCellW, trayPieces.length, onPiecesChange]
+    [pieces, pw, ph, gridCellW, targetOX, targetOY, onPiecesChange]
   );
 
-  // ── Move staging piece to board (place at specific coords or random if clicked) ──
-  const handleSendToBoard = useCallback((id: string, boardX?: number, boardY?: number) => {
-    const x = boardX ?? Math.random() * Math.max(0, boardW - pw);
-    const y = boardY ?? Math.random() * Math.max(0, boardH - ph);
-    onPiecesChange(pieces.map((p) =>
-      p.id === id ? { ...p, zone: 'free' as const, currentX: x, currentY: y } : p
-    ));
-  }, [pieces, onPiecesChange, boardW, boardH, pw, ph]);
-
-  // ── Handle HTML5 drop on the board panel ──
-  // One-step: drop snaps if correct, otherwise sends piece back to tray
-  const handleBoardDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    setBoardDragOver(false);
-    const id = e.dataTransfer.getData('text/plain');
-    if (!id) return;
-
-    const piece = pieces.find((p) => p.id === id);
-    if (!piece) return;
-
-    // Get drop position relative to the stage element
-    const stageEl = boardRef.current?.querySelector('.puzzle-single-stage');
-    if (!stageEl) return;
-
-    const rect = stageEl.getBoundingClientRect();
-    // Convert pixel position to board (world) coordinates
-    const dropX = (e.clientX - rect.left) / safeScale;
-    const dropY = (e.clientY - rect.top) / safeScale;
-
-    // Center of the dropped piece
-    const pCX = dropX;
-    const pCY = dropY;
-    // Center of the correct slot
-    const sCX = piece.correctX + pw / 2;
-    const sCY = piece.correctY + ph / 2;
-    const dist = Math.hypot(pCX - sCX, pCY - sCY);
-
-    if (dist <= gridCellW * SNAP_THRESHOLD) {
-      // Correct! Snap it in place
-      playSnapSound();
-      onPiecesChange(pieces.map((p) =>
-        p.id === id
-          ? { ...p, currentX: piece.correctX, currentY: piece.correctY, snapped: true, zone: 'free' as const }
-          : p
-      ));
-    } else {
-      // Wrong — flash board red and send piece to tray
-      playWrongSound();
-      setBoardFlash(true);
-      setTimeout(() => setBoardFlash(false), WRONG_FLASH_MS);
-
-      const currentTrayCount = pieces.filter((p) => p.zone === 'tray' && !p.snapped && p.id !== id).length;
-      setNewestTrayId(id);
-      onPiecesChange(pieces.map((p) =>
-        p.id === id ? { ...p, zone: 'tray' as const, slotIndex: currentTrayCount } : p
-      ));
-      setTimeout(() => {
-        if (trayRef.current) trayRef.current.scrollLeft = trayRef.current.scrollWidth;
-      }, 50);
-      setTimeout(() => setNewestTrayId(null), 800);
-    }
-  }, [pieces, pw, ph, gridCellW, safeScale, onPiecesChange]);
-
-  const handleBoardDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    setBoardDragOver(true);
-  }, []);
-
-  const handleBoardDragLeave = useCallback(() => {
-    setBoardDragOver(false);
-  }, []);
-
-  // ── Move piece to tray ──
-  const handleSendToTray = useCallback((id: string) => {
-    const currentTrayCount = pieces.filter((p) => p.zone === 'tray' && !p.snapped && p.id !== id).length;
-    setNewestTrayId(id);
-    onPiecesChange(pieces.map((p) =>
-      p.id === id ? { ...p, zone: 'tray' as const, slotIndex: currentTrayCount } : p
-    ));
-    setTimeout(() => {
-      if (trayRef.current) trayRef.current.scrollLeft = trayRef.current.scrollWidth;
-    }, 50);
-    setTimeout(() => setNewestTrayId(null), 800);
-  }, [pieces, onPiecesChange]);
-
-  // ── Move tray piece to staging ──
-  const handleTrayToStaging = useCallback((id: string) => {
-    onPiecesChange(pieces.map((p) =>
-      p.id === id ? { ...p, zone: 'left' as const, slotIndex: 0 } : p
-    ));
-  }, [pieces, onPiecesChange]);
-
-  // Tray scroll
-  const scrollTray = (dir: 'left' | 'right') => {
-    if (!trayRef.current) return;
-    trayRef.current.scrollBy({ left: dir === 'left' ? -200 : 200, behavior: 'smooth' });
-  };
-
   if (!ready) {
-    return <div className="puzzle-board-wrap" ref={boardRef} style={{ minHeight: 200 }} />;
+    return <div className="puzzle-board-wrap" ref={wrapRef} style={{ minHeight: 200 }} />;
   }
 
-  // Determine panel order based on layout preference
-  const boardPanel = (
-    <div
-      className={`pb-board-panel${boardDragOver ? ' drag-over' : ''}`}
-      ref={boardRef}
-      onDrop={handleBoardDrop}
-      onDragOver={handleBoardDragOver}
-      onDragLeave={handleBoardDragLeave}
-    >
-      <div
-        className="puzzle-single-stage"
-        style={{ width: stageW, height: stageH }}
-        onDrop={handleBoardDrop}
-        onDragOver={handleBoardDragOver}
-      >
+  return (
+    <div className="puzzle-board-wrap" ref={wrapRef}>
+      <div className="puzzle-single-stage">
         <Stage width={stageW} height={stageH} scaleX={safeScale} scaleY={safeScale}>
-          {/* Board background */}
+          {/* Background */}
           <Layer listening={false}>
-            <Rect x={0} y={0} width={boardW} height={boardH}
-              fill={boardFlash ? 'rgba(220,38,38,0.45)' : '#2a2740'} />
-            <SlotGrid cols={cols} rows={rows} pieceW={gridCellW} pieceH={gridCellH} ox={0} oy={0} />
+            <Rect x={0} y={0} width={worldW} height={worldH} fill="#3d3b4a" />
+
+            {/* Target area background (slightly different shade) */}
+            <Rect x={targetOX} y={targetOY} width={targetW} height={targetH}
+              fill="#2a2740" />
+
+            {/* Grid lines in target area */}
+            <SlotGrid cols={cols} rows={rows} pieceW={gridCellW} pieceH={gridCellH} ox={targetOX} oy={targetOY} />
+
+            {/* Highlighted border around target area */}
+            <Rect x={targetOX} y={targetOY} width={targetW} height={targetH}
+              stroke="rgba(124, 58, 237, 0.6)" strokeWidth={3}
+              fill="transparent" listening={false}
+              dash={[10, 5]}
+            />
           </Layer>
 
-          {/* Snapped pieces */}
+          {/* Snapped pieces (at their correct world positions) */}
           <Layer>
             {snapped.map((piece) => (
               <DraggablePieceTile key={piece.id} piece={piece}
-                x={piece.correctX} y={piece.correctY}
+                x={piece.currentX} y={piece.currentY}
                 onDragEnd={handleDragEnd} />
             ))}
           </Layer>
 
-          {/* Hint slot highlight */}
+          {/* Hint highlight */}
           {hintPiece && (
             <Layer listening={false}>
               <Rect
-                x={hintPiece.correctX}
-                y={hintPiece.correctY}
+                x={targetOX + hintPiece.correctX}
+                y={targetOY + hintPiece.correctY}
                 width={pw} height={ph}
                 fill="rgba(34,197,94,0.22)"
                 stroke="rgba(34,197,94,1)"
@@ -472,134 +292,18 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPi
             </Layer>
           )}
 
-          {/* Free pieces on board (draggable) */}
+          {/* Unsnapped pieces — freely draggable anywhere */}
           <Layer>
-            {pieces.filter((p) => !p.snapped && p.zone === 'free').map((piece) => (
+            {unsnapped.map((piece) => (
               <DraggablePieceTile
                 key={piece.id}
                 piece={piece}
                 x={piece.currentX} y={piece.currentY}
-                flashRed={flashingId === piece.id}
-                flashGreen={hintPieceId === piece.id}
                 onDragEnd={handleDragEnd}
               />
             ))}
           </Layer>
-
-          {/* Flashing piece during wrong animation */}
-          {flashingId && (() => {
-            const fp = pieces.find((p) => p.id === flashingId);
-            if (!fp) return null;
-            return (
-              <Layer>
-                <DraggablePieceTile
-                  piece={fp}
-                  x={fp.currentX} y={fp.currentY}
-                  flashRed={true}
-                  onDragEnd={handleDragEnd}
-                />
-              </Layer>
-            );
-          })()}
         </Stage>
-      </div>
-    </div>
-  );
-
-  const stagingPanel = (
-    <div className="pb-staging-panel" style={{ height: stageH + 24 }}>
-      <div className="pb-staging-header">
-        <span className="pb-staging-title">STAGING AREA</span>
-        <span className="pb-staging-subtitle">Drag pieces here to organize and build sections</span>
-      </div>
-      <div className="pb-staging-grid">
-        {staging.length === 0 ? (
-          <div className="pb-staging-empty">
-            <span>Click pieces from the tray to move them here</span>
-          </div>
-        ) : (
-          staging.map((piece) => (
-            <StagingPiece
-              key={piece.id}
-              piece={piece}
-              scaledW={pw * safeScale}
-              scaledH={ph * safeScale}
-              isHinted={piece.id === hintPieceId}
-              onSendToBoard={handleSendToBoard}
-              onSendToTray={handleSendToTray}
-            />
-          ))
-        )}
-      </div>
-    </div>
-  );
-
-  return (
-    <div className="puzzle-board-wrap">
-      {/* Two-panel layout: board + staging */}
-      <div className={`pb-layout${prefs.boardPosition === 'right' ? ' pb-layout--reversed' : ''}`}>
-        {boardPanel}
-        {stagingPanel}
-      </div>
-
-      {/* ── Piece Tray (HTML, horizontally scrollable) ── */}
-      <div className="piece-tray-section">
-        <div className="piece-tray-header">
-          <span className="piece-tray-label">PIECE TRAY</span>
-          <div className="piece-tray-remaining">
-            <span className="piece-tray-remaining-label">Remaining</span>
-            <span className="piece-tray-remaining-num">{trayPieces.length + overflowToTray.length}</span>
-          </div>
-          <button type="button" className="piece-tray-sort-btn" disabled>
-            <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
-              <path d="M2 4h12M4 8h8M6 12h4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
-            </svg>
-            Sort
-          </button>
-        </div>
-
-        <div className="piece-tray-row">
-          {(trayPieces.length + overflowToTray.length) > 0 && (
-            <button
-              className="tray-scroll-btn tray-scroll-btn--left"
-              onClick={() => scrollTray('left')}
-              aria-label="Scroll tray left"
-            >
-              ‹
-            </button>
-          )}
-
-          <div
-            className={`piece-tray-track${(trayPieces.length + overflowToTray.length) === 0 ? ' piece-tray-track--empty' : ''}`}
-            ref={trayRef}
-          >
-            {(trayPieces.length + overflowToTray.length) === 0 ? (
-              <span className="piece-tray-empty-msg">No pieces here yet</span>
-            ) : (
-              [...overflowToTray, ...trayPieces].map((piece) => (
-                <TrayPiece
-                  key={piece.id}
-                  piece={piece}
-                  scaledW={pw * safeScale}
-                  scaledH={ph * safeScale}
-                  isNew={piece.id === newestTrayId}
-                  isHinted={piece.id === hintPieceId}
-                  onMoveToStaging={handleTrayToStaging}
-                />
-              ))
-            )}
-          </div>
-
-          {(trayPieces.length + overflowToTray.length) > 0 && (
-            <button
-              className="tray-scroll-btn tray-scroll-btn--right"
-              onClick={() => scrollTray('right')}
-              aria-label="Scroll tray right"
-            >
-              ›
-            </button>
-          )}
-        </div>
       </div>
     </div>
   );
