@@ -228,8 +228,20 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPi
 
   const pw = pieces[0]?.pieceWidth  ?? 0;
   const ph = pieces[0]?.pieceHeight ?? 0;
-  const boardW = cols * pw;
-  const boardH = rows * ph;
+
+  // Derive grid cell size: pieces include tab padding, grid cells don't
+  // correctX for col 0 is -tabSize, for col 1 is gridCellW - tabSize
+  // So gridCellW = correctX(col1) - correctX(col0) when both exist
+  // Alternatively: gridCellW = (imgW / cols), but we can compute from piece data
+  // tabSize = (pieceWidth - gridCellW) / 2 → gridCellW = (piece at col1).correctX - (piece at col0).correctX
+  const piece0 = pieces.find((p) => p.correctCol === 0 && p.correctRow === 0);
+  const piece1 = pieces.find((p) => p.correctCol === 1 && p.correctRow === 0);
+  const piece0r1 = pieces.find((p) => p.correctCol === 0 && p.correctRow === 1);
+  const gridCellW = piece0 && piece1 ? piece1.correctX - piece0.correctX : pw;
+  const gridCellH = piece0 && piece0r1 ? piece0r1.correctY - piece0.correctY : ph;
+
+  const boardW = cols * gridCellW;
+  const boardH = rows * gridCellH;
   const ready  = pieces.length > 0 && boardContainerW > 0 && pw > 0 && ph > 0;
 
   // Scale board to fit its container
@@ -277,7 +289,7 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPi
       const sCY  = piece.correctY + ph / 2;
       const dist = Math.hypot(pCX - sCX, pCY - sCY);
 
-      if (dist <= pw * SNAP_THRESHOLD) {
+      if (dist <= gridCellW * SNAP_THRESHOLD) {
         playSnapSound();
         onPiecesChange(pieces.map((p) =>
           p.id === id
@@ -307,7 +319,7 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPi
         setTimeout(() => setNewestTrayId(null), 800);
       }, WRONG_FLASH_MS);
     },
-    [pieces, pw, ph, trayPieces.length, onPiecesChange]
+    [pieces, pw, ph, gridCellW, trayPieces.length, onPiecesChange]
   );
 
   // ── Move staging piece to board (place at specific coords or random if clicked) ──
@@ -347,7 +359,7 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPi
     const sCY = piece.correctY + ph / 2;
     const dist = Math.hypot(pCX - sCX, pCY - sCY);
 
-    if (dist <= pw * SNAP_THRESHOLD) {
+    if (dist <= gridCellW * SNAP_THRESHOLD) {
       // Correct! Snap it in place
       playSnapSound();
       onPiecesChange(pieces.map((p) =>
@@ -371,7 +383,7 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPi
       }, 50);
       setTimeout(() => setNewestTrayId(null), 800);
     }
-  }, [pieces, pw, ph, safeScale, onPiecesChange]);
+  }, [pieces, pw, ph, gridCellW, safeScale, onPiecesChange]);
 
   const handleBoardDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -433,7 +445,7 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPi
           <Layer listening={false}>
             <Rect x={0} y={0} width={boardW} height={boardH}
               fill={boardFlash ? 'rgba(220,38,38,0.45)' : '#2a2740'} />
-            <SlotGrid cols={cols} rows={rows} pieceW={pw} pieceH={ph} ox={0} oy={0} />
+            <SlotGrid cols={cols} rows={rows} pieceW={gridCellW} pieceH={gridCellH} ox={0} oy={0} />
           </Layer>
 
           {/* Snapped pieces */}
