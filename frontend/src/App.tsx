@@ -103,6 +103,8 @@ export default function App() {
   const [isWon, setIsWon] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [hintPieceId, setHintPieceId] = useState<string | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const puzzleScreenRef = useRef<HTMLDivElement>(null);
   const hintTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── Timer ─────────────────────────────────────────────────────
@@ -346,6 +348,24 @@ export default function App() {
     hintTimer.current = setTimeout(() => setHintPieceId(null), 2500);
   }, [pieces]);
 
+  // ── Fullscreen toggle ─────────────────────────────────────────
+  const toggleFullscreen = useCallback(() => {
+    if (!puzzleScreenRef.current) return;
+    if (!document.fullscreenElement) {
+      puzzleScreenRef.current.requestFullscreen().catch(() => {});
+    } else {
+      document.exitFullscreen().catch(() => {});
+    }
+  }, []);
+
+  useEffect(() => {
+    const handleFsChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFsChange);
+    return () => document.removeEventListener('fullscreenchange', handleFsChange);
+  }, []);
+
   const handleCollectAll = useCallback(() => {
     setPieces((prev) =>
       prev.map((p, _, arr) => {
@@ -499,7 +519,7 @@ export default function App() {
           </div>
         )}
         {phase === 'puzzle' && pieces.length > 0 && (
-          <div className="puzzle-screen">
+          <div className={`puzzle-screen${isFullscreen ? ' puzzle-screen--fullscreen' : ''}`} ref={puzzleScreenRef}>
             {/* Toolbar */}
             <div className="puzzle-toolbar">
               {/* Left section: back + puzzle info */}
@@ -621,6 +641,25 @@ export default function App() {
                     </svg>
                   </button>
                 )}
+
+                {/* Fullscreen toggle */}
+                <button
+                  type="button"
+                  className={`toolbar-action-btn toolbar-action-btn--fullscreen${isFullscreen ? ' toolbar-action-btn--active' : ''}`}
+                  onClick={toggleFullscreen}
+                  aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+                  title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+                >
+                  {isFullscreen ? (
+                    <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                      <path d="M5 2v3H2M11 2v3h3M5 14v-3H2M11 14v-3h3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  ) : (
+                    <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                      <path d="M2 5V2h3M14 5V2h-3M2 11v3h3M14 11v3h-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  )}
+                </button>
               </div>
             </div>
 

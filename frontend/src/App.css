@@ -382,6 +382,40 @@
   color: var(--accent);
 }
 
+/* Fullscreen button */
+.toolbar-action-btn--fullscreen {
+  padding: 7px 10px;
+}
+
+.toolbar-action-btn--fullscreen:not(:disabled):hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.toolbar-action-btn--fullscreen.toolbar-action-btn--active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+/* ── Fullscreen puzzle screen ────────────────────────────────── */
+.puzzle-screen--fullscreen {
+  background: #1a1730;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  padding: 8px 12px;
+}
+
+.puzzle-screen--fullscreen .puzzle-toolbar {
+  flex-shrink: 0;
+}
+
+.puzzle-screen--fullscreen .puzzle-board-wrap {
+  flex: 1;
+  min-height: 0;
+}
+
 /* ── Responsive tweaks ───────────────────────────────────────── */
 @media (max-width: 560px) {
   .main-content {
