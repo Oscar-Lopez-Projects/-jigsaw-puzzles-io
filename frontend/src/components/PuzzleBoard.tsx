@@ -186,14 +186,19 @@ interface PuzzleBoardProps {
 export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }: PuzzleBoardProps) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const [containerW, setContainerW] = useState(0);
+  const [containerH, setContainerH] = useState(0);
   const [hasScattered, setHasScattered] = useState(false);
 
   useEffect(() => {
     const el = wrapRef.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => setContainerW(el.clientWidth));
+    const ro = new ResizeObserver(() => {
+      setContainerW(el.clientWidth);
+      setContainerH(el.clientHeight || window.innerHeight - 80);
+    });
     ro.observe(el);
     setContainerW(el.clientWidth);
+    setContainerH(el.clientHeight || window.innerHeight - 80);
     return () => ro.disconnect();
   }, []);
 
@@ -221,47 +226,28 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPi
 
   const ready = pieces.length > 0 && containerW > 0 && pw > 0 && ph > 0;
 
-  // Scale: fill full container width
-  const safeScale = ready ? containerW / worldW : 1;
-  const stageW = containerW;
+  // Scale: fit within container (both width and height), never overflow
+  const scaleByW = ready ? containerW / worldW : 1;
+  const scaleByH = ready && containerH > 0 ? containerH / worldH : scaleByW;
+  const safeScale = Math.min(scaleByW, scaleByH);
+  const stageW = worldW * safeScale;
   const stageH = worldH * safeScale;
 
-  // Scatter pieces in a non-overlapping grid pattern around the margins
+  // Scatter pieces across the entire board in a non-overlapping grid pattern
   useEffect(() => {
     if (!ready || hasScattered || pieces.some((p) => p.snapped)) return;
     const allAtOrigin = pieces.every((p) => p.currentX === 0 && p.currentY === 0 && !p.snapped);
     if (!allAtOrigin) return;
 
-    // Lay out pieces in a grid pattern within the available margin space
-    // Avoid the center target area
-    const gap = 4;
+    // Lay out pieces in a grid across the full world area (including over the target zone)
+    const gap = 6;
     const cellW = pw + gap;
     const cellH = ph + gap;
 
-    // Available positions: anywhere in worldW×worldH EXCEPT the target center
+    // Generate all possible positions across the entire board
     const positions: { x: number; y: number }[] = [];
-
-    // Top band
-    for (let y = gap; y + ph < targetOY - gap; y += cellH) {
+    for (let y = gap; y + ph < worldH - gap; y += cellH) {
       for (let x = gap; x + pw < worldW - gap; x += cellW) {
-        positions.push({ x, y });
-      }
-    }
-    // Bottom band
-    for (let y = targetOY + targetH + gap; y + ph < worldH - gap; y += cellH) {
-      for (let x = gap; x + pw < worldW - gap; x += cellW) {
-        positions.push({ x, y });
-      }
-    }
-    // Left band (between top and bottom)
-    for (let y = targetOY; y + ph < targetOY + targetH; y += cellH) {
-      for (let x = gap; x + pw < targetOX - gap; x += cellW) {
-        positions.push({ x, y });
-      }
-    }
-    // Right band (between top and bottom)
-    for (let y = targetOY; y + ph < targetOY + targetH; y += cellH) {
-      for (let x = targetOX + targetW + gap; x + pw < worldW - gap; x += cellW) {
         positions.push({ x, y });
       }
     }
@@ -276,7 +262,7 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPi
 
     setHasScattered(true);
     onPiecesChange(scattered);
-  }, [ready, hasScattered, pieces, worldW, worldH, targetOX, targetOY, targetW, targetH, pw, ph, onPiecesChange]);
+  }, [ready, hasScattered, pieces, worldW, worldH, pw, ph, onPiecesChange]);
 
   // Groups of snapped pieces that should move together
   const groups = findGroups(pieces, gridCellW, gridCellH);
