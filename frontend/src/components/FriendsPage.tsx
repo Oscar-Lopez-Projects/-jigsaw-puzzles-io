@@ -107,6 +107,8 @@ export default function FriendsPage({ onViewProfile, onChallenge, onViewChalleng
   const [searching, setSearching] = useState(false);
   const [addingId, setAddingId] = useState<string | null>(null);
   const [challengeStats, setChallengeStats] = useState<{ wins: number; total: number } | null>(null);
+  const [suggestions, setSuggestions] = useState<{ id: string; username: string; avatar_url: string | null; rating: number }[]>([]);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
 
   const fetchFriends = () => {
     if (!session?.access_token) return;
@@ -135,6 +137,18 @@ export default function FriendsPage({ onViewProfile, onChallenge, onViewChalleng
       .catch(() => {});
   }, [session, user?.id]);
 
+  // Fetch suggested players
+  const fetchSuggestions = () => {
+    if (!session?.access_token) return;
+    setSuggestionsLoading(true);
+    apiFetch<{ id: string; username: string; avatar_url: string | null; rating: number }[]>('/api/users/suggestions/list?limit=5', { token: session.access_token })
+      .then((data) => setSuggestions(data))
+      .catch(() => setSuggestions([]))
+      .finally(() => setSuggestionsLoading(false));
+  };
+
+  useEffect(() => { fetchSuggestions(); }, [session]);
+
   const handleSearch = async () => {
     if (!session?.access_token || searchQuery.trim().length < 2) return;
     setSearching(true);
@@ -152,6 +166,7 @@ export default function FriendsPage({ onViewProfile, onChallenge, onViewChalleng
     try {
       await apiFetch('/api/friends', { method: 'POST', token: session.access_token, body: { addressee_id: userId } });
       setSearchResults((prev) => prev.filter((r) => r.id !== userId));
+      setSuggestions((prev) => prev.filter((s) => s.id !== userId));
       fetchFriends();
     } catch {}
     finally { setAddingId(null); }
@@ -240,13 +255,31 @@ export default function FriendsPage({ onViewProfile, onChallenge, onViewChalleng
             )}
           </div>
 
-          {/* Suggested Players (static) */}
+          {/* Suggested Players (dynamic) */}
           <div className="fp-card">
-            <div className="fp-card-header"><h3>Suggested Players xoxo</h3></div>
-            <div className="fp-request-row"><div className="fp-req-avatar">J</div><span className="fp-req-name">jigsaw_master xoxo</span><button className="fp-suggest-add" disabled>Add</button></div>
-            <div className="fp-request-row"><div className="fp-req-avatar">N</div><span className="fp-req-name">nightowl_puzzler xoxo</span><button className="fp-suggest-add" disabled>Add</button></div>
-            <div className="fp-request-row"><div className="fp-req-avatar">P</div><span className="fp-req-name">puzzle_wizard xoxo</span><button className="fp-suggest-add" disabled>Add</button></div>
-            <button type="button" className="fp-link-btn" disabled>View More Suggestions → xoxo</button>
+            <div className="fp-card-header"><h3>Suggested Players</h3></div>
+            {suggestionsLoading ? (
+              <p className="fp-empty-sm">Loading...</p>
+            ) : suggestions.length === 0 ? (
+              <p className="fp-empty-sm">No suggestions available</p>
+            ) : (
+              suggestions.map((s) => (
+                <div className="fp-request-row" key={s.id}>
+                  <Avatar user={{ username: s.username, avatar_url: s.avatar_url }} />
+                  <div className="fp-req-info">
+                    <span className="fp-req-name" onClick={() => onViewProfile(s.id)}>{s.username}</span>
+                    <span className="fp-req-elo">⚡ {s.rating.toLocaleString()}</span>
+                  </div>
+                  <button
+                    className="fp-suggest-add"
+                    onClick={() => handleAdd(s.id)}
+                    disabled={addingId === s.id}
+                  >
+                    {addingId === s.id ? '...' : '+ Add'}
+                  </button>
+                </div>
+              ))
+            )}
           </div>
         </div>
 

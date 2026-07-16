@@ -24,6 +24,60 @@ router.get('/search', requireAuth, async (req: AuthRequest, res) => {
   res.json(data);
 });
 
+// Get suggested players (users who aren't already friends with the requester)
+router.get('/suggestions/list', requireAuth, async (req: AuthRequest, res) => {
+  const userId = req.userId!;
+  const limit = parseInt(req.query.limit as string) || 5;
+
+  // Get all friend relationships (any status) to exclude them
+  const { data: sentFriends } = await supabase
+    .from('friends')
+    .select('addressee_id')
+    .eq('requester_id', userId);
+
+  const { data: recvFriends } = await supabase
+    .from('friends')
+    .select('requester_id')
+    .eq('addressee_id', userId);
+
+  const excludeIds = new Set<string>([userId]);
+  (sentFriends || []).forEach((f) => excludeIds.add(f.addressee_id));
+  (recvFriends || []).forEach((f) => excludeIds.add(f.requester_id));
+
+  // Get users sorted by ELO (most active/ranked players first), excluding friends
+  const { data: eloUsers } = await supabase
+    .from('elo_ratings')
+    .select('user_id, rating')
+    .order('rating', { ascending: false })
+    .limit(limit + excludeIds.size); // fetch extra to account for filtering
+
+  // Filter out friends and self
+  const candidateIds = (eloUsers || [])
+    .filter((e) => !excludeIds.has(e.user_id))
+    .slice(0, limit)
+    .map((e) => e.user_id);
+
+  if (candidateIds.length === 0) {
+    return res.json([]);
+  }
+
+  // Fetch user profiles for the candidates
+  const { data: users, error } = await supabase
+    .from('users')
+    .select('id, username, avatar_url')
+    .in('id', candidateIds);
+
+  if (error) return res.status(500).json({ error: error.message });
+
+  // Attach ELO rating to each user and sort by rating
+  const eloMap = new Map((eloUsers || []).map((e) => [e.user_id, e.rating]));
+  const result = (users || [])
+    .map((u) => ({ ...u, rating: eloMap.get(u.id) || 0 }))
+    .sort((a, b) => b.rating - a.rating);
+
+  res.json(result);
+});
+
 // Get a user's public profile
 router.get('/:userId', async (req, res) => {
   const { userId } = req.params;
