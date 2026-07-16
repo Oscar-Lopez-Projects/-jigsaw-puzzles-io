@@ -7,7 +7,6 @@ import './PuzzleBoard.css';
 
 // ─── layout constants ─────────────────────────────────────────
 const SNAP_THRESHOLD  = 0.5;
-const BOARD_VH_TARGET = 0.75; // use more vertical space
 const MARGIN_RATIO    = 0.25; // extra space around target for scattered pieces
 
 // ─── useImage hook ─────────────────────────────────────────────
@@ -113,7 +112,6 @@ interface PuzzleBoardProps {
 export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }: PuzzleBoardProps) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const [containerW, setContainerW] = useState(0);
-  const [viewportH, setViewportH] = useState(window.innerHeight);
   const [hasScattered, setHasScattered] = useState(false);
 
   useEffect(() => {
@@ -123,12 +121,6 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPi
     ro.observe(el);
     setContainerW(el.clientWidth);
     return () => ro.disconnect();
-  }, []);
-
-  useEffect(() => {
-    const fn = () => setViewportH(window.innerHeight);
-    window.addEventListener('resize', fn);
-    return () => window.removeEventListener('resize', fn);
   }, []);
 
   const pw = pieces[0]?.pieceWidth  ?? 0;
@@ -157,12 +149,9 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPi
 
   const ready = pieces.length > 0 && containerW > 0 && pw > 0 && ph > 0;
 
-  // Scale to fit container
-  const scaleByH = ready ? (viewportH * BOARD_VH_TARGET) / worldH : 1;
-  const scaleByW = ready ? containerW / worldW : 1;
-  const scale = Math.min(scaleByH, scaleByW);
-  const safeScale = isFinite(scale) && scale > 0 ? scale : 1;
-  const stageW = worldW * safeScale;
+  // Scale: always fill the full container width; height adjusts accordingly
+  const safeScale = ready ? containerW / worldW : 1;
+  const stageW = containerW;
   const stageH = worldH * safeScale;
 
   // Scatter pieces around the margins on first render
