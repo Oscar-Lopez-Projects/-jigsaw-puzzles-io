@@ -233,36 +233,50 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPi
   const stageW = worldW * safeScale;
   const stageH = worldH * safeScale;
 
-  // Scatter pieces across the entire board in a non-overlapping grid pattern
+  // Scatter pieces around the border ring first, then overflow into the middle
   useEffect(() => {
     if (!ready || hasScattered || pieces.some((p) => p.snapped)) return;
     const allAtOrigin = pieces.every((p) => p.currentX === 0 && p.currentY === 0 && !p.snapped);
     if (!allAtOrigin) return;
 
-    // Lay out pieces in a grid across the full world area (including over the target zone)
     const gap = 6;
     const cellW = pw + gap;
     const cellH = ph + gap;
 
-    // Generate all possible positions across the entire board
-    const positions: { x: number; y: number }[] = [];
+    // Target rectangle bounds (where the finished puzzle goes)
+    const targetLeft = targetOX;
+    const targetRight = targetOX + targetW;
+    const targetTop = targetOY;
+    const targetBottom = targetOY + targetH;
+
+    // Generate every non-overlapping grid slot across the whole world,
+    // classifying each as "border" (outside the target rect) or "interior".
+    const border: { x: number; y: number }[] = [];
+    const interior: { x: number; y: number }[] = [];
+
     for (let y = gap; y + ph < worldH - gap; y += cellH) {
       for (let x = gap; x + pw < worldW - gap; x += cellW) {
-        positions.push({ x, y });
+        const cx = x + pw / 2;
+        const cy = y + ph / 2;
+        const insideTarget =
+          cx > targetLeft && cx < targetRight && cy > targetTop && cy < targetBottom;
+        if (insideTarget) interior.push({ x, y });
+        else border.push({ x, y });
       }
     }
 
-    // Shuffle positions and assign to pieces
-    const shuffledPos = [...positions].sort(() => Math.random() - 0.5);
+    // Fill the border ring first (shuffled for a natural look), then interior.
+    const shuffle = <T,>(arr: T[]) => [...arr].sort(() => Math.random() - 0.5);
+    const ordered = [...shuffle(border), ...shuffle(interior)];
 
     const scattered = pieces.map((p, i) => {
-      const pos = shuffledPos[i % shuffledPos.length];
+      const pos = ordered[i % ordered.length];
       return { ...p, currentX: pos?.x ?? 0, currentY: pos?.y ?? 0, zone: 'free' as const };
     });
 
     setHasScattered(true);
     onPiecesChange(scattered);
-  }, [ready, hasScattered, pieces, worldW, worldH, pw, ph, onPiecesChange]);
+  }, [ready, hasScattered, pieces, worldW, worldH, pw, ph, targetOX, targetOY, targetW, targetH, onPiecesChange]);
 
   // Groups of snapped pieces that should move together
   const groups = findGroups(pieces, gridCellW, gridCellH);
