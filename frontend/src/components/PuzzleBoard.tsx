@@ -25,10 +25,13 @@ interface PieceTileProps {
   piece: PuzzlePiece;
   x: number;
   y: number;
+  worldW: number;
+  worldH: number;
+  scale: number;
   onDragEnd: (id: string, wx: number, wy: number) => void;
 }
 
-function DraggablePieceTile({ piece, x, y, onDragEnd }: PieceTileProps) {
+function DraggablePieceTile({ piece, x, y, worldW, worldH, scale, onDragEnd }: PieceTileProps) {
   const img = useImage(piece.imageUrl);
 
   const handleDragStart = useCallback((e: Konva.KonvaEventObject<DragEvent>) => {
@@ -44,12 +47,26 @@ function DraggablePieceTile({ piece, x, y, onDragEnd }: PieceTileProps) {
     [piece.id, onDragEnd]
   );
 
+  // Keep the piece fully inside the world bounds while dragging
+  const dragBound = useCallback(
+    (pos: { x: number; y: number }) => {
+      const maxX = Math.max(0, (worldW - piece.pieceWidth) * scale);
+      const maxY = Math.max(0, (worldH - piece.pieceHeight) * scale);
+      return {
+        x: Math.max(0, Math.min(pos.x, maxX)),
+        y: Math.max(0, Math.min(pos.y, maxY)),
+      };
+    },
+    [worldW, worldH, scale, piece.pieceWidth, piece.pieceHeight]
+  );
+
   if (!img) return null;
 
   return (
     <Group
       x={x} y={y}
       draggable={!piece.snapped}
+      dragBoundFunc={!piece.snapped ? dragBound : undefined}
       onDragStart={!piece.snapped ? handleDragStart : undefined}
       onDragEnd={!piece.snapped ? handleDragEndInner : undefined}
       onMouseEnter={(e) => {
@@ -81,11 +98,18 @@ interface PieceGroupProps {
   groupPieces: PuzzlePiece[];
   offsetX: number;
   offsetY: number;
+  worldW: number;
+  worldH: number;
+  scale: number;
   onGroupDragEnd: (ids: string[], dx: number, dy: number) => void;
 }
 
-function DraggablePieceGroup({ groupPieces, offsetX, offsetY, onGroupDragEnd }: PieceGroupProps) {
+function DraggablePieceGroup({ groupPieces, offsetX, offsetY, worldW, worldH, scale, onGroupDragEnd }: PieceGroupProps) {
   const startPos = useRef({ x: offsetX, y: offsetY });
+
+  // Bounding size of the group (relative to its top-left offset)
+  const groupW = Math.max(...groupPieces.map((p) => p.currentX - offsetX + p.pieceWidth));
+  const groupH = Math.max(...groupPieces.map((p) => p.currentY - offsetY + p.pieceHeight));
 
   const handleDragStart = useCallback((e: Konva.KonvaEventObject<DragEvent>) => {
     startPos.current = { x: e.target.x(), y: e.target.y() };
@@ -100,10 +124,24 @@ function DraggablePieceGroup({ groupPieces, offsetX, offsetY, onGroupDragEnd }: 
     e.target.getStage()!.container().style.cursor = 'default';
   }, [groupPieces, onGroupDragEnd]);
 
+  // Keep the whole group inside the world bounds while dragging
+  const dragBound = useCallback(
+    (pos: { x: number; y: number }) => {
+      const maxX = Math.max(0, (worldW - groupW) * scale);
+      const maxY = Math.max(0, (worldH - groupH) * scale);
+      return {
+        x: Math.max(0, Math.min(pos.x, maxX)),
+        y: Math.max(0, Math.min(pos.y, maxY)),
+      };
+    },
+    [worldW, worldH, scale, groupW, groupH]
+  );
+
   return (
     <Group
       x={offsetX} y={offsetY}
       draggable
+      dragBoundFunc={dragBound}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
       onMouseEnter={(e) => {
@@ -452,6 +490,7 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPi
             {lockedPieces.map((piece) => (
               <DraggablePieceTile key={piece.id} piece={piece}
                 x={piece.currentX} y={piece.currentY}
+                worldW={worldW} worldH={worldH} scale={safeScale}
                 onDragEnd={handleDragEnd} />
             ))}
           </Layer>
@@ -467,6 +506,7 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPi
                   groupPieces={group}
                   offsetX={minX}
                   offsetY={minY}
+                  worldW={worldW} worldH={worldH} scale={safeScale}
                   onGroupDragEnd={handleGroupDragEnd}
                 />
               );
@@ -480,6 +520,7 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPi
                 key={piece.id}
                 piece={piece}
                 x={piece.currentX} y={piece.currentY}
+                worldW={worldW} worldH={worldH} scale={safeScale}
                 onDragEnd={handleDragEnd}
               />
             ))}
