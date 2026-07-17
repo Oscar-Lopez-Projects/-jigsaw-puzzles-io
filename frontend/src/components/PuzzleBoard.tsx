@@ -204,7 +204,6 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPi
   const wrapRef = useRef<HTMLDivElement>(null);
   const [containerW, setContainerW] = useState(0);
   const [containerH, setContainerH] = useState(0);
-  const [hasScattered, setHasScattered] = useState(false);
 
   useEffect(() => {
     const el = wrapRef.current;
@@ -250,9 +249,10 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPi
   const stageW = worldW * safeScale;
   const stageH = worldH * safeScale;
 
-  // Scatter pieces around the border ring first, then overflow into the middle
+  // Scatter pieces around the border ring first, then overflow into the middle.
+  // Re-runs whenever every piece is back at the origin (e.g. after a Reset).
   useEffect(() => {
-    if (!ready || hasScattered || pieces.some((p) => p.snapped)) return;
+    if (!ready) return;
     const allAtOrigin = pieces.every((p) => p.currentX === 0 && p.currentY === 0 && !p.snapped);
     if (!allAtOrigin) return;
 
@@ -291,9 +291,8 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPi
       return { ...p, currentX: pos?.x ?? 0, currentY: pos?.y ?? 0, zone: 'free' as const };
     });
 
-    setHasScattered(true);
     onPiecesChange(scattered);
-  }, [ready, hasScattered, pieces, worldW, worldH, pw, ph, targetOX, targetOY, targetW, targetH, onPiecesChange]);
+  }, [ready, pieces, worldW, worldH, pw, ph, targetOX, targetOY, targetW, targetH, onPiecesChange]);
 
   // Locked pieces (placed correctly on the board) — immovable, green outline
   const lockedPieces = pieces.filter((p) => p.snapped);

@@ -18,7 +18,6 @@ import UserProfile from './components/UserProfile';
 import FriendsPage from './components/FriendsPage';
 import { getGrid, generatePieces, reshufflePieces } from './utils/puzzleUtils';
 import { useAuth } from './context/AuthContext';
-import { usePuzzleLayout } from './context/PuzzleLayoutContext';
 import { apiFetch } from './lib/api';
 import { playWinSound, playClickSound } from './lib/sounds';
 import type { PuzzlePiece } from './types/puzzle';
@@ -30,7 +29,6 @@ type View = 'game' | 'dashboard' | 'community' | 'leaderboard' | 'profile' | 'fr
 export default function App() {
   // ── Auth ─────────────────────────────────────────────────────
   const { session } = useAuth();
-  const { prefs, toggleBoardPosition } = usePuzzleLayout();
 
   // ── View (game vs dashboard vs community) ────────────────────
   const [view, setViewState] = useState<View>('game');
@@ -339,11 +337,14 @@ export default function App() {
   };
 
   const handleHint = useCallback(() => {
-    const candidates = pieces.filter((p) => !p.snapped);
-    if (candidates.length === 0) return;
+    // Prefer loose (free, unconnected) pieces; fall back to any not-yet-placed piece.
+    const notPlaced = pieces.filter((p) => !p.snapped);
+    if (notPlaced.length === 0) return;
+    const free = notPlaced.filter((p) => p.groupId == null);
+    const pool = free.length > 0 ? free : notPlaced;
     // clear any running hint first
     if (hintTimer.current) clearTimeout(hintTimer.current);
-    const pick = candidates[Math.floor(Math.random() * candidates.length)];
+    const pick = pool[Math.floor(Math.random() * pool.length)];
     setHintPieceId(pick.id);
     hintTimer.current = setTimeout(() => setHintPieceId(null), 2500);
   }, [pieces]);
@@ -364,23 +365,6 @@ export default function App() {
     };
     document.addEventListener('fullscreenchange', handleFsChange);
     return () => document.removeEventListener('fullscreenchange', handleFsChange);
-  }, []);
-
-  const handleCollectAll = useCallback(() => {
-    setPieces((prev) =>
-      prev.map((p, _, arr) => {
-        if (p.snapped || p.zone === 'tray') return p;
-        // assign a slotIndex after existing tray pieces
-        const trayCount = arr.filter((q) => q.zone === 'tray' && q.id !== p.id).length;
-        return { ...p, zone: 'tray' as const, slotIndex: trayCount };
-      }).map((p, _, arr) => {
-        // re-index tray pieces sequentially so slots don't collide
-        if (p.zone !== 'tray' || p.snapped) return p;
-        const trayPieces = arr.filter((q) => q.zone === 'tray' && !q.snapped);
-        const idx = trayPieces.findIndex((q) => q.id === p.id);
-        return { ...p, slotIndex: idx };
-      })
-    );
   }, []);
 
   // ── Play a community puzzle ─────────────────────────────────
@@ -596,23 +580,6 @@ export default function App() {
                   Hint
                 </button>
 
-                <button
-                  type="button"
-                  className="toolbar-action-btn toolbar-action-btn--collect"
-                  onClick={handleCollectAll}
-                  disabled={pieces.filter((p) => !p.snapped && p.zone !== 'tray').length === 0}
-                  aria-label="Collect all loose pieces into tray"
-                  title="Collect all pieces into tray"
-                >
-                  <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
-                    <path d="M3 13h14" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
-                    <path d="M5 13V7a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-                    <path d="M2 13h16v2a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-2Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round"/>
-                    <path d="M8 6V4M12 6V4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
-                  </svg>
-                  Collect
-                </button>
-
                 <button type="button" className="toolbar-action-btn toolbar-action-btn--reset" onClick={handleReset}>
                   <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
                     <path
@@ -625,22 +592,6 @@ export default function App() {
                   </svg>
                   Reset
                 </button>
-
-                {/* Layout toggle — swap board/staging sides */}
-                {session?.access_token && (
-                  <button
-                    type="button"
-                    className="toolbar-action-btn toolbar-action-btn--layout"
-                    onClick={toggleBoardPosition}
-                    aria-label={`Board on ${prefs.boardPosition === 'left' ? 'right' : 'left'}`}
-                    title={`Move board to ${prefs.boardPosition === 'left' ? 'right' : 'left'}`}
-                  >
-                    <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                      <rect x="1" y="2" width="6" height="12" rx="1" stroke="currentColor" strokeWidth="1.4" fill={prefs.boardPosition === 'left' ? 'currentColor' : 'none'} opacity={prefs.boardPosition === 'left' ? '0.3' : '1'} />
-                      <rect x="9" y="2" width="6" height="12" rx="1" stroke="currentColor" strokeWidth="1.4" fill={prefs.boardPosition === 'right' ? 'currentColor' : 'none'} opacity={prefs.boardPosition === 'right' ? '0.3' : '1'} />
-                    </svg>
-                  </button>
-                )}
 
                 {/* Fullscreen toggle */}
                 <button
@@ -673,6 +624,61 @@ export default function App() {
                 hintPieceId={hintPieceId}
               />
             </PuzzleBoardErrorBoundary>
+
+            {/* Draggable image preview panel — inside puzzle-screen so it shows in fullscreen too */}
+            {showPreview && selectedImage && (
+              <div
+                className="preview-float"
+                style={{ left: previewPos.x, top: previewPos.y }}
+                role="dialog"
+                aria-label="Reference image preview"
+              >
+                {/* Drag handle / header */}
+                <div
+                  className="preview-float-header"
+                  onPointerDown={handlePreviewPointerDown}
+                  onPointerMove={handlePreviewPointerMove}
+                  onPointerUp={handlePreviewPointerUp}
+                >
+                  <svg className="preview-float-drag-icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                    <circle cx="5" cy="4" r="1" fill="currentColor" />
+                    <circle cx="5" cy="8" r="1" fill="currentColor" />
+                    <circle cx="5" cy="12" r="1" fill="currentColor" />
+                    <circle cx="11" cy="4" r="1" fill="currentColor" />
+                    <circle cx="11" cy="8" r="1" fill="currentColor" />
+                    <circle cx="11" cy="12" r="1" fill="currentColor" />
+                  </svg>
+                  <span className="preview-float-title">
+                    {imageFileName ?? 'Reference Image'}
+                  </span>
+                  <button
+                    type="button"
+                    className="preview-float-close"
+                    onClick={() => setShowPreview(false)}
+                    aria-label="Close preview"
+                  >
+                    <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                      <path
+                        d="M3 3l10 10M13 3L3 13"
+                        stroke="currentColor"
+                        strokeWidth="1.75"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                  </button>
+                </div>
+
+                {/* Image */}
+                <div className="preview-float-body">
+                  <img
+                    src={selectedImage}
+                    alt={imageFileName ?? 'Reference image'}
+                    className="preview-float-img"
+                    draggable={false}
+                  />
+                </div>
+              </div>
+            )}
           </div>
         )}
       </main>
@@ -700,61 +706,6 @@ export default function App() {
         />
       )}
       </>
-      )}
-
-      {/* Draggable image preview panel */}
-      {showPreview && selectedImage && (
-        <div
-          className="preview-float"
-          style={{ left: previewPos.x, top: previewPos.y }}
-          role="dialog"
-          aria-label="Reference image preview"
-        >
-          {/* Drag handle / header */}
-          <div
-            className="preview-float-header"
-            onPointerDown={handlePreviewPointerDown}
-            onPointerMove={handlePreviewPointerMove}
-            onPointerUp={handlePreviewPointerUp}
-          >
-            <svg className="preview-float-drag-icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-              <circle cx="5" cy="4" r="1" fill="currentColor" />
-              <circle cx="5" cy="8" r="1" fill="currentColor" />
-              <circle cx="5" cy="12" r="1" fill="currentColor" />
-              <circle cx="11" cy="4" r="1" fill="currentColor" />
-              <circle cx="11" cy="8" r="1" fill="currentColor" />
-              <circle cx="11" cy="12" r="1" fill="currentColor" />
-            </svg>
-            <span className="preview-float-title">
-              {imageFileName ?? 'Reference Image'}
-            </span>
-            <button
-              type="button"
-              className="preview-float-close"
-              onClick={() => setShowPreview(false)}
-              aria-label="Close preview"
-            >
-              <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                <path
-                  d="M3 3l10 10M13 3L3 13"
-                  stroke="currentColor"
-                  strokeWidth="1.75"
-                  strokeLinecap="round"
-                />
-              </svg>
-            </button>
-          </div>
-
-          {/* Image */}
-          <div className="preview-float-body">
-            <img
-              src={selectedImage}
-              alt={imageFileName ?? 'Reference image'}
-              className="preview-float-img"
-              draggable={false}
-            />
-          </div>
-        </div>
       )}
 
       {/* Auth modal triggered from win overlay */}
