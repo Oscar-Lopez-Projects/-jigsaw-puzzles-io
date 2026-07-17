@@ -168,6 +168,41 @@ function PieceImage({ piece, relX, relY }: { piece: PuzzlePiece; relX: number; r
   );
 }
 
+// ─── Hint overlay: shows the piece shape at its slot + glows the real piece ──
+function HintOverlay({ piece, targetOX, targetOY }: { piece: PuzzlePiece; targetOX: number; targetOY: number }) {
+  const img = useImage(piece.imageUrl);
+  if (!img) return null;
+  const targetX = targetOX + piece.correctX;
+  const targetY = targetOY + piece.correctY;
+  return (
+    <>
+      {/* Ghost of the piece at its correct board slot — shows the jigsaw shape */}
+      <KonvaImage
+        image={img}
+        x={targetX} y={targetY}
+        width={piece.pieceWidth} height={piece.pieceHeight}
+        opacity={0.55}
+        shadowColor="#22c55e"
+        shadowBlur={18}
+        shadowOpacity={1}
+        shadowOffset={{ x: 0, y: 0 }}
+        listening={false}
+      />
+      {/* Green glow around the actual piece so the player can find it */}
+      <KonvaImage
+        image={img}
+        x={piece.currentX} y={piece.currentY}
+        width={piece.pieceWidth} height={piece.pieceHeight}
+        shadowColor="#22c55e"
+        shadowBlur={24}
+        shadowOpacity={1}
+        shadowOffset={{ x: 0, y: 0 }}
+        listening={false}
+      />
+    </>
+  );
+}
+
 // ─── Helpers ───────────────────────────────────────────────────
 /**
  * Lock any non-locked piece that is sitting exactly at its correct final
@@ -469,21 +504,6 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPi
               fill="#2f2d3e" cornerRadius={4} listening={false} />
           </Layer>
 
-          {/* Hint highlight */}
-          {hintPiece && (
-            <Layer listening={false}>
-              <Rect
-                x={targetOX + hintPiece.correctX}
-                y={targetOY + hintPiece.correctY}
-                width={pw} height={ph}
-                fill="rgba(34,197,94,0.18)"
-                stroke="rgba(34,197,94,0.8)"
-                strokeWidth={2}
-                listening={false}
-              />
-            </Layer>
-          )}
-
           {/* Locked pieces (correctly placed on board) — immovable, green glow */}
           <Layer>
             {lockedPieces.map((piece) => (
@@ -524,6 +544,13 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPi
               />
             ))}
           </Layer>
+
+          {/* Hint overlay — drawn on top so the glow is visible */}
+          {hintPiece && (
+            <Layer listening={false}>
+              <HintOverlay piece={hintPiece} targetOX={targetOX} targetOY={targetOY} />
+            </Layer>
+          )}
         </Stage>
       </div>
     </div>
