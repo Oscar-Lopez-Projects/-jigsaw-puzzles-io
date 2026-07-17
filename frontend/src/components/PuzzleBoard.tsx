@@ -66,7 +66,11 @@ function DraggablePieceTile({ piece, x, y, onDragEnd }: PieceTileProps) {
       <KonvaImage
         image={img} x={0} y={0}
         width={piece.pieceWidth} height={piece.pieceHeight}
-        listening={true}
+        listening={!piece.snapped}
+        shadowColor={piece.snapped ? '#22c55e' : undefined}
+        shadowBlur={piece.snapped ? 14 : 0}
+        shadowOpacity={piece.snapped ? 1 : 0}
+        shadowOffset={{ x: 0, y: 0 }}
       />
     </Group>
   );
@@ -126,52 +130,27 @@ function PieceImage({ piece, relX, relY }: { piece: PuzzlePiece; relX: number; r
   );
 }
 
-// ─── Group detection: find connected snapped pieces ───────────
-function findGroups(pieces: PuzzlePiece[], gridCellW: number, gridCellH: number): PuzzlePiece[][] {
-  const snapped = pieces.filter((p) => p.snapped);
-  if (snapped.length < 2) return [];
-
-  const visited = new Set<string>();
-  const groups: PuzzlePiece[][] = [];
-
-  for (const piece of snapped) {
-    if (visited.has(piece.id)) continue;
-
-    // BFS to find connected pieces
-    const group: PuzzlePiece[] = [];
-    const queue = [piece];
-    visited.add(piece.id);
-
-    while (queue.length > 0) {
-      const curr = queue.shift()!;
-      group.push(curr);
-
-      // Find adjacent snapped pieces (share an edge in the grid)
-      for (const other of snapped) {
-        if (visited.has(other.id)) continue;
-        const colDiff = Math.abs(curr.correctCol - other.correctCol);
-        const rowDiff = Math.abs(curr.correctRow - other.correctRow);
-        // Adjacent if exactly 1 cell apart in one direction
-        if ((colDiff === 1 && rowDiff === 0) || (colDiff === 0 && rowDiff === 1)) {
-          // Check they're actually placed correctly relative to each other
-          const expectedDx = (other.correctCol - curr.correctCol) * gridCellW;
-          const expectedDy = (other.correctRow - curr.correctRow) * gridCellH;
-          const actualDx = other.currentX - curr.currentX;
-          const actualDy = other.currentY - curr.currentY;
-          if (Math.abs(actualDx - expectedDx) < 5 && Math.abs(actualDy - expectedDy) < 5) {
-            visited.add(other.id);
-            queue.push(other);
-          }
-        }
-      }
+// ─── Helpers ───────────────────────────────────────────────────
+/**
+ * Lock any non-locked piece that is sitting exactly at its correct final
+ * board position. This catches pieces placed directly on the board as well
+ * as pieces/groups that connect to an already-locked piece.
+ */
+function lockCorrectPieces(arr: PuzzlePiece[], targetOX: number, targetOY: number): PuzzlePiece[] {
+  return arr.map((p) => {
+    if (p.snapped) return p;
+    const cwx = targetOX + p.correctX;
+    const cwy = targetOY + p.correctY;
+    if (Math.abs(p.currentX - cwx) < 1 && Math.abs(p.currentY - cwy) < 1) {
+      return { ...p, snapped: true };
     }
+    return p;
+  });
+}
 
-    if (group.length >= 2) {
-      groups.push(group);
-    }
-  }
-
-  return groups;
+/** Next unused group id. */
+function nextGroupId(arr: PuzzlePiece[]): number {
+  return arr.reduce((m, p) => Math.max(m, p.groupId ?? 0), 0) + 1;
 }
 
 // ─── PuzzleBoard ───────────────────────────────────────────────
@@ -278,13 +257,22 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPi
     onPiecesChange(scattered);
   }, [ready, hasScattered, pieces, worldW, worldH, pw, ph, targetOX, targetOY, targetW, targetH, onPiecesChange]);
 
-  // Groups of snapped pieces that should move together
-  const groups = findGroups(pieces, gridCellW, gridCellH);
-  const groupedIds = new Set(groups.flatMap((g) => g.map((p) => p.id)));
+  // Locked pieces (placed correctly on the board) — immovable, green outline
+  const lockedPieces = pieces.filter((p) => p.snapped);
 
-  // Snapped but not in a group (solo snapped)
-  const soloSnapped = pieces.filter((p) => p.snapped && !groupedIds.has(p.id));
-  const unsnapped = pieces.filter((p) => !p.snapped);
+  // Non-locked pieces grouped by their permanent connection groupId
+  const groupMap = new Map<number, PuzzlePiece[]>();
+  for (const p of pieces) {
+    if (!p.snapped && p.groupId != null) {
+      const arr = groupMap.get(p.groupId) ?? [];
+      arr.push(p);
+      groupMap.set(p.groupId, arr);
+    }
+  }
+  const groups = [...groupMap.entries()];
+
+  // Free, unconnected, unlocked pieces
+  const freePieces = pieces.filter((p) => !p.snapped && p.groupId == null);
   const hintPiece = hintPieceId ? pieces.find((p) => p.id === hintPieceId && !p.snapped) ?? null : null;
 
   // Single piece drag end — check board snap AND piece-to-piece snap
@@ -293,27 +281,25 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPi
       const piece = pieces.find((p) => p.id === id);
       if (!piece) return;
 
-      // 1. Check snap to target area (final board position)
+      // 1. Snap to the correct final board position → lock it
       const correctWorldX = targetOX + piece.correctX;
       const correctWorldY = targetOY + piece.correctY;
-      const pCX = wx + pw / 2;
-      const pCY = wy + ph / 2;
-      const sCX = correctWorldX + pw / 2;
-      const sCY = correctWorldY + ph / 2;
-      const distToTarget = Math.hypot(pCX - sCX, pCY - sCY);
+      const distToTarget = Math.hypot(
+        (wx + pw / 2) - (correctWorldX + pw / 2),
+        (wy + ph / 2) - (correctWorldY + ph / 2)
+      );
 
       if (distToTarget <= gridCellW * SNAP_THRESHOLD) {
         playSnapSound();
-        onPiecesChange(pieces.map((p) =>
-          p.id === id
-            ? { ...p, currentX: correctWorldX, currentY: correctWorldY, snapped: true }
-            : p
-        ));
+        let updated = pieces.map((p) =>
+          p.id === id ? { ...p, currentX: correctWorldX, currentY: correctWorldY } : p
+        );
+        updated = lockCorrectPieces(updated, targetOX, targetOY);
+        onPiecesChange(updated);
         return;
       }
 
-      // 2. Check piece-to-piece snap (connect with any neighbor)
-      // Find all other pieces (snapped or not) that are grid-adjacent to this one
+      // 2. Piece-to-piece snap — connect to an adjacent neighbor
       const neighbors = pieces.filter((other) => {
         if (other.id === id) return false;
         const colDiff = Math.abs(piece.correctCol - other.correctCol);
@@ -321,24 +307,26 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPi
         return (colDiff === 1 && rowDiff === 0) || (colDiff === 0 && rowDiff === 1);
       });
 
-      // Check if dropped position is close enough to any neighbor's expected relative position
       for (const neighbor of neighbors) {
-        // Where should 'piece' be relative to 'neighbor' based on grid positions?
         const expectedDx = (piece.correctCol - neighbor.correctCol) * gridCellW;
         const expectedDy = (piece.correctRow - neighbor.correctRow) * gridCellH;
         const expectedX = neighbor.currentX + expectedDx;
         const expectedY = neighbor.currentY + expectedDy;
-
         const snapDist = Math.hypot(wx - expectedX, wy - expectedY);
 
         if (snapDist <= gridCellW * SNAP_THRESHOLD) {
-          // Snap to the correct relative position next to this neighbor
           playSnapSound();
-          onPiecesChange(pieces.map((p) =>
-            p.id === id
-              ? { ...p, currentX: expectedX, currentY: expectedY, snapped: true }
-              : p
-          ));
+          // Merge into the neighbor's group (or start a new one) — permanent
+          const gid = neighbor.groupId ?? nextGroupId(pieces);
+          let updated = pieces.map((p) => {
+            if (p.id === id) return { ...p, currentX: expectedX, currentY: expectedY, groupId: gid };
+            if (p.id === neighbor.id && p.groupId == null) return { ...p, groupId: gid };
+            return p;
+          });
+          // If connecting placed the piece exactly on its board slot (e.g. neighbor
+          // was already locked), lock it (and any others now correct).
+          updated = lockCorrectPieces(updated, targetOX, targetOY);
+          onPiecesChange(updated);
           return;
         }
       }
@@ -354,39 +342,40 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPi
   // Group drag end: move all pieces in the group by the delta, then check snaps
   const handleGroupDragEnd = useCallback(
     (ids: string[], dx: number, dy: number) => {
-      // Calculate new positions for all pieces in the group
-      const updatedPieces = pieces.map((p) =>
+      // Move every piece in the group by the drag delta
+      let updated = pieces.map((p) =>
         ids.includes(p.id)
           ? { ...p, currentX: p.currentX + dx, currentY: p.currentY + dy }
           : p
       );
 
-      // Check if any piece in the group is now at its correct board position
-      const groupPieces = updatedPieces.filter((p) => ids.includes(p.id));
-      const refPiece = groupPieces[0];
-      if (refPiece) {
-        const correctWorldX = targetOX + refPiece.correctX;
-        const correctWorldY = targetOY + refPiece.correctY;
-        const distToTarget = Math.hypot(refPiece.currentX - correctWorldX, refPiece.currentY - correctWorldY);
+      const groupPieces = updated.filter((p) => ids.includes(p.id));
 
+      // 1. Snap the whole group onto the board if ANY piece lands close enough
+      //    to its correct board slot (the group is rigid, so aligning one aligns all).
+      for (const gp of groupPieces) {
+        const correctWX = targetOX + gp.correctX;
+        const correctWY = targetOY + gp.correctY;
+        const distToTarget = Math.hypot(gp.currentX - correctWX, gp.currentY - correctWY);
         if (distToTarget <= gridCellW * SNAP_THRESHOLD) {
-          // Snap entire group to the board
+          const offX = correctWX - gp.currentX;
+          const offY = correctWY - gp.currentY;
           playSnapSound();
-          const finalPieces = updatedPieces.map((p) => {
-            if (!ids.includes(p.id)) return p;
-            const correctWX = targetOX + p.correctX;
-            const correctWY = targetOY + p.correctY;
-            return { ...p, currentX: correctWX, currentY: correctWY, snapped: true };
-          });
-          onPiecesChange(finalPieces);
+          updated = updated.map((p) =>
+            ids.includes(p.id)
+              ? { ...p, currentX: p.currentX + offX, currentY: p.currentY + offY }
+              : p
+          );
+          updated = lockCorrectPieces(updated, targetOX, targetOY);
+          onPiecesChange(updated);
           return;
         }
       }
 
-      // Check if any piece in this group can connect to a neighboring piece outside the group
+      // 2. Connect the group to a neighboring piece/group outside it
       for (const gPiece of groupPieces) {
-        const neighbors = updatedPieces.filter((other) => {
-          if (ids.includes(other.id)) return false; // skip pieces in same group
+        const neighbors = updated.filter((other) => {
+          if (ids.includes(other.id)) return false;
           const colDiff = Math.abs(gPiece.correctCol - other.correctCol);
           const rowDiff = Math.abs(gPiece.correctRow - other.correctRow);
           return (colDiff === 1 && rowDiff === 0) || (colDiff === 0 && rowDiff === 1);
@@ -400,25 +389,29 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPi
           const snapDist = Math.hypot(gPiece.currentX - expectedX, gPiece.currentY - expectedY);
 
           if (snapDist <= gridCellW * SNAP_THRESHOLD) {
-            // Snap: move entire group so this piece aligns with the neighbor
-            const offsetX = expectedX - gPiece.currentX;
-            const offsetY = expectedY - gPiece.currentY;
+            const offX = expectedX - gPiece.currentX;
+            const offY = expectedY - gPiece.currentY;
             playSnapSound();
-            const finalPieces = updatedPieces.map((p) => {
-              if (!ids.includes(p.id)) return p;
-              return { ...p, currentX: p.currentX + offsetX, currentY: p.currentY + offsetY, snapped: true };
+            // Merge this group and the neighbor's group under one permanent id
+            const gid = gPiece.groupId ?? neighbor.groupId ?? nextGroupId(updated);
+            const neighborGroupId = neighbor.groupId;
+            updated = updated.map((p) => {
+              if (ids.includes(p.id)) {
+                return { ...p, currentX: p.currentX + offX, currentY: p.currentY + offY, groupId: gid };
+              }
+              if (p.id === neighbor.id) return { ...p, groupId: gid };
+              if (neighborGroupId != null && p.groupId === neighborGroupId) return { ...p, groupId: gid };
+              return p;
             });
-            // Also mark the neighbor as snapped so they form a group
-            onPiecesChange(finalPieces.map((p) =>
-              p.id === neighbor.id ? { ...p, snapped: true } : p
-            ));
+            updated = lockCorrectPieces(updated, targetOX, targetOY);
+            onPiecesChange(updated);
             return;
           }
         }
       }
 
-      // No snap — just move
-      onPiecesChange(updatedPieces);
+      // 3. No snap — just move
+      onPiecesChange(updated);
     },
     [pieces, gridCellW, gridCellH, targetOX, targetOY, onPiecesChange]
   );
@@ -454,23 +447,23 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPi
             </Layer>
           )}
 
-          {/* Solo snapped pieces (not part of a group) */}
+          {/* Locked pieces (correctly placed on board) — immovable, green glow */}
           <Layer>
-            {soloSnapped.map((piece) => (
+            {lockedPieces.map((piece) => (
               <DraggablePieceTile key={piece.id} piece={piece}
                 x={piece.currentX} y={piece.currentY}
                 onDragEnd={handleDragEnd} />
             ))}
           </Layer>
 
-          {/* Grouped snapped pieces (move together) */}
+          {/* Connected groups (move together, permanently linked) */}
           <Layer>
-            {groups.map((group, gi) => {
+            {groups.map(([gid, group]) => {
               const minX = Math.min(...group.map((p) => p.currentX));
               const minY = Math.min(...group.map((p) => p.currentY));
               return (
                 <DraggablePieceGroup
-                  key={`group-${gi}-${group[0].id}`}
+                  key={`group-${gid}`}
                   groupPieces={group}
                   offsetX={minX}
                   offsetY={minY}
@@ -480,9 +473,9 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPi
             })}
           </Layer>
 
-          {/* Unsnapped pieces */}
+          {/* Free, unconnected pieces */}
           <Layer>
-            {unsnapped.map((piece) => (
+            {freePieces.map((piece) => (
               <DraggablePieceTile
                 key={piece.id}
                 piece={piece}

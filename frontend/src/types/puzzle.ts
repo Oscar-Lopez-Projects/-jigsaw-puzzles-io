@@ -47,8 +47,14 @@ export interface PuzzlePiece {
   /** Which zone the piece currently lives in. */
   zone: PieceZone;
 
-  /** True once the piece has been snapped to its correct slot on the board. */
+  /** True once the piece is locked at its correct final board position (immovable). */
   snapped: boolean;
+
+  /**
+   * ID of the connection group this piece belongs to. Pieces sharing a
+   * groupId are permanently connected and move together. null/undefined = free.
+   */
+  groupId?: number | null;
 }
 
 /** Grid dimensions derived from the chosen piece count. */

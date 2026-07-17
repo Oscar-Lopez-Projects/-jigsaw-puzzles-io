@@ -333,7 +333,7 @@ export function generatePieces(
  * left and right panels.
  */
 export function reshufflePieces(pieces: PuzzlePiece[]): PuzzlePiece[] {
-  const shuffled = shuffle(pieces.map((p) => ({ ...p, snapped: false })));
+  const shuffled = shuffle(pieces.map((p) => ({ ...p, snapped: false, groupId: null })));
   const half     = Math.ceil(shuffled.length / 2);
   return shuffled.map((p, i) => ({
     ...p,
