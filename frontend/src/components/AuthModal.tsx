@@ -40,7 +40,7 @@ export default function AuthModal({ onClose }: AuthModalProps) {
   };
 
   return (
-    <div className="auth-backdrop" onClick={onClose}>
+    <div className="auth-backdrop">
       <div className="auth-modal" onClick={(e) => e.stopPropagation()}>
         <button className="auth-close" onClick={onClose} aria-label="Close">
           <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
