@@ -9,47 +9,43 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
+  align-items: center;
+  border-radius: 12px;
   overflow: hidden;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
   position: relative;
 }
 
-/* ── Inner layout: stage centered + zoom controls on right ───── */
+/* ── Inner layout: stage + zoom controls side by side ────────── */
 .puzzle-board-inner {
   display: flex;
   flex: 1;
   min-height: 0;
   width: 100%;
-  align-items: center;
-  justify-content: center;
   position: relative;
-  overflow-x: auto;
-  overflow-y: hidden;
 }
 
-/* ── Konva stage wrapper — always centered ───────────────────── */
+/* ── Konva stage wrapper ─────────────────────────────────────── */
 .puzzle-single-stage {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
+  flex: 1;
+  min-width: 0;
   line-height: 0;
   border-radius: 12px;
-  overflow: visible;
+  overflow: auto;
   cursor: default;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
 }
 
-/* ── Zoom controls (right side, vertically centered) ─────────── */
+/* ── Zoom controls (right side) ──────────────────────────────── */
 .puzzle-zoom-controls {
-  position: fixed;
-  right: 20px;
+  position: absolute;
+  right: 12px;
   top: 50%;
   transform: translateY(-50%);
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 6px;
-  z-index: 50;
+  z-index: 10;
 }
 
 .puzzle-zoom-btn {
@@ -58,18 +54,18 @@
   justify-content: center;
   width: 36px;
   height: 36px;
-  background: rgba(30, 27, 50, 0.88);
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(30, 27, 50, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 8px;
   color: #e0dfe8;
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s, transform 0.1s;
-  backdrop-filter: blur(8px);
+  backdrop-filter: blur(6px);
 }
 
 .puzzle-zoom-btn:hover {
-  background: rgba(60, 55, 90, 0.95);
-  border-color: rgba(255, 255, 255, 0.35);
+  background: rgba(60, 55, 90, 0.9);
+  border-color: rgba(255, 255, 255, 0.3);
   transform: scale(1.08);
 }
 
@@ -85,11 +81,11 @@
 .puzzle-zoom-level {
   font-size: 11px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.75);
+  color: rgba(255, 255, 255, 0.7);
   text-align: center;
   min-width: 36px;
-  padding: 3px 0;
-  background: rgba(30, 27, 50, 0.75);
+  padding: 2px 0;
+  background: rgba(30, 27, 50, 0.7);
   border-radius: 4px;
-  backdrop-filter: blur(8px);
+  backdrop-filter: blur(6px);
 }

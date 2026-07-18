@@ -7,10 +7,8 @@ import './PuzzleBoard.css';
 
 // ─── layout constants ─────────────────────────────────────────
 const SNAP_THRESHOLD = 0.5;
-// Side margin: enough room to scatter all pieces left+right.
-// We budget ~2 piece-columns worth of space per side, scaled by piece count.
-// This formula keeps it roomy for 50 pieces and doesn't explode for 300+.
-const SIDE_MARGIN_PIECES = 3.5; // piece-widths per side
+const MARGIN_RATIO_X = 0.30; // more horizontal margin → side padding
+const MARGIN_RATIO_Y = 0.12; // less vertical margin → image fills height
 
 // ─── useImage hook ─────────────────────────────────────────────
 function useImage(src: string): HTMLImageElement | null {
@@ -279,15 +277,9 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPi
   const targetW = cols * gridCellW;
   const targetH = rows * gridCellH;
 
-  // World: target fills full height, side margins hold scattered pieces.
-  // Side margin scales with piece count so 300-piece games still have room.
-  // Formula: each side gets enough columns to hold ~half the pieces in rows = grid rows.
-  // That naturally scales: 50 pieces → narrow margin, 300 pieces → wider margin.
-  const totalPieces = cols * rows;
-  const piecesPerSide = Math.ceil(totalPieces / 2);
-  const sideColumns = Math.ceil(piecesPerSide / rows);
-  const marginX = Math.max(SIDE_MARGIN_PIECES * pw, sideColumns * (pw + 4));
-  const marginY = 0; // no top/bottom padding — target fills full canvas height
+  // World: target + margins (asymmetric: more side space, less top/bottom)
+  const marginX = Math.max(pw * 3, targetW * MARGIN_RATIO_X);
+  const marginY = Math.max(ph * 2, targetH * MARGIN_RATIO_Y);
   const worldW = targetW + marginX * 2;
   const worldH = targetH + marginY * 2;
   const targetOX = marginX;
@@ -295,10 +287,9 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPi
 
   const ready = pieces.length > 0 && containerW > 0 && pw > 0 && ph > 0;
 
-  // Scale: fit the TARGET HEIGHT to the container height (image fills vertically).
-  // The world is wider than tall, so horizontal scroll handles overflow when zoomed.
-  const scaleByH = ready && containerH > 0 ? containerH / worldH : 1;
+  // Scale: fit within container (both width and height), never overflow
   const scaleByW = ready ? containerW / worldW : 1;
+  const scaleByH = ready && containerH > 0 ? containerH / worldH : scaleByW;
   const baseScale = Math.min(scaleByW, scaleByH);
   const safeScale = baseScale * zoomLevel;
   const stageW = worldW * safeScale;
