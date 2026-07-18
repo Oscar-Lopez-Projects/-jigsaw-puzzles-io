@@ -334,11 +334,13 @@ export default function App() {
     setElapsedSec(0);
     if (hintTimer.current) clearTimeout(hintTimer.current);
     setHintPieceId(null);
+    setActiveSaveId(null);
   };
 
   // ── Save Game (solo only) ─────────────────────────────────────
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [activeSaveId, setActiveSaveId] = useState<string | null>(null); // set when resuming a save
 
   const isSoloPuzzle = !activeChallengeId && !challengeOpponent;
 
@@ -367,20 +369,31 @@ export default function App() {
       // Reduces payload from ~15MB to ~50KB for a 150-piece game.
       const slimPieces = pieces.map(({ imageUrl: _img, ...rest }) => rest);
 
-      await apiFetch('/api/saved-games', {
-        method: 'POST',
-        token: session.access_token,
-        body: {
-          image_url: imageUrl,
-          image_filename: imageFileName || null,
-          piece_count: pieceCount,
-          grid_cols: gridCols,
-          grid_rows: gridRows,
-          elapsed_sec: elapsedRef.current,
-          pieces_state: slimPieces,
-          puzzle_id: activePuzzleId || null,
-        },
-      });
+      const saveBody = {
+        image_url: imageUrl,
+        image_filename: imageFileName || null,
+        piece_count: pieceCount,
+        grid_cols: gridCols,
+        grid_rows: gridRows,
+        elapsed_sec: elapsedRef.current,
+        pieces_state: slimPieces,
+        puzzle_id: activePuzzleId || null,
+      };
+
+      // If resuming an existing save, update it (PUT). Otherwise create new (POST).
+      if (activeSaveId) {
+        await apiFetch(`/api/saved-games/${activeSaveId}`, {
+          method: 'PUT',
+          token: session.access_token,
+          body: saveBody,
+        });
+      } else {
+        await apiFetch('/api/saved-games', {
+          method: 'POST',
+          token: session.access_token,
+          body: saveBody,
+        });
+      }
 
       stopTimer();
       handleBackToSetup();
@@ -392,7 +405,7 @@ export default function App() {
     } finally {
       setIsSaving(false);
     }
-  }, [session, selectedImage, imageFileName, pieceCount, gridCols, gridRows, pieces, activePuzzleId]);
+  }, [session, selectedImage, imageFileName, pieceCount, gridCols, gridRows, pieces, activePuzzleId, activeSaveId]);
 
   const handleHint = useCallback(() => {
     // Prefer loose (free, unconnected) pieces; fall back to any not-yet-placed piece.
@@ -531,6 +544,7 @@ export default function App() {
             setActivePuzzleId(save.puzzle_id);
             setActiveChallengeId(null);
             setChallengeOpponent(null);
+            setActiveSaveId(save.id); // track so Save overwrites this record instead of creating a new one
             setIsWon(false);
             setView('game');
             setPhase('generating');

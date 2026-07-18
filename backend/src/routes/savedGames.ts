@@ -97,6 +97,48 @@ router.post('/', requireAuth, async (req: AuthRequest, res) => {
   res.status(201).json(data);
 });
 
+// ── PUT /api/saved-games/:id ─────────────────────────────────
+// Update an existing saved game (owner only).
+router.put('/:id', requireAuth, async (req: AuthRequest, res) => {
+  const { id } = req.params;
+  const {
+    image_url,
+    image_filename,
+    piece_count,
+    grid_cols,
+    grid_rows,
+    elapsed_sec,
+    pieces_state,
+    puzzle_id,
+  } = req.body;
+
+  if (!image_url || !piece_count || !grid_cols || !grid_rows || !pieces_state) {
+    return res.status(400).json({ error: 'image_url, piece_count, grid_cols, grid_rows, and pieces_state are required' });
+  }
+
+  const { data, error } = await supabase
+    .from('saved_games')
+    .update({
+      image_url,
+      image_filename: image_filename || null,
+      piece_count,
+      grid_cols,
+      grid_rows,
+      elapsed_sec: elapsed_sec ?? 0,
+      pieces_state,
+      puzzle_id: puzzle_id || null,
+      saved_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+    .eq('user_id', req.userId!) // ensures ownership
+    .select()
+    .single();
+
+  if (error) return res.status(500).json({ error: error.message });
+  if (!data) return res.status(404).json({ error: 'Saved game not found' });
+  res.json(data);
+});
+
 // ── DELETE /api/saved-games/:id ──────────────────────────────
 // Delete a specific saved game (only the owner can delete).
 router.delete('/:id', requireAuth, async (req: AuthRequest, res) => {
