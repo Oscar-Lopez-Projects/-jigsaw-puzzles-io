@@ -348,19 +348,32 @@ export default function App() {
     setSaveError(null);
     pauseTimer();
 
+    // Helper: fetch with retry on cold-start HTML responses (Render free tier)
+    const fetchWithRetry = async (url: string, options: RequestInit, maxAttempts = 3): Promise<Response> => {
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        const res = await fetch(url, options);
+        const contentType = res.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) return res;
+        // Got HTML (cold-start 503/502) — wait and retry
+        if (attempt < maxAttempts) {
+          await new Promise((r) => setTimeout(r, 3000));
+        } else {
+          throw new Error('Server is waking up, please try again in a moment.');
+        }
+      }
+      throw new Error('Server unavailable');
+    };
+
     try {
-      // If the image is a local data URL, upload to storage first.
-      // Use the dedicated save-image endpoint — does NOT create a community puzzle.
       let imageUrl = selectedImage;
       if (selectedImage.startsWith('data:')) {
         const blob = await fetch(selectedImage).then((r) => r.blob());
         const formData = new FormData();
         formData.append('image', blob, imageFileName || 'saved-game.jpg');
-        const uploadRes = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/saved-games/upload-image`, {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${session.access_token}` },
-          body: formData,
-        });
+        const uploadRes = await fetchWithRetry(
+          `${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/saved-games/upload-image`,
+          { method: 'POST', headers: { Authorization: `Bearer ${session.access_token}` }, body: formData }
+        );
         const uploadData = await uploadRes.json();
         if (!uploadRes.ok) throw new Error(uploadData.error || 'Image upload failed');
         imageUrl = uploadData.image_url;
@@ -381,7 +394,6 @@ export default function App() {
         },
       });
 
-      // Success — stop timer and navigate to dashboard
       stopTimer();
       handleBackToSetup();
       setView('dashboard');
