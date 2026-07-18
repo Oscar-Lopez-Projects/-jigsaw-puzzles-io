@@ -241,6 +241,8 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPi
   const [containerW, setContainerW] = useState(0);
   const [containerH, setContainerH] = useState(0);
   const [zoomLevel, setZoomLevel] = useState(1);
+  const [panMode, setPanMode] = useState(false);
+  const [stagePos, setStagePos] = useState({ x: 0, y: 0 });
 
   const handleZoomIn = useCallback(() => {
     setZoomLevel((z) => Math.min(z + 0.2, 3));
@@ -506,8 +508,17 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPi
   return (
     <div className="puzzle-board-wrap" ref={wrapRef}>
       <div className="puzzle-board-inner">
-        <div className="puzzle-single-stage">
-          <Stage width={stageW} height={stageH} scaleX={safeScale} scaleY={safeScale}>
+        <div className={`puzzle-single-stage${panMode ? ' puzzle-single-stage--pan' : ''}`}>
+          <Stage
+            width={stageW}
+            height={stageH}
+            scaleX={safeScale}
+            scaleY={safeScale}
+            draggable={panMode}
+            x={stagePos.x}
+            y={stagePos.y}
+            onDragEnd={(e) => setStagePos({ x: e.target.x(), y: e.target.y() })}
+          >
           {/* Background — single uniform color, no borders */}
           <Layer listening={false}>
             <Rect x={0} y={0} width={worldW} height={worldH} fill="#3d3b4a" />
@@ -566,8 +577,25 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPi
         </Stage>
         </div>
 
-        {/* Zoom controls — right side */}
+        {/* Zoom + pan controls — right side */}
         <div className="puzzle-zoom-controls">
+          {/* Pan / hand toggle */}
+          <button
+            type="button"
+            className={`puzzle-zoom-btn puzzle-pan-btn${panMode ? ' puzzle-zoom-btn--active' : ''}`}
+            onClick={() => setPanMode((v) => !v)}
+            aria-label={panMode ? 'Disable pan mode' : 'Enable pan mode — drag to move the board'}
+            title={panMode ? 'Pan mode on — click to disable' : 'Pan mode — drag board to move'}
+          >
+            <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+              <path d="M8 3.5V10M8 3.5a1.5 1.5 0 0 1 3 0V10M11 5a1.5 1.5 0 0 1 3 0v2M14 7a1.5 1.5 0 0 1 3 0v4c0 3-2 5-5 5H9c-1.5 0-2.8-.7-3.6-1.8L3 11.5a1.5 1.5 0 0 1 2.4-1.8L6.5 11V3.5a1.5 1.5 0 0 1 3 0"
+                stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+
+          {/* Divider */}
+          <div className="puzzle-zoom-divider" />
+
           <button
             type="button"
             className="puzzle-zoom-btn"

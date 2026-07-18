@@ -89,3 +89,29 @@
   border-radius: 4px;
   backdrop-filter: blur(6px);
 }
+
+/* Active state for zoom/pan buttons */
+.puzzle-zoom-btn--active {
+  background: var(--accent, #7c3aed) !important;
+  border-color: var(--accent, #7c3aed) !important;
+  color: #fff !important;
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.3);
+}
+
+/* Pan cursor on the stage when pan mode is on */
+.puzzle-single-stage--pan {
+  cursor: grab !important;
+}
+
+.puzzle-single-stage--pan:active {
+  cursor: grabbing !important;
+}
+
+/* Divider between pan and zoom buttons */
+.puzzle-zoom-divider {
+  width: 24px;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 1px;
+  margin: 2px 0;
+}
