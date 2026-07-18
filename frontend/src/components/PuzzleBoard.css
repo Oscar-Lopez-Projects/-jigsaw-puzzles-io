@@ -44,6 +44,10 @@
   overflow: hidden;
   cursor: default;
   will-change: transform;
+  /* Center the Konva canvas horizontally and vertically */
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* In pan mode, pointer events pass through to the wrap's pan handlers */
