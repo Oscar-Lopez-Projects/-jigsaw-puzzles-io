@@ -563,9 +563,15 @@ export default function App() {
                 setGridRows(save.grid_rows);
                 setPieces(restored);
                 setPhase('puzzle');
+                // Restore elapsed time then start counting from there (don't use
+                // startTimer — it resets to 0. Set refs first, then resumeTimer.)
                 elapsedRef.current = save.elapsed_sec;
                 setElapsedSec(save.elapsed_sec);
-                startTimer();
+                if (timerRef.current) clearInterval(timerRef.current);
+                timerRef.current = setInterval(() => {
+                  elapsedRef.current += 1;
+                  setElapsedSec(elapsedRef.current);
+                }, 1000);
               })
               .catch(() => {
                 setGenerateError('Failed to restore saved game.');
