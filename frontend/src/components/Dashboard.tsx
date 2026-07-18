@@ -31,6 +31,20 @@ interface DashboardProps {
   onStartPuzzle?: () => void;
   onViewChallenge?: (challengeId: string) => void;
   onAcceptChallenge?: (challenge: { id: string; image_url: string; puzzle_title: string; piece_count: number; difficulty: string; challenger_time_sec: number; challenger_stars: number }) => void;
+  onResumeSave?: (save: SavedGame) => void;
+}
+
+interface SavedGame {
+  id: string;
+  image_url: string;
+  image_filename: string | null;
+  piece_count: number;
+  grid_cols: number;
+  grid_rows: number;
+  elapsed_sec: number;
+  pieces_state: unknown[];
+  puzzle_id: string | null;
+  saved_at: string;
 }
 
 function getTier(rating: number): { name: string; color: string } {
@@ -70,10 +84,11 @@ function DateCell({ iso }: { iso: string }) {
   );
 }
 
-export default function Dashboard({ onBack, onViewProfile, onStartPuzzle, onViewChallenge, onAcceptChallenge }: DashboardProps) {
+export default function Dashboard({ onBack, onViewProfile, onStartPuzzle, onViewChallenge, onAcceptChallenge, onResumeSave }: DashboardProps) {
   const { user, session, logout, updateUser } = useAuth();
   const [records, setRecords] = useState<PuzzleRecord[]>([]);
   const [profile, setProfile] = useState<ProfileData | null>(null);
+  const [savedGames, setSavedGames] = useState<SavedGame[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sortCol, setSortCol] = useState<'puzzle' | 'pieces' | 'stars' | 'time' | 'date'>('date');
@@ -91,8 +106,9 @@ export default function Dashboard({ onBack, onViewProfile, onStartPuzzle, onView
     Promise.all([
       apiFetch<PuzzleRecord[]>('/api/records', { token: session.access_token }),
       apiFetch<ProfileData>(`/api/users/${user.id}`),
+      apiFetch<SavedGame[]>('/api/saved-games', { token: session.access_token }),
     ])
-      .then(([recs, prof]) => { setRecords(recs); setProfile(prof); })
+      .then(([recs, prof, saves]) => { setRecords(recs); setProfile(prof); setSavedGames(saves); })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, [session?.access_token, user?.id]);
@@ -334,6 +350,49 @@ export default function Dashboard({ onBack, onViewProfile, onStartPuzzle, onView
 
         {/* Right Column */}
         <div className="dash-col-right">
+          {/* Saved Games */}
+          {savedGames.length > 0 && (
+            <div className="dash-card">
+              <div className="dash-card-header"><h3>💾 Saved Games</h3><span className="dash-card-meta">{savedGames.length}/2 slots used</span></div>
+              <div className="dash-saved-list">
+                {savedGames.map((save) => (
+                  <div key={save.id} className="dash-saved-item">
+                    <img src={save.image_url} alt={save.image_filename || 'Saved puzzle'} className="dash-saved-thumb" />
+                    <div className="dash-saved-info">
+                      <span className="dash-saved-name">{save.image_filename || 'Puzzle'}</span>
+                      <span className="dash-saved-meta">{save.piece_count} pieces &middot; {formatTime(save.elapsed_sec)} elapsed</span>
+                      <span className="dash-saved-date">{formatDate(save.saved_at)}</span>
+                    </div>
+                    <div className="dash-saved-actions">
+                      <button
+                        type="button"
+                        className="dash-saved-resume-btn"
+                        onClick={() => onResumeSave?.(save)}
+                        title="Resume this game"
+                      >
+                        ▶ Resume
+                      </button>
+                      <button
+                        type="button"
+                        className="dash-saved-delete-btn"
+                        title="Delete this save"
+                        onClick={async () => {
+                          if (!session?.access_token) return;
+                          try {
+                            await apiFetch(`/api/saved-games/${save.id}`, { method: 'DELETE', token: session.access_token });
+                            setSavedGames((prev) => prev.filter((s) => s.id !== save.id));
+                          } catch {}
+                        }}
+                      >
+                        🗑
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Challenges */}
           <PendingChallenges onAcceptChallenge={onAcceptChallenge || (() => {})} onViewChallenge={onViewChallenge} />
 

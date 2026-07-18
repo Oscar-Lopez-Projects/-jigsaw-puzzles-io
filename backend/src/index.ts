@@ -9,6 +9,7 @@ import leaderboardRouter from './routes/leaderboard.js';
 import usersRouter from './routes/users.js';
 import friendsRouter from './routes/friends.js';
 import challengesRouter from './routes/challenges.js';
+import savedGamesRouter from './routes/savedGames.js';
 
 dotenv.config();
 
@@ -54,6 +55,7 @@ app.use('/api/leaderboard', leaderboardRouter);
 app.use('/api/users', usersRouter);
 app.use('/api/friends', friendsRouter);
 app.use('/api/challenges', challengesRouter);
+app.use('/api/saved-games', savedGamesRouter);
 
 // Only listen when running directly (not when imported for tests)
 if (process.env.NODE_ENV !== 'test') {

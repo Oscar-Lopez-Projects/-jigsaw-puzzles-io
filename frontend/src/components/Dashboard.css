@@ -218,3 +218,103 @@
 .dash-pagination button:hover:not(:disabled) { background: var(--accent-subtle); color: var(--accent); border-color: var(--accent); }
 .dash-pagination button:disabled { opacity: 0.4; cursor: not-allowed; }
 .dash-pagination-info { font-size: 12px; color: var(--text-muted); font-weight: 600; }
+
+/* ── Saved Games card ────────────────────────────────────────── */
+.dash-saved-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.dash-saved-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  background: var(--surface-subtle);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  transition: border-color 0.15s;
+}
+
+.dash-saved-item:hover {
+  border-color: var(--border-strong);
+}
+
+.dash-saved-thumb {
+  width: 54px;
+  height: 40px;
+  object-fit: cover;
+  border-radius: 6px;
+  flex-shrink: 0;
+  background: var(--surface);
+}
+
+.dash-saved-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dash-saved-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-heading);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dash-saved-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.dash-saved-date {
+  font-size: 10px;
+  color: var(--text-faint);
+}
+
+.dash-saved-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.dash-saved-resume-btn {
+  padding: 5px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--accent);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+
+.dash-saved-resume-btn:hover {
+  background: var(--accent-hover);
+}
+
+.dash-saved-delete-btn {
+  padding: 4px 8px;
+  font-size: 13px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: background 0.15s, color 0.15s;
+  text-align: center;
+}
+
+.dash-saved-delete-btn:hover {
+  background: var(--error-subtle);
+  border-color: var(--error-border);
+  color: var(--error-text);
+}

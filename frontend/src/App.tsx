@@ -336,6 +336,68 @@ export default function App() {
     setHintPieceId(null);
   };
 
+  // ── Save Game (solo only) ─────────────────────────────────────
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const isSoloPuzzle = !activeChallengeId && !challengeOpponent;
+
+  const handleSaveGame = useCallback(async () => {
+    if (!session?.access_token || !selectedImage || !pieceCount) return;
+    setIsSaving(true);
+    setSaveError(null);
+    pauseTimer();
+
+    try {
+      // If the image is a data URL, upload it first so the saved game stores a real URL
+      let imageUrl = selectedImage;
+      if (selectedImage.startsWith('data:')) {
+        const blob = await fetch(selectedImage).then((r) => r.blob());
+        const formData = new FormData();
+        formData.append('image', blob, imageFileName || 'saved-game.jpg');
+        formData.append('title', imageFileName || 'Saved Game');
+        formData.append('piece_count', String(pieceCount));
+        formData.append('category', 'other');
+        const uploadRes = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/puzzles/upload`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${session.access_token}` },
+          body: formData,
+        });
+        const uploadData = await uploadRes.json();
+        if (uploadRes.ok && uploadData.image_url) {
+          imageUrl = uploadData.image_url;
+        }
+      }
+
+      await apiFetch('/api/saved-games', {
+        method: 'POST',
+        token: session.access_token,
+        body: {
+          image_url: imageUrl,
+          image_filename: imageFileName || null,
+          piece_count: pieceCount,
+          grid_cols: gridCols,
+          grid_rows: gridRows,
+          elapsed_sec: elapsedRef.current,
+          pieces_state: pieces,
+          puzzle_id: activePuzzleId || null,
+        },
+      });
+
+      // Stop timer and navigate to dashboard
+      stopTimer();
+      handleBackToSetup();
+      setView('dashboard');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to save game';
+      setSaveError(msg);
+      // Resume timer if save failed
+      resumeTimer();
+    } finally {
+      setIsSaving(false);
+    }
+  }, [session, selectedImage, imageFileName, pieceCount, gridCols, gridRows, pieces, activePuzzleId]);
+
   const handleHint = useCallback(() => {
     // Prefer loose (free, unconnected) pieces; fall back to any not-yet-placed piece.
     const notPlaced = pieces.filter((p) => !p.snapped);
@@ -463,6 +525,25 @@ export default function App() {
             generatePieces(challenge.image_url, cols, rows)
               .then((generated) => { setGridCols(cols); setGridRows(rows); setPieces(generated); setPhase('puzzle'); startTimer(); })
               .catch((err) => { setGenerateError(`Failed: ${err instanceof Error ? err.message : 'Unknown'}`); setPhase('setup'); });
+          }}
+          onResumeSave={(save) => {
+            // Restore full puzzle state from the saved game
+            setSelectedImage(save.image_url);
+            setImageFileName(save.image_filename);
+            setPieceCount(save.piece_count as PieceCount);
+            setActivePuzzleId(save.puzzle_id);
+            setActiveChallengeId(null);
+            setChallengeOpponent(null);
+            setGridCols(save.grid_cols);
+            setGridRows(save.grid_rows);
+            setPieces(save.pieces_state as import('./types/puzzle').PuzzlePiece[]);
+            setIsWon(false);
+            setView('game');
+            setPhase('puzzle');
+            // Restore elapsed time and restart timer from where they left off
+            elapsedRef.current = save.elapsed_sec;
+            setElapsedSec(save.elapsed_sec);
+            startTimer();
           }}
         />
       ) : view === 'leaderboard' ? (
@@ -592,6 +673,34 @@ export default function App() {
                   </svg>
                   Reset
                 </button>
+
+                {/* Save Game — solo play only, requires login */}
+                {isSoloPuzzle && session?.access_token && (
+                  <button
+                    type="button"
+                    className={`toolbar-action-btn toolbar-action-btn--save${isSaving ? ' toolbar-action-btn--saving' : ''}`}
+                    onClick={handleSaveGame}
+                    disabled={isSaving}
+                    aria-label="Save game and go to dashboard"
+                    title={saveError || 'Save game'}
+                  >
+                    {isSaving ? (
+                      <>
+                        <span className="spinner" style={{ width: 13, height: 13, borderWidth: 2 }} />
+                        Saving…
+                      </>
+                    ) : (
+                      <>
+                        <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                          <path d="M2 3a1 1 0 0 1 1-1h8l3 3v8a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+                          <path d="M5 2v4h6V2M5 10h6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                        Save
+                      </>
+                    )}
+                  </button>
+                )}
+                {saveError && <span className="toolbar-save-error" title={saveError}>⚠</span>}
 
                 {/* Fullscreen toggle */}
                 <button

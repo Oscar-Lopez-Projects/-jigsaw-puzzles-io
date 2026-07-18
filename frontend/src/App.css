@@ -372,6 +372,25 @@
   color: var(--accent);
 }
 
+/* Save button */
+.toolbar-action-btn--save:not(:disabled):hover {
+  border-color: #22c55e;
+  color: #22c55e;
+}
+
+.toolbar-action-btn--saving {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+/* Inline save error icon */
+.toolbar-save-error {
+  font-size: 14px;
+  color: #f87171;
+  cursor: help;
+  flex-shrink: 0;
+}
+
 /* Layout toggle button */
 .toolbar-action-btn--layout {
   padding: 7px 10px;
