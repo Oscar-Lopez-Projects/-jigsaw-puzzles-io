@@ -401,6 +401,7 @@ export default function Dashboard({ onBack, onViewProfile, onStartPuzzle, onView
 
           {/* Friends */}
           <FriendsList onViewProfile={onViewProfile} />
+        </div>
 
         {/* Right Column */}
         <div className="dash-col-right">
