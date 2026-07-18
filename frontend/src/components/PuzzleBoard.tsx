@@ -7,7 +7,8 @@ import './PuzzleBoard.css';
 
 // ─── layout constants ─────────────────────────────────────────
 const SNAP_THRESHOLD = 0.5;
-const MARGIN_RATIO   = 0.22;
+const MARGIN_RATIO_X = 0.30; // more horizontal margin → side padding
+const MARGIN_RATIO_Y = 0.12; // less vertical margin → image fills height
 
 // ─── useImage hook ─────────────────────────────────────────────
 function useImage(src: string): HTMLImageElement | null {
@@ -239,6 +240,15 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPi
   const wrapRef = useRef<HTMLDivElement>(null);
   const [containerW, setContainerW] = useState(0);
   const [containerH, setContainerH] = useState(0);
+  const [zoomLevel, setZoomLevel] = useState(1);
+
+  const handleZoomIn = useCallback(() => {
+    setZoomLevel((z) => Math.min(z + 0.2, 3));
+  }, []);
+
+  const handleZoomOut = useCallback(() => {
+    setZoomLevel((z) => Math.max(z - 0.2, 0.4));
+  }, []);
 
   useEffect(() => {
     const el = wrapRef.current;
@@ -267,9 +277,9 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPi
   const targetW = cols * gridCellW;
   const targetH = rows * gridCellH;
 
-  // World: target + margins
-  const marginX = Math.max(pw * 3, targetW * MARGIN_RATIO);
-  const marginY = Math.max(ph * 3, targetH * MARGIN_RATIO);
+  // World: target + margins (asymmetric: more side space, less top/bottom)
+  const marginX = Math.max(pw * 3, targetW * MARGIN_RATIO_X);
+  const marginY = Math.max(ph * 2, targetH * MARGIN_RATIO_Y);
   const worldW = targetW + marginX * 2;
   const worldH = targetH + marginY * 2;
   const targetOX = marginX;
@@ -280,7 +290,8 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPi
   // Scale: fit within container (both width and height), never overflow
   const scaleByW = ready ? containerW / worldW : 1;
   const scaleByH = ready && containerH > 0 ? containerH / worldH : scaleByW;
-  const safeScale = Math.min(scaleByW, scaleByH);
+  const baseScale = Math.min(scaleByW, scaleByH);
+  const safeScale = baseScale * zoomLevel;
   const stageW = worldW * safeScale;
   const stageH = worldH * safeScale;
 
@@ -494,8 +505,9 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPi
 
   return (
     <div className="puzzle-board-wrap" ref={wrapRef}>
-      <div className="puzzle-single-stage">
-        <Stage width={stageW} height={stageH} scaleX={safeScale} scaleY={safeScale}>
+      <div className="puzzle-board-inner">
+        <div className="puzzle-single-stage">
+          <Stage width={stageW} height={stageH} scaleX={safeScale} scaleY={safeScale}>
           {/* Background — single uniform color, no borders */}
           <Layer listening={false}>
             <Rect x={0} y={0} width={worldW} height={worldH} fill="#3d3b4a" />
@@ -552,6 +564,38 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPi
             </Layer>
           )}
         </Stage>
+        </div>
+
+        {/* Zoom controls — right side */}
+        <div className="puzzle-zoom-controls">
+          <button
+            type="button"
+            className="puzzle-zoom-btn"
+            onClick={handleZoomIn}
+            aria-label="Zoom in"
+            title="Zoom in"
+          >
+            <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+              <circle cx="9" cy="9" r="6.5" stroke="currentColor" strokeWidth="1.6" />
+              <path d="M9 6.5v5M6.5 9h5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+              <path d="M14 14l3.5 3.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+            </svg>
+          </button>
+          <span className="puzzle-zoom-level">{Math.round(zoomLevel * 100)}%</span>
+          <button
+            type="button"
+            className="puzzle-zoom-btn"
+            onClick={handleZoomOut}
+            aria-label="Zoom out"
+            title="Zoom out"
+          >
+            <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+              <circle cx="9" cy="9" r="6.5" stroke="currentColor" strokeWidth="1.6" />
+              <path d="M6.5 9h5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+              <path d="M14 14l3.5 3.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+            </svg>
+          </button>
+        </div>
       </div>
     </div>
   );
