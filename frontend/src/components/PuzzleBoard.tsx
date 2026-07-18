@@ -256,6 +256,10 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPi
     setZoomLevel((z) => Math.max(z - 0.2, 0.4));
   }, []);
 
+  const handleCenterBoard = useCallback(() => {
+    setPanOffset({ x: 0, y: 0 });
+  }, []);
+
   // Pointer handlers for free-range pan (tracked on the whole wrap, no DOM clipping)
   const handlePanPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     if (!panMode) return;
@@ -607,7 +611,10 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPi
         </div>
 
         {/* Zoom + pan controls — right side */}
-        <div className="puzzle-zoom-controls">
+        <div
+          className="puzzle-zoom-controls"
+          onPointerDown={(e) => e.stopPropagation()}
+        >
           {/* Pan / hand toggle */}
           <button
             type="button"
@@ -619,6 +626,21 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPi
             <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
               <path d="M8 3.5V10M8 3.5a1.5 1.5 0 0 1 3 0V10M11 5a1.5 1.5 0 0 1 3 0v2M14 7a1.5 1.5 0 0 1 3 0v4c0 3-2 5-5 5H9c-1.5 0-2.8-.7-3.6-1.8L3 11.5a1.5 1.5 0 0 1 2.4-1.8L6.5 11V3.5a1.5 1.5 0 0 1 3 0"
                 stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+
+          {/* Center / reset board position */}
+          <button
+            type="button"
+            className="puzzle-zoom-btn"
+            onClick={handleCenterBoard}
+            aria-label="Reset board to center"
+            title="Reset board to center"
+          >
+            <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+              <circle cx="10" cy="10" r="2.5" stroke="currentColor" strokeWidth="1.6" />
+              <path d="M10 3v2M10 15v2M3 10h2M15 10h2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+              <path d="M5.5 5.5l1.4 1.4M13.1 13.1l1.4 1.4M13.1 6.9l-1.4 1.4M6.9 13.1l-1.4 1.4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
             </svg>
           </button>
 
