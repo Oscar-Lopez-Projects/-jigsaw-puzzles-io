@@ -61,18 +61,6 @@ app.use('/api/saved-games', savedGamesRouter);
 if (process.env.NODE_ENV !== 'test') {
   app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
-
-    // Keep-alive ping — prevents Render free tier from spinning down.
-    // Pings the health endpoint every 9 minutes (Render sleeps after 15m idle).
-    const SELF_URL = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
-    setInterval(async () => {
-      try {
-        await fetch(`${SELF_URL}/api/health`);
-        console.log('[keep-alive] ping ok');
-      } catch {
-        // silently ignore — server may be mid-restart
-      }
-    }, 9 * 60 * 1000);
   });
 }
 

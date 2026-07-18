@@ -4,11 +4,10 @@ interface RequestOptions {
   method?: string;
   body?: unknown;
   token?: string | null;
-  retries?: number; // how many times to retry on cold-start HTML responses
 }
 
 export async function apiFetch<T = unknown>(path: string, opts: RequestOptions = {}): Promise<T> {
-  const { method = 'GET', body, token, retries = 2 } = opts;
+  const { method = 'GET', body, token } = opts;
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -18,34 +17,17 @@ export async function apiFetch<T = unknown>(path: string, opts: RequestOptions =
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  let lastError: Error = new Error('Request failed');
+  const res = await fetch(`${API_URL}${path}`, {
+    method,
+    headers,
+    body: body ? JSON.stringify(body) : undefined,
+  });
 
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    const res = await fetch(`${API_URL}${path}`, {
-      method,
-      headers,
-      body: body ? JSON.stringify(body) : undefined,
-    });
+  const data = await res.json();
 
-    // If the server returned HTML (cold-start 502/503), wait and retry
-    const contentType = res.headers.get('content-type') || '';
-    if (!contentType.includes('application/json')) {
-      lastError = new Error('Server is starting up, please wait a moment…');
-      if (attempt < retries) {
-        await new Promise((r) => setTimeout(r, 3000));
-        continue;
-      }
-      throw lastError;
-    }
-
-    const data = await res.json();
-
-    if (!res.ok) {
-      throw new Error(data.error || `Request failed with status ${res.status}`);
-    }
-
-    return data as T;
+  if (!res.ok) {
+    throw new Error(data.error || `Request failed with status ${res.status}`);
   }
 
-  throw lastError;
+  return data as T;
 }

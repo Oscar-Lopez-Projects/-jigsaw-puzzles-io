@@ -348,28 +348,13 @@ export default function App() {
     setSaveError(null);
     pauseTimer();
 
-    // Helper: fetch with retry on cold-start HTML responses (Render free tier)
-    const fetchWithRetry = async (url: string, options: RequestInit, maxAttempts = 3): Promise<Response> => {
-      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-        const res = await fetch(url, options);
-        const contentType = res.headers.get('content-type') || '';
-        if (contentType.includes('application/json')) return res;
-        if (attempt < maxAttempts) {
-          await new Promise((r) => setTimeout(r, 3000));
-        } else {
-          throw new Error('Server is waking up, please try again in a moment.');
-        }
-      }
-      throw new Error('Server unavailable');
-    };
-
     try {
       let imageUrl = selectedImage;
       if (selectedImage.startsWith('data:')) {
         const blob = await fetch(selectedImage).then((r) => r.blob());
         const formData = new FormData();
         formData.append('image', blob, imageFileName || 'saved-game.jpg');
-        const uploadRes = await fetchWithRetry(
+        const uploadRes = await fetch(
           `${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/saved-games/upload-image`,
           { method: 'POST', headers: { Authorization: `Bearer ${session.access_token}` }, body: formData }
         );
@@ -378,8 +363,8 @@ export default function App() {
         imageUrl = uploadData.image_url;
       }
 
-      // Strip imageUrl (base64) from each piece before saving — can be regenerated on resume.
-      // This reduces payload from ~15MB to ~50KB for a 150-piece game.
+      // Strip imageUrl (base64) from each piece before saving — regenerated on resume.
+      // Reduces payload from ~15MB to ~50KB for a 150-piece game.
       const slimPieces = pieces.map(({ imageUrl: _img, ...rest }) => rest);
 
       await apiFetch('/api/saved-games', {
