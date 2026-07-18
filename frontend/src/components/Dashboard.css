@@ -318,3 +318,29 @@
   border-color: var(--error-border);
   color: var(--error-text);
 }
+
+/* ── Saved Solo Gameplay — empty state ───────────────────────── */
+.dash-saved-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 20px 12px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.dash-saved-empty-icon {
+  font-size: 28px;
+  margin-bottom: 4px;
+}
+
+.dash-saved-empty p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.dash-saved-empty strong {
+  color: var(--text-body);
+}

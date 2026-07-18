@@ -346,22 +346,30 @@ export default function Dashboard({ onBack, onViewProfile, onStartPuzzle, onView
 
           {/* Friends */}
           <FriendsList onViewProfile={onViewProfile} />
-        </div>
 
-        {/* Right Column */}
-        <div className="dash-col-right">
-          {/* Saved Games */}
-          {savedGames.length > 0 && (
-            <div className="dash-card">
-              <div className="dash-card-header"><h3>💾 Saved Games</h3><span className="dash-card-meta">{savedGames.length}/2 slots used</span></div>
+          {/* Saved Solo Gameplay */}
+          <div className="dash-card">
+            <div className="dash-card-header">
+              <h3>💾 Saved Solo Gameplay</h3>
+              <span className="dash-card-meta">{savedGames.length}/2 slots used</span>
+            </div>
+            {savedGames.length === 0 ? (
+              <div className="dash-saved-empty">
+                <span className="dash-saved-empty-icon">🎮</span>
+                <p>No saved games yet.</p>
+                <p>Press <strong>Save</strong> during a solo puzzle to pick up right where you left off.</p>
+              </div>
+            ) : (
               <div className="dash-saved-list">
                 {savedGames.map((save) => (
                   <div key={save.id} className="dash-saved-item">
                     <img src={save.image_url} alt={save.image_filename || 'Saved puzzle'} className="dash-saved-thumb" />
                     <div className="dash-saved-info">
                       <span className="dash-saved-name">{save.image_filename || 'Puzzle'}</span>
-                      <span className="dash-saved-meta">{save.piece_count} pieces &middot; {formatTime(save.elapsed_sec)} elapsed</span>
-                      <span className="dash-saved-date">{formatDate(save.saved_at)}</span>
+                      <span className="dash-saved-meta">
+                        {save.piece_count} pieces &middot; {save.grid_cols}×{save.grid_rows} &middot; {formatTime(save.elapsed_sec)} elapsed
+                      </span>
+                      <span className="dash-saved-date">Saved {formatDate(save.saved_at)}</span>
                     </div>
                     <div className="dash-saved-actions">
                       <button
@@ -378,6 +386,7 @@ export default function Dashboard({ onBack, onViewProfile, onStartPuzzle, onView
                         title="Delete this save"
                         onClick={async () => {
                           if (!session?.access_token) return;
+                          if (!window.confirm('Delete this saved game? This cannot be undone.')) return;
                           try {
                             await apiFetch(`/api/saved-games/${save.id}`, { method: 'DELETE', token: session.access_token });
                             setSavedGames((prev) => prev.filter((s) => s.id !== save.id));
@@ -390,9 +399,12 @@ export default function Dashboard({ onBack, onViewProfile, onStartPuzzle, onView
                   </div>
                 ))}
               </div>
-            </div>
-          )}
+            )}
+          </div>
+        </div>
 
+        {/* Right Column */}
+        <div className="dash-col-right">
           {/* Challenges */}
           <PendingChallenges onAcceptChallenge={onAcceptChallenge || (() => {})} onViewChallenge={onViewChallenge} />
 
