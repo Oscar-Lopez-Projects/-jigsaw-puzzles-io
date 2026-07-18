@@ -344,9 +344,6 @@ export default function Dashboard({ onBack, onViewProfile, onStartPuzzle, onView
             )}
           </div>
 
-          {/* Friends */}
-          <FriendsList onViewProfile={onViewProfile} />
-
           {/* Saved Solo Gameplay */}
           <div className="dash-card">
             <div className="dash-card-header">
@@ -401,7 +398,9 @@ export default function Dashboard({ onBack, onViewProfile, onStartPuzzle, onView
               </div>
             )}
           </div>
-        </div>
+
+          {/* Friends */}
+          <FriendsList onViewProfile={onViewProfile} />
 
         {/* Right Column */}
         <div className="dash-col-right">
