@@ -238,11 +238,15 @@ interface PuzzleBoardProps {
 
 export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }: PuzzleBoardProps) {
   const wrapRef = useRef<HTMLDivElement>(null);
+  const stageWrapRef = useRef<HTMLDivElement>(null);
   const [containerW, setContainerW] = useState(0);
   const [containerH, setContainerH] = useState(0);
   const [zoomLevel, setZoomLevel] = useState(1);
   const [panMode, setPanMode] = useState(false);
-  const [stagePos, setStagePos] = useState({ x: 0, y: 0 });
+  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
+
+  // Pan drag tracking — stored in a ref so pointer handlers don't go stale
+  const panDrag = useRef<{ startX: number; startY: number; originX: number; originY: number } | null>(null);
 
   const handleZoomIn = useCallback(() => {
     setZoomLevel((z) => Math.min(z + 0.2, 3));
@@ -250,6 +254,24 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPi
 
   const handleZoomOut = useCallback(() => {
     setZoomLevel((z) => Math.max(z - 0.2, 0.4));
+  }, []);
+
+  // Pointer handlers for free-range pan (tracked on the whole wrap, no DOM clipping)
+  const handlePanPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (!panMode) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    panDrag.current = { startX: e.clientX, startY: e.clientY, originX: panOffset.x, originY: panOffset.y };
+  }, [panMode, panOffset]);
+
+  const handlePanPointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (!panDrag.current) return;
+    const dx = e.clientX - panDrag.current.startX;
+    const dy = e.clientY - panDrag.current.startY;
+    setPanOffset({ x: panDrag.current.originX + dx, y: panDrag.current.originY + dy });
+  }, []);
+
+  const handlePanPointerUp = useCallback(() => {
+    panDrag.current = null;
   }, []);
 
   useEffect(() => {
@@ -506,18 +528,25 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPi
   }
 
   return (
-    <div className="puzzle-board-wrap" ref={wrapRef}>
+    <div
+      className={`puzzle-board-wrap${panMode ? ' puzzle-board-wrap--pan' : ''}`}
+      ref={wrapRef}
+      onPointerDown={handlePanPointerDown}
+      onPointerMove={handlePanPointerMove}
+      onPointerUp={handlePanPointerUp}
+      onPointerLeave={handlePanPointerUp}
+    >
       <div className="puzzle-board-inner">
-        <div className={`puzzle-single-stage${panMode ? ' puzzle-single-stage--pan' : ''}`}>
+        <div
+          ref={stageWrapRef}
+          className={`puzzle-single-stage${panMode ? ' puzzle-single-stage--pan' : ''}`}
+          style={{ transform: `translate(${panOffset.x}px, ${panOffset.y}px)` }}
+        >
           <Stage
             width={stageW}
             height={stageH}
             scaleX={safeScale}
             scaleY={safeScale}
-            draggable={panMode}
-            x={stagePos.x}
-            y={stagePos.y}
-            onDragEnd={(e) => setStagePos({ x: e.target.x(), y: e.target.y() })}
           >
           {/* Background — single uniform color, no borders */}
           <Layer listening={false}>

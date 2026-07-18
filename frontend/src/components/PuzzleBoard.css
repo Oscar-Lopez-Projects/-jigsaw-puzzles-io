@@ -16,6 +16,16 @@
   position: relative;
 }
 
+/* Pan mode: allow the stage to travel outside the box */
+.puzzle-board-wrap--pan {
+  overflow: visible;
+  cursor: grab;
+}
+
+.puzzle-board-wrap--pan:active {
+  cursor: grabbing;
+}
+
 /* ── Inner layout: stage + zoom controls side by side ────────── */
 .puzzle-board-inner {
   display: flex;
@@ -31,8 +41,14 @@
   min-width: 0;
   line-height: 0;
   border-radius: 12px;
-  overflow: auto;
+  overflow: hidden;
   cursor: default;
+  will-change: transform;
+}
+
+/* In pan mode, pointer events pass through to the wrap's pan handlers */
+.puzzle-single-stage--pan {
+  pointer-events: none;
 }
 
 /* ── Zoom controls (right side) ──────────────────────────────── */
@@ -96,15 +112,6 @@
   border-color: var(--accent, #7c3aed) !important;
   color: #fff !important;
   box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.3);
-}
-
-/* Pan cursor on the stage when pan mode is on */
-.puzzle-single-stage--pan {
-  cursor: grab !important;
-}
-
-.puzzle-single-stage--pan:active {
-  cursor: grabbing !important;
 }
 
 /* Divider between pan and zoom buttons */
