@@ -349,24 +349,21 @@ export default function App() {
     pauseTimer();
 
     try {
-      // If the image is a data URL, upload it first so the saved game stores a real URL
+      // If the image is a local data URL, upload to storage first.
+      // Use the dedicated save-image endpoint — does NOT create a community puzzle.
       let imageUrl = selectedImage;
       if (selectedImage.startsWith('data:')) {
         const blob = await fetch(selectedImage).then((r) => r.blob());
         const formData = new FormData();
         formData.append('image', blob, imageFileName || 'saved-game.jpg');
-        formData.append('title', imageFileName || 'Saved Game');
-        formData.append('piece_count', String(pieceCount));
-        formData.append('category', 'other');
-        const uploadRes = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/puzzles/upload`, {
+        const uploadRes = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/saved-games/upload-image`, {
           method: 'POST',
           headers: { Authorization: `Bearer ${session.access_token}` },
           body: formData,
         });
         const uploadData = await uploadRes.json();
-        if (uploadRes.ok && uploadData.image_url) {
-          imageUrl = uploadData.image_url;
-        }
+        if (!uploadRes.ok) throw new Error(uploadData.error || 'Image upload failed');
+        imageUrl = uploadData.image_url;
       }
 
       await apiFetch('/api/saved-games', {
@@ -384,14 +381,13 @@ export default function App() {
         },
       });
 
-      // Stop timer and navigate to dashboard
+      // Success — stop timer and navigate to dashboard
       stopTimer();
       handleBackToSetup();
       setView('dashboard');
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to save game';
       setSaveError(msg);
-      // Resume timer if save failed
       resumeTimer();
     } finally {
       setIsSaving(false);
@@ -700,7 +696,7 @@ export default function App() {
                     )}
                   </button>
                 )}
-                {saveError && <span className="toolbar-save-error" title={saveError}>⚠</span>}
+                {saveError && <span className="toolbar-save-error" title={saveError} aria-label={saveError}>⚠ {saveError}</span>}
 
                 {/* Fullscreen toggle */}
                 <button

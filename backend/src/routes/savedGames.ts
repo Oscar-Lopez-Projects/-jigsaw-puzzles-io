@@ -1,10 +1,32 @@
 import { Router } from 'express';
+import multer from 'multer';
 import { supabase } from '../supabaseClient.js';
 import { requireAuth, AuthRequest } from '../middleware/auth.js';
 
 const router = Router();
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
 
 const MAX_SAVES = 2;
+
+// ── POST /api/saved-games/upload-image ───────────────────────
+// Upload a solo-play image to storage only (no puzzles table entry).
+// Returns { image_url } — a stable public URL safe to store in saved_games.
+router.post('/upload-image', requireAuth, upload.single('image'), async (req: AuthRequest, res) => {
+  const file = req.file;
+  if (!file) return res.status(400).json({ error: 'image file is required' });
+
+  const ext = file.originalname.split('.').pop() || 'jpg';
+  const fileName = `saves/${req.userId}/${Date.now()}.${ext}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from('puzzle-images')
+    .upload(fileName, file.buffer, { contentType: file.mimetype, upsert: true });
+
+  if (uploadError) return res.status(500).json({ error: uploadError.message });
+
+  const { data: urlData } = supabase.storage.from('puzzle-images').getPublicUrl(fileName);
+  res.json({ image_url: urlData.publicUrl });
+});
 
 // ── GET /api/saved-games ─────────────────────────────────────
 // Returns all saved games for the authenticated user (max 2).

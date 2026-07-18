@@ -385,10 +385,14 @@
 
 /* Inline save error icon */
 .toolbar-save-error {
-  font-size: 14px;
+  font-size: 11px;
   color: #f87171;
   cursor: help;
   flex-shrink: 0;
+  max-width: 180px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Layout toggle button */
