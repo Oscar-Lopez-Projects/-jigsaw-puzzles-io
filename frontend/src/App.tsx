@@ -354,7 +354,6 @@ export default function App() {
         const res = await fetch(url, options);
         const contentType = res.headers.get('content-type') || '';
         if (contentType.includes('application/json')) return res;
-        // Got HTML (cold-start 503/502) — wait and retry
         if (attempt < maxAttempts) {
           await new Promise((r) => setTimeout(r, 3000));
         } else {
@@ -379,6 +378,10 @@ export default function App() {
         imageUrl = uploadData.image_url;
       }
 
+      // Strip imageUrl (base64) from each piece before saving — can be regenerated on resume.
+      // This reduces payload from ~15MB to ~50KB for a 150-piece game.
+      const slimPieces = pieces.map(({ imageUrl: _img, ...rest }) => rest);
+
       await apiFetch('/api/saved-games', {
         method: 'POST',
         token: session.access_token,
@@ -389,7 +392,7 @@ export default function App() {
           grid_cols: gridCols,
           grid_rows: gridRows,
           elapsed_sec: elapsedRef.current,
-          pieces_state: pieces,
+          pieces_state: slimPieces,
           puzzle_id: activePuzzleId || null,
         },
       });
@@ -535,23 +538,40 @@ export default function App() {
               .catch((err) => { setGenerateError(`Failed: ${err instanceof Error ? err.message : 'Unknown'}`); setPhase('setup'); });
           }}
           onResumeSave={(save) => {
-            // Restore full puzzle state from the saved game
+            // Regenerate piece images from the saved image URL, then restore positions/state.
+            // We stored slim pieces (no imageUrl) so we need to re-slice the image first.
             setSelectedImage(save.image_url);
             setImageFileName(save.image_filename);
             setPieceCount(save.piece_count as PieceCount);
             setActivePuzzleId(save.puzzle_id);
             setActiveChallengeId(null);
             setChallengeOpponent(null);
-            setGridCols(save.grid_cols);
-            setGridRows(save.grid_rows);
-            setPieces(save.pieces_state as import('./types/puzzle').PuzzlePiece[]);
             setIsWon(false);
             setView('game');
-            setPhase('puzzle');
-            // Restore elapsed time and restart timer from where they left off
-            elapsedRef.current = save.elapsed_sec;
-            setElapsedSec(save.elapsed_sec);
-            startTimer();
+            setPhase('generating');
+
+            const slimPieces = save.pieces_state as Array<Omit<import('./types/puzzle').PuzzlePiece, 'imageUrl'>>;
+
+            generatePieces(save.image_url, save.grid_cols, save.grid_rows)
+              .then((freshPieces) => {
+                // Merge fresh imageUrls back into the saved position/state data
+                const slimMap = new Map(slimPieces.map((p) => [p.id, p]));
+                const restored = freshPieces.map((fp) => {
+                  const saved = slimMap.get(fp.id);
+                  return saved ? { ...fp, ...saved, imageUrl: fp.imageUrl } : fp;
+                });
+                setGridCols(save.grid_cols);
+                setGridRows(save.grid_rows);
+                setPieces(restored);
+                setPhase('puzzle');
+                elapsedRef.current = save.elapsed_sec;
+                setElapsedSec(save.elapsed_sec);
+                startTimer();
+              })
+              .catch(() => {
+                setGenerateError('Failed to restore saved game.');
+                setPhase('setup');
+              });
           }}
         />
       ) : view === 'leaderboard' ? (
