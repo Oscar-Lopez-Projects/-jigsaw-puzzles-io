@@ -473,7 +473,7 @@ export default function App() {
     if (hintTimer.current) clearTimeout(hintTimer.current);
     const pick = pool[Math.floor(Math.random() * pool.length)];
     setHintPieceId(pick.id);
-    hintTimer.current = setTimeout(() => setHintPieceId(null), 2500);
+    hintTimer.current = setTimeout(() => setHintPieceId(null), 5000);
   }, [pieces]);
 
   // ── Fullscreen toggle ─────────────────────────────────────────
