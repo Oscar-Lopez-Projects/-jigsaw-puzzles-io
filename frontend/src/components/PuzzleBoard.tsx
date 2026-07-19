@@ -392,10 +392,18 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
   const targetOX = marginX;
   const targetOY = marginY;
 
-  // Scale: fit within container (both width and height), never overflow
+  // Scale: for portrait images, height is the dominant axis — fill the container height
+  // and let the wider world extend horizontally (more scatter space on sides).
+  // For landscape, width is dominant.
+  // At expandLevel > 0 the world grows along the non-dominant axis, so we must
+  // clamp to whichever axis would overflow first.
   const scaleByW = ready ? containerW / worldW : 1;
   const scaleByH = ready && containerH > 0 ? containerH / worldH : scaleByW;
-  const baseScale = Math.min(scaleByW, scaleByH);
+  // For portrait: prefer scaleByH (fill height), but cap at scaleByW so we never clip horizontally
+  // For landscape: prefer scaleByW (fill width), but cap at scaleByH
+  const baseScale = isPortrait
+    ? Math.min(scaleByH, scaleByW)   // height-dominant: fills screen height, clips sides only if needed
+    : Math.min(scaleByW, scaleByH);  // width-dominant (same as before)
   const safeScale = baseScale * zoomLevel;
   const stageW = worldW * safeScale;
   const stageH = worldH * safeScale;
@@ -403,25 +411,30 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
   // Keep cropRef in sync so captureSnapshot always reads the latest values
   cropRef.current = { targetOX, targetOY, targetW, targetH, scale: safeScale };
 
-  // Scatter pieces around the border ring first, then overflow into the middle.
-  // Re-runs whenever every piece is back at the origin (e.g. after a Reset).
+  // Scatter pieces into the border zones.
+  // Fires on initial load (allAtOrigin) AND when expandLevel changes mid-game
+  // so pieces redistribute into the newly available space.
+  const prevExpandLevel = useRef(expandLevel);
   useEffect(() => {
     if (!ready) return;
+
     const allAtOrigin = pieces.every((p) => p.currentX === 0 && p.currentY === 0 && !p.snapped);
-    if (!allAtOrigin) return;
+    const expandChanged = expandLevel !== prevExpandLevel.current;
+    prevExpandLevel.current = expandLevel;
+
+    // Only scatter on initial load or when expand level changes
+    if (!allAtOrigin && !expandChanged) return;
 
     const gap = 6;
     const cellW = pw + gap;
     const cellH = ph + gap;
 
-    // Target rectangle bounds (where the finished puzzle goes)
-    const targetLeft = targetOX;
-    const targetRight = targetOX + targetW;
-    const targetTop = targetOY;
+    const targetLeft   = targetOX;
+    const targetRight  = targetOX + targetW;
+    const targetTop    = targetOY;
     const targetBottom = targetOY + targetH;
 
-    // Generate every non-overlapping grid slot across the whole world,
-    // classifying each as "border" (outside the target rect) or "interior".
+    // All slots across the world
     const border: { x: number; y: number }[] = [];
     const interior: { x: number; y: number }[] = [];
 
@@ -436,17 +449,35 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
       }
     }
 
-    // Fill the border ring first (shuffled for a natural look), then interior.
     const shuffle = <T,>(arr: T[]) => [...arr].sort(() => Math.random() - 0.5);
     const ordered = [...shuffle(border), ...shuffle(interior)];
 
-    const scattered = pieces.map((p, i) => {
-      const pos = ordered[i % ordered.length];
-      return { ...p, currentX: pos?.x ?? 0, currentY: pos?.y ?? 0, zone: 'free' as const };
-    });
+    if (allAtOrigin) {
+      // Initial scatter — all pieces
+      const scattered = pieces.map((p, i) => {
+        const pos = ordered[i % ordered.length];
+        return { ...p, currentX: pos?.x ?? 0, currentY: pos?.y ?? 0, zone: 'free' as const };
+      });
+      onPiecesChange(scattered);
+    } else {
+      // Expand changed mid-game — only redistribute unsnapped, non-grouped pieces
+      // into border slots so they're symmetrically spread in the new wider area.
+      // Keep snapped and grouped pieces exactly where they are.
+      const freePieceIds = pieces
+        .filter((p) => !p.snapped && p.groupId == null)
+        .map((p) => p.id);
 
-    onPiecesChange(scattered);
-  }, [ready, pieces, worldW, worldH, pw, ph, targetOX, targetOY, targetW, targetH, onPiecesChange]);
+      let slotIdx = 0;
+      const updated = pieces.map((p) => {
+        if (!freePieceIds.includes(p.id)) return p; // snapped or grouped — don't move
+        // Only place in border slots (leave interior empty for building area)
+        const pos = border[slotIdx % border.length];
+        slotIdx++;
+        return { ...p, currentX: pos?.x ?? p.currentX, currentY: pos?.y ?? p.currentY, zone: 'free' as const };
+      });
+      onPiecesChange(updated);
+    }
+  }, [ready, expandLevel, worldW, worldH, pw, ph, targetOX, targetOY, targetW, targetH]); // eslint-disable-line
 
   // Locked pieces (placed correctly on the board) — immovable, green outline
   const lockedPieces = pieces.filter((p) => p.snapped);
