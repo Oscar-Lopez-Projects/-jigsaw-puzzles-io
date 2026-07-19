@@ -114,6 +114,8 @@ export default function App() {
   const puzzleBoardRef  = useRef<PuzzleBoardHandle>(null);
   const snapshotRef     = useRef<string | null>(null);        // PNG data URL captured at win
   const snapshotPromise = useRef<Promise<string | null> | null>(null); // in-flight capture
+  // Maps record ID → snapshot data URL so the completion page can retrieve it later in the session
+  const snapshotMap     = useRef<Map<string, string>>(new Map());
   const hintTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── Uploaded image tracking ───────────────────────────────────
@@ -219,20 +221,10 @@ export default function App() {
       stopTimer();
       setFinalTime(elapsedRef.current);
 
-      // ── DEBUG: show what we have at win time ──────────────────
-      const refExists = !!puzzleBoardRef.current;
-      const hasCaptureMethod = typeof puzzleBoardRef.current?.captureSnapshot === 'function';
-      alert(`[WIN DEBUG]\npuzzleBoardRef exists: ${refExists}\ncaptureSnapshot method: ${hasCaptureMethod}`);
-      // ─────────────────────────────────────────────────────────
-
       // Start the screenshot capture and keep the Promise so win flow can await it
       const capture = puzzleBoardRef.current?.captureSnapshot() ?? Promise.resolve(null);
       snapshotPromise.current = capture;
-      capture.then((url) => {
-        alert(`[SNAPSHOT RESULT]\n${url ? `length=${url.length}\nprefix=${url.slice(0,80)}` : 'NULL — captureSnapshot returned null'}`);
-        console.log('[win] snapshot result:', url ? `data URL length=${url.length}, prefix=${url.slice(0,60)}` : 'NULL');
-        snapshotRef.current = url;
-      });
+      capture.then((url) => { snapshotRef.current = url; });
       setIsWon(true);
       playWinSound();
     }
@@ -295,6 +287,11 @@ export default function App() {
             // Attach snapshot for the completion detail view (in-session only, not stored in DB)
             if (res && snapshot) {
               (res as Record<string, unknown>)._snapshot = snapshot;
+            }
+            // Also store in the session map so the completion page can find it by record ID
+            const savedRecord = res as { id?: string };
+            if (savedRecord?.id && snapshot) {
+              snapshotMap.current.set(savedRecord.id, snapshot);
             }
             console.log('[Record]', msg, res);
             setDebugMsg((prev) => prev + ' | RECORD SAVED');
@@ -615,7 +612,13 @@ export default function App() {
           onBack={() => setView('game')}
           onStartPuzzle={() => setShowGlobalStartModal(true)}
           onViewChallenge={(id) => { setChallengeDetailsId(id); setPreviousView('dashboard'); setView('challenge-details'); }}
-          onViewRecord={(rec) => { setCompletionRecord(rec); setPreviousView('dashboard'); setView('puzzle-completion'); }}
+          onViewRecord={(rec) => {
+            // Attach the in-session snapshot if we have one for this record
+            const snap = snapshotMap.current.get(rec.id) ?? null;
+            setCompletionRecord({ ...rec, _snapshot: snap });
+            setPreviousView('dashboard');
+            setView('puzzle-completion');
+          }}
           onViewProfile={(id) => navigate('profile', { profileId: id, prev: 'dashboard' })}
           onAcceptChallenge={(challenge) => {
             setActiveChallengeId(challenge.id);

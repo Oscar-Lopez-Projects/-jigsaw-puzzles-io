@@ -37,11 +37,6 @@ export default function PuzzleCompletionDetail({ record, onBack }: PuzzleComplet
   const [displayUrl, setDisplayUrl] = useState<string | null>(
     record._snapshot || record.image_url || null
   );
-
-  // Debug log
-  console.log('[PuzzleCompletionDetail] record._snapshot length:', record._snapshot?.length ?? 'null');
-  console.log('[PuzzleCompletionDetail] record.image_url:', record.image_url?.slice(0, 60) ?? 'null');
-  console.log('[PuzzleCompletionDetail] using displayUrl prefix:', displayUrl?.slice(0, 60) ?? 'null');
   const [puzzleTitle, setPuzzleTitle] = useState<string>(record.image_reference || 'Puzzle');
   const [loading, setLoading]         = useState(!displayUrl && !!record.puzzle_id);
   const [downloading, setDownloading] = useState(false);
