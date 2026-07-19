@@ -372,6 +372,8 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
   const targetW = cols * gridCellW;
   const targetH = rows * gridCellH;
 
+  const ready = pieces.length > 0 && containerW > 0 && pw > 0 && ph > 0;
+
   // Portrait detection: by actual image dimensions, not grid shape.
   // An iPhone photo can be a 15×10 grid but still taller than wide.
   const isPortrait = ready ? targetH > targetW : rows > cols;
@@ -389,8 +391,6 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
   const worldH = targetH + marginY * 2;
   const targetOX = marginX;
   const targetOY = marginY;
-
-  const ready = pieces.length > 0 && containerW > 0 && pw > 0 && ph > 0;
 
   // Scale: fit within container (both width and height), never overflow
   const scaleByW = ready ? containerW / worldW : 1;
