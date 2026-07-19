@@ -4,6 +4,9 @@
  * Reusable across solo play, saved games, multiplayer, and gallery.
  * Compresses images to max 1800px on the long side at 82% JPEG quality
  * before uploading, keeping storage and bandwidth minimal.
+ *
+ * Race-condition safe: callers share a single Promise for a given upload
+ * session. See UploadTask below.
  */
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
@@ -11,6 +14,75 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 export interface UploadResult {
   upload_id: string | null;
   image_url: string;
+}
+
+/**
+ * UploadTask wraps a single in-flight upload Promise.
+ *
+ * Start an upload once with startUpload(). Then:
+ *  - Call resolve() from the win/save handler to get the result (awaits if
+ *    still in flight — guaranteed no second upload).
+ *  - Call abandon() to wait for completion and delete the upload.
+ *  - Call cancel() immediately (e.g. on unmount) to mark it abandoned so
+ *    that the in-flight Promise's .then() disposes the result instead of
+ *    writing it to refs.
+ *
+ * All methods are safe to call in any order and multiple times.
+ */
+export class UploadTask {
+  private promise: Promise<UploadResult | null>;
+  private _abandoned = false;
+  private _token: string;
+
+  constructor(promise: Promise<UploadResult | null>, token: string) {
+    this.promise = promise;
+    this._token = token;
+  }
+
+  /** True once abandon() or cancel() has been called. */
+  get abandoned() { return this._abandoned; }
+
+  /**
+   * Await the upload result.
+   * Returns null if the upload failed or the task was abandoned.
+   * Safe to call multiple times — always returns the same Promise.
+   */
+  async resolve(): Promise<UploadResult | null> {
+    if (this._abandoned) return null;
+    return this.promise;
+  }
+
+  /**
+   * Wait for the upload to finish, then delete it from storage.
+   * Call this when the user abandons the puzzle.
+   * Non-throwing.
+   */
+  async abandon(): Promise<void> {
+    this._abandoned = true;
+    try {
+      const result = await this.promise;
+      if (result?.upload_id) {
+        await abandonUpload(result.upload_id, this._token);
+      }
+    } catch {
+      // Non-fatal — the pending_uploads cleanup job will catch orphans
+    }
+  }
+
+  /**
+   * Synchronously mark as abandoned without waiting.
+   * Use on component unmount where you can't await.
+   * The in-flight .then() will check _abandoned and delete if needed.
+   */
+  cancel(): void {
+    this._abandoned = true;
+    // Wire up a detached cleanup — don't await, fire-and-forget
+    this.promise.then((result) => {
+      if (result?.upload_id) {
+        abandonUpload(result.upload_id, this._token).catch(() => {});
+      }
+    }).catch(() => {});
+  }
 }
 
 /**
@@ -52,45 +124,51 @@ export async function compressImage(
 }
 
 /**
- * Upload an image (data URL or Blob) to /api/images.
+ * Start an image upload and return an UploadTask.
  *
- * - If `src` is already an https:// URL, returns it unchanged (no upload needed).
+ * - If `src` is already an https:// URL, resolves immediately with no upload.
  * - Compresses before uploading if `src` is a data URL.
- * - Never throws — on failure returns null so callers can fall back gracefully.
+ * - The returned UploadTask is the single shared handle for this upload session.
+ *   Pass it to resolveUpload() and abandonUpload() — never start a second one.
  */
-export async function uploadImage(
+export function startUpload(
   src: string,
   token: string,
   context: 'solo' | 'save' | 'multiplayer' | 'gallery' | 'profile' = 'solo',
   fileName = 'image.jpg',
-): Promise<UploadResult | null> {
-  // Already a remote URL — nothing to do
+): UploadTask {
+  // Already a remote URL — nothing to upload
   if (src.startsWith('https://') || src.startsWith('http://')) {
-    return { upload_id: null, image_url: src };
+    const noop = Promise.resolve<UploadResult>({ upload_id: null, image_url: src });
+    return new UploadTask(noop, token);
   }
 
-  try {
-    const blob = await compressImage(src);
-    const formData = new FormData();
-    formData.append('image', blob, fileName);
+  const promise = (async (): Promise<UploadResult | null> => {
+    try {
+      const blob = await compressImage(src);
+      const formData = new FormData();
+      formData.append('image', blob, fileName);
 
-    const res = await fetch(`${API_URL}/api/images?context=${context}`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
-      body: formData,
-    });
+      const res = await fetch(`${API_URL}/api/images?context=${context}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
 
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      console.warn('[imageUpload] Upload failed:', err.error || res.status);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        console.warn('[imageUpload] Upload failed:', err.error || res.status);
+        return null;
+      }
+
+      return (await res.json()) as UploadResult;
+    } catch (err) {
+      console.warn('[imageUpload] Upload error (non-fatal):', err);
       return null;
     }
+  })();
 
-    return (await res.json()) as UploadResult;
-  } catch (err) {
-    console.warn('[imageUpload] Upload error (non-fatal):', err);
-    return null;
-  }
+  return new UploadTask(promise, token);
 }
 
 /**
@@ -109,7 +187,7 @@ export async function claimUpload(uploadId: string, token: string): Promise<void
 }
 
 /**
- * Abandon an upload — call when user navigates away before completing.
+ * Abandon (delete) an upload by ID.
  * Non-throwing: best-effort cleanup.
  */
 export async function abandonUpload(uploadId: string, token: string): Promise<void> {

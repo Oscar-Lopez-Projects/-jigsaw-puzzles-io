@@ -20,7 +20,7 @@ import FriendsPage from './components/FriendsPage';
 import { getGrid, generatePieces, reshufflePieces } from './utils/puzzleUtils';
 import { useAuth } from './context/AuthContext';
 import { apiFetch } from './lib/api';
-import { uploadImage, claimUpload, abandonUpload } from './lib/imageUpload';
+import { startUpload, claimUpload, type UploadTask } from './lib/imageUpload';
 import { playWinSound, playClickSound } from './lib/sounds';
 import type { PuzzlePiece } from './types/puzzle';
 import './App.css';
@@ -114,11 +114,15 @@ export default function App() {
   const hintTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── Uploaded image tracking ───────────────────────────────────
-  // Stores the result of uploading a solo image at puzzle-start.
-  // uploadedImageUrl: the stable public URL to store in records/saves.
-  // pendingUploadId:  the pending_uploads row ID, used to claim or abandon.
-  const uploadedImageUrl = useRef<string | null>(null);
-  const pendingUploadId  = useRef<string | null>(null);
+  // Single shared UploadTask for the current puzzle session.
+  // All consumers (win handler, Save, Back) await the SAME Promise —
+  // this prevents duplicate uploads and orphaned files.
+  const uploadTask = useRef<UploadTask | null>(null);
+
+  // Cancel any in-flight upload on unmount (e.g. hard navigation)
+  useEffect(() => {
+    return () => { uploadTask.current?.cancel(); };
+  }, []);
 
   // ── Timer ─────────────────────────────────────────────────────
   const [elapsedSec, setElapsedSec] = useState(0);
@@ -219,6 +223,26 @@ export default function App() {
   // Save record after win — runs as effect so it always has fresh state
   const hasWonRef = useRef(false);
   const [debugMsg, setDebugMsg] = useState('');
+
+  /**
+   * Shared helper: resolve the in-flight upload and return the stable image URL.
+   * Used by both the win handler and handleSaveGame so behaviour is identical.
+   * - Awaits the existing UploadTask (never starts a second upload).
+   * - If already resolved, returns immediately.
+   * - Falls back to the community puzzle URL or null for data URLs.
+   */
+  const resolveImageUrl = useCallback(async (): Promise<{ imageUrl: string | null; uploadId: string | null }> => {
+    // Community puzzle — already a remote URL, nothing to upload
+    if (selectedImage && !selectedImage.startsWith('data:')) {
+      return { imageUrl: selectedImage, uploadId: null };
+    }
+    if (!uploadTask.current) return { imageUrl: null, uploadId: null };
+    const result = await uploadTask.current.resolve();
+    return {
+      imageUrl:  result?.image_url  ?? null,
+      uploadId:  result?.upload_id  ?? null,
+    };
+  }, [selectedImage]);
   useEffect(() => {
     if (isWon && !hasWonRef.current) {
       hasWonRef.current = true;
@@ -230,6 +254,10 @@ export default function App() {
 
         (async () => {
           try {
+            // Await the in-flight upload before creating the record.
+            // resolveImageUrl() always returns the same Promise — never a second upload.
+            const { imageUrl: resolvedUrl, uploadId } = await resolveImageUrl();
+
             // Save puzzle record
             const res = await apiFetch('/api/records', {
               method: 'POST',
@@ -240,18 +268,17 @@ export default function App() {
                 difficulty: difficultyMap[pieceCount] || 'easy',
                 image_reference: imageFileName || null,
                 puzzle_id: activePuzzleId || null,
-                // Use uploaded URL if available (solo plays), otherwise use existing URL (community)
-                image_url: uploadedImageUrl.current ||
-                  (selectedImage && !selectedImage.startsWith('data:') ? selectedImage : null),
+                image_url: resolvedUrl,
               },
             });
             console.log('[Record]', msg, res);
             setDebugMsg((prev) => prev + ' | RECORD SAVED');
 
-            // Claim the upload now that the record is saved
-            if (pendingUploadId.current) {
-              claimUpload(pendingUploadId.current, session.access_token);
-              pendingUploadId.current = null;
+            // Claim the upload now that the record is saved.
+            // Only claim if record creation succeeded — if it failed we'd have thrown above.
+            if (uploadId) {
+              claimUpload(uploadId, session.access_token);
+              uploadTask.current = null; // no longer needed
             }
 
             // If playing a challenge (Player B), submit result
@@ -341,7 +368,7 @@ export default function App() {
       hasWonRef.current = false;
       setDebugMsg('');
     }
-  }, [isWon, session, pieceCount, imageFileName, activePuzzleId, activeChallengeId, challengeOpponent, selectedImage]);
+  }, [isWon, session, pieceCount, imageFileName, activePuzzleId, activeChallengeId, challengeOpponent, selectedImage, resolveImageUrl]);
 
   const handleReset = useCallback(() => {
     setPieces((prev) => reshufflePieces(prev));
@@ -359,12 +386,10 @@ export default function App() {
     if (hintTimer.current) clearTimeout(hintTimer.current);
     setHintPieceId(null);
     setActiveSaveId(null);
-    // Abandon any pending upload that was never claimed (user left before completing)
-    if (pendingUploadId.current && session?.access_token) {
-      abandonUpload(pendingUploadId.current, session.access_token);
-    }
-    uploadedImageUrl.current = null;
-    pendingUploadId.current = null;
+    // Abandon the upload: wait for it to finish then delete it.
+    // abandon() is safe to call even if the upload already resolved or failed.
+    uploadTask.current?.abandon();
+    uploadTask.current = null;
   };
 
   // ── Save Game (solo only) ─────────────────────────────────────
@@ -381,39 +406,17 @@ export default function App() {
     pauseTimer();
 
     try {
-      // Use the pre-uploaded URL if available (uploaded at puzzle start).
-      // If not yet uploaded (upload was still in flight), upload now.
-      // If the image is already a remote URL, use it directly.
-      let imageUrl = uploadedImageUrl.current || selectedImage;
+      // Await the in-flight upload using the same helper as the win flow.
+      // Guaranteed: resolves the existing Promise, never starts a second upload.
+      const { imageUrl: resolvedUrl, uploadId } = await resolveImageUrl();
 
-      if (imageUrl && imageUrl.startsWith('data:')) {
-        // Upload hasn't finished yet — do it now (blocking, since we need the URL)
-        const result = await uploadImage(imageUrl, session.access_token, 'save', imageFileName || 'saved-game.jpg');
-        if (result) {
-          imageUrl = result.image_url;
-          // Don't set pendingUploadId — we'll claim it right below
-          if (result.upload_id) {
-            claimUpload(result.upload_id, session.access_token);
-          }
-        }
-        // If upload failed, imageUrl stays as data: URL — will be blocked by backend
-        // so fall back to null to avoid sending 15MB of base64
-        if (imageUrl?.startsWith('data:')) imageUrl = null;
-      } else if (pendingUploadId.current) {
-        // Image was pre-uploaded — claim it now
-        claimUpload(pendingUploadId.current, session.access_token);
-        pendingUploadId.current = null;
-      }
+      // Fallback: if upload failed and we have no URL, use a sentinel so
+      // the backend still accepts the save (image display will show placeholder).
+      const finalImageUrl = resolvedUrl || 'about:blank';
 
-      // Strip imageUrl (base64) from each piece before saving — regenerated on resume.
+      // Strip imageUrl (base64) from each piece — regenerated on resume.
       // Reduces payload from ~15MB to ~50KB for a 150-piece game.
       const slimPieces = pieces.map(({ imageUrl: _img, ...rest }) => rest);
-
-      // If image upload failed, we still want to save the game.
-      // Use the selectedImage as a last resort only if it's a remote URL,
-      // otherwise use a sentinel so the backend knows there's no image.
-      const finalImageUrl = imageUrl ||
-        (selectedImage && !selectedImage.startsWith('data:') ? selectedImage : 'about:blank');
 
       const saveBody = {
         image_url: finalImageUrl,
@@ -431,14 +434,21 @@ export default function App() {
         await apiFetch(`/api/saved-games/${activeSaveId}`, {
           method: 'PUT',
           token: session.access_token,
-          body: { ...saveBody, image_url: finalImageUrl },
+          body: saveBody,
         });
       } else {
         await apiFetch('/api/saved-games', {
           method: 'POST',
           token: session.access_token,
-          body: { ...saveBody, image_url: finalImageUrl },
+          body: saveBody,
         });
+      }
+
+      // Save succeeded — claim the upload so cleanup won't delete it.
+      // If save had thrown above, we'd skip this and leave it pending (correct).
+      if (uploadId) {
+        claimUpload(uploadId, session.access_token);
+        uploadTask.current = null;
       }
 
       stopTimer();
@@ -451,7 +461,7 @@ export default function App() {
     } finally {
       setIsSaving(false);
     }
-  }, [session, selectedImage, imageFileName, pieceCount, gridCols, gridRows, pieces, activePuzzleId, activeSaveId]);
+  }, [session, selectedImage, imageFileName, pieceCount, gridCols, gridRows, pieces, activePuzzleId, activeSaveId, resolveImageUrl]);
 
   const handleHint = useCallback(() => {
     // Prefer loose (free, unconnected) pieces; fall back to any not-yet-placed piece.
@@ -522,20 +532,14 @@ export default function App() {
     setIsWon(false);
 
     // Reset any previous upload tracking
-    uploadedImageUrl.current = null;
-    pendingUploadId.current = null;
+    uploadTask.current?.abandon();
+    uploadTask.current = null;
 
-    // Fire-and-forget upload — runs in background while puzzle generates.
-    // Compresses to 1800px JPEG before uploading. Non-blocking: if it fails,
-    // gameplay continues and image_url will be null on the record.
+    // Start the upload immediately in the background while the puzzle generates.
+    // We store the UploadTask — all consumers (win, save, back) await the SAME
+    // Promise, so no second upload can ever start and no orphan can escape.
     if (session?.access_token) {
-      uploadImage(imageDataUrl, session.access_token, 'solo', fileName)
-        .then((result) => {
-          if (result) {
-            uploadedImageUrl.current = result.image_url;
-            pendingUploadId.current  = result.upload_id;
-          }
-        });
+      uploadTask.current = startUpload(imageDataUrl, session.access_token, 'solo', fileName);
     }
 
     const { cols, rows } = getGrid(count);
