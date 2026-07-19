@@ -321,11 +321,13 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
 
   // ── Expand board level ────────────────────────────────────────
   // 0 = default margins, 1 = expanded, 2 = max
-  // Portrait (rows > cols): expands marginX (pieces shift left/right)
-  // Landscape (cols > rows): expands marginY (pieces shift top/bottom)
+  // Portrait image (targetH > targetW): expands marginX (pieces shift left/right, image grows taller)
+  // Landscape image (targetW >= targetH): expands marginY (pieces shift top/bottom, image grows wider)
   const totalPieces = cols * rows;
   const canExpand = EXPAND_PIECE_COUNTS.has(totalPieces);
-  const isPortrait = rows > cols;
+  // Detect by actual image dimensions, NOT grid shape
+  // (An iPhone photo can be a 15×10 grid but still taller than wide)
+  const isPortrait = ready ? targetH > targetW : rows > cols;
   const [expandLevel, setExpandLevel] = useState(0);
   const cycleExpand = useCallback(() => {
     setExpandLevel((l) => (l + 1) % EXPAND_RATIOS.length);
@@ -691,79 +693,69 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
         </Stage>
         </div>
 
+        {/* Floating expand arrows on the edges of the board — portrait gets left/right, landscape gets top/bottom */}
+        {canExpand && isPortrait && (
+          <>
+            <button
+              type="button"
+              className={`puzzle-expand-arrow puzzle-expand-arrow--left${expandLevel > 0 ? ' puzzle-expand-arrow--active' : ''}`}
+              onClick={cycleExpand}
+              aria-label={expandLevel < 2 ? 'Expand board sideways' : 'Reset board width'}
+              title={expandLevel < 2 ? 'Expand board' : 'Reset to default'}
+            >
+              {expandLevel < 2
+                ? <svg viewBox="0 0 16 24" fill="none" aria-hidden="true"><path d="M10 4L4 12l6 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                : <svg viewBox="0 0 16 24" fill="none" aria-hidden="true"><path d="M6 4l6 8-6 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              }
+            </button>
+            <button
+              type="button"
+              className={`puzzle-expand-arrow puzzle-expand-arrow--right${expandLevel > 0 ? ' puzzle-expand-arrow--active' : ''}`}
+              onClick={cycleExpand}
+              aria-label={expandLevel < 2 ? 'Expand board sideways' : 'Reset board width'}
+              title={expandLevel < 2 ? 'Expand board' : 'Reset to default'}
+            >
+              {expandLevel < 2
+                ? <svg viewBox="0 0 16 24" fill="none" aria-hidden="true"><path d="M6 4l6 8-6 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                : <svg viewBox="0 0 16 24" fill="none" aria-hidden="true"><path d="M10 4L4 12l6 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              }
+            </button>
+          </>
+        )}
+        {canExpand && !isPortrait && (
+          <>
+            <button
+              type="button"
+              className={`puzzle-expand-arrow puzzle-expand-arrow--top${expandLevel > 0 ? ' puzzle-expand-arrow--active' : ''}`}
+              onClick={cycleExpand}
+              aria-label={expandLevel < 2 ? 'Expand board vertically' : 'Reset board height'}
+              title={expandLevel < 2 ? 'Expand board' : 'Reset to default'}
+            >
+              {expandLevel < 2
+                ? <svg viewBox="0 0 24 16" fill="none" aria-hidden="true"><path d="M4 10L12 4l8 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                : <svg viewBox="0 0 24 16" fill="none" aria-hidden="true"><path d="M4 6l8 6 8-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              }
+            </button>
+            <button
+              type="button"
+              className={`puzzle-expand-arrow puzzle-expand-arrow--bottom${expandLevel > 0 ? ' puzzle-expand-arrow--active' : ''}`}
+              onClick={cycleExpand}
+              aria-label={expandLevel < 2 ? 'Expand board vertically' : 'Reset board height'}
+              title={expandLevel < 2 ? 'Expand board' : 'Reset to default'}
+            >
+              {expandLevel < 2
+                ? <svg viewBox="0 0 24 16" fill="none" aria-hidden="true"><path d="M4 6l8 6 8-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                : <svg viewBox="0 0 24 16" fill="none" aria-hidden="true"><path d="M4 10L12 4l8 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              }
+            </button>
+          </>
+        )}
+
         {/* Zoom + pan controls — right side */}
         <div
           className="puzzle-zoom-controls"
           onPointerDown={(e) => e.stopPropagation()}
         >
-          {/* Expand board — portrait: widen sides; landscape: expand top/bottom */}
-          {canExpand && (
-            <button
-              type="button"
-              className={`puzzle-zoom-btn${expandLevel > 0 ? ' puzzle-zoom-btn--active' : ''}`}
-              onClick={cycleExpand}
-              aria-label={expandLevel === 0 ? 'Expand board' : expandLevel === 1 ? 'Expand more' : 'Reset board size'}
-              title={
-                expandLevel === 0
-                  ? `Expand board (${isPortrait ? 'widen sides for portrait' : 'expand top/bottom for landscape'})`
-                  : expandLevel === 1 ? 'Expand to max'
-                  : 'Reset to default size'
-              }
-            >
-              {expandLevel === 0 ? (
-                /* Expand icon — arrows pointing outward */
-                <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
-                  {isPortrait ? (
-                    /* horizontal expand (←→) for portrait */
-                    <>
-                      <path d="M2 10h4M14 10h4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
-                      <path d="M4 7l-3 3 3 3M16 7l3 3-3 3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-                    </>
-                  ) : (
-                    /* vertical expand (↑↓) for landscape */
-                    <>
-                      <path d="M10 2v4M10 14v4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
-                      <path d="M7 4l3-3 3 3M7 16l3 3 3-3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-                    </>
-                  )}
-                </svg>
-              ) : expandLevel === 1 ? (
-                /* Expand more icon */
-                <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
-                  {isPortrait ? (
-                    <>
-                      <path d="M1 10h5M14 10h5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
-                      <path d="M3 6l-3 4 3 4M17 6l3 4-3 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-                    </>
-                  ) : (
-                    <>
-                      <path d="M10 1v5M10 14v5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
-                      <path d="M6 3l4-3 4 3M6 17l4 3 4-3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-                    </>
-                  )}
-                </svg>
-              ) : (
-                /* Collapse icon — arrows pointing inward */
-                <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
-                  {isPortrait ? (
-                    <>
-                      <path d="M6 10h8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
-                      <path d="M9 7l-3 3 3 3M11 7l3 3-3 3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-                    </>
-                  ) : (
-                    <>
-                      <path d="M10 6v8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
-                      <path d="M7 9l3-3 3 3M7 11l3 3 3-3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-                    </>
-                  )}
-                </svg>
-              )}
-            </button>
-          )}
-
-          {/* Divider before pan/zoom if expand is shown */}
-          {canExpand && <div className="puzzle-zoom-divider" />}
-
           {/* Pan / hand toggle */}
           <button
             type="button"

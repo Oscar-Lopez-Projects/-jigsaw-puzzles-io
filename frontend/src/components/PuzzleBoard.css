@@ -128,3 +128,75 @@
   border-radius: 1px;
   margin: 2px 0;
 }
+
+/* ── Expand board edge arrows ────────────────────────────────── */
+.puzzle-expand-arrow {
+  position: absolute;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(30, 27, 50, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  color: #e0dfe8;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  transition: background 0.15s, border-color 0.15s, transform 0.1s;
+  pointer-events: auto;
+}
+
+.puzzle-expand-arrow:hover {
+  background: rgba(60, 55, 90, 0.95);
+  border-color: rgba(255, 255, 255, 0.35);
+  transform: scale(1.1);
+}
+
+.puzzle-expand-arrow--active {
+  background: var(--accent, #7c3aed);
+  border-color: var(--accent, #7c3aed);
+  color: #fff;
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.3);
+}
+
+/* Left / right arrows — vertically centered, on the edges */
+.puzzle-expand-arrow--left,
+.puzzle-expand-arrow--right {
+  top: 50%;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 56px;
+}
+
+.puzzle-expand-arrow--left  { left: 6px; }
+.puzzle-expand-arrow--right { right: 52px; } /* leave room for zoom controls */
+
+.puzzle-expand-arrow--left svg,
+.puzzle-expand-arrow--right svg {
+  width: 16px;
+  height: 24px;
+}
+
+/* Top / bottom arrows — horizontally centered */
+.puzzle-expand-arrow--top,
+.puzzle-expand-arrow--bottom {
+  left: 50%;
+  transform: translateX(-50%);
+  width: 56px;
+  height: 28px;
+}
+
+.puzzle-expand-arrow--top    { top: 6px; }
+.puzzle-expand-arrow--bottom { bottom: 6px; }
+
+.puzzle-expand-arrow--top svg,
+.puzzle-expand-arrow--bottom svg {
+  width: 24px;
+  height: 16px;
+}
+
+/* Hover override for transform (don't lose position) */
+.puzzle-expand-arrow--left:hover  { transform: translateY(-50%) scale(1.1); }
+.puzzle-expand-arrow--right:hover { transform: translateY(-50%) scale(1.1); }
+.puzzle-expand-arrow--top:hover   { transform: translateX(-50%) scale(1.1); }
+.puzzle-expand-arrow--bottom:hover { transform: translateX(-50%) scale(1.1); }
