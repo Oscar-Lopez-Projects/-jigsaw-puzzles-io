@@ -319,15 +319,9 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
     setPanOffset({ x: 0, y: 0 });
   }, []);
 
-  // ── Expand board level ────────────────────────────────────────
-  // 0 = default margins, 1 = expanded, 2 = max
-  // Portrait image (targetH > targetW): expands marginX (pieces shift left/right, image grows taller)
-  // Landscape image (targetW >= targetH): expands marginY (pieces shift top/bottom, image grows wider)
+  // ── Expand board level (state only — logic computed after targetW/H below) ─
   const totalPieces = cols * rows;
   const canExpand = EXPAND_PIECE_COUNTS.has(totalPieces);
-  // Detect by actual image dimensions, NOT grid shape
-  // (An iPhone photo can be a 15×10 grid but still taller than wide)
-  const isPortrait = ready ? targetH > targetW : rows > cols;
   const [expandLevel, setExpandLevel] = useState(0);
   const cycleExpand = useCallback(() => {
     setExpandLevel((l) => (l + 1) % EXPAND_RATIOS.length);
@@ -377,6 +371,10 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
   // Target area dimensions
   const targetW = cols * gridCellW;
   const targetH = rows * gridCellH;
+
+  // Portrait detection: by actual image dimensions, not grid shape.
+  // An iPhone photo can be a 15×10 grid but still taller than wide.
+  const isPortrait = ready ? targetH > targetW : rows > cols;
 
   // World: target + margins.
   // Expand level grows the relevant margin axis:
