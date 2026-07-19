@@ -1,0 +1,154 @@
+/* ── Puzzle Completion Detail Page ───────────────────────────── */
+.pcd-page {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 24px 24px 80px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* ── Header ──────────────────────────────────────────────────── */
+.pcd-header {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pcd-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-body);
+  background: var(--surface-subtle);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  width: fit-content;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.pcd-back-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.pcd-back-btn:hover {
+  background: var(--surface);
+  border-color: var(--border-strong);
+}
+
+.pcd-title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.pcd-title {
+  font-size: 26px;
+  font-weight: 900;
+  color: var(--text-heading);
+  margin: 0;
+}
+
+.pcd-completed-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #22c55e;
+  background: rgba(34, 197, 94, 0.12);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  border-radius: 99px;
+}
+
+.pcd-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pcd-meta-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 99px;
+}
+
+.pcd-stars {
+  color: #f59e0b;
+  letter-spacing: 1px;
+}
+
+.pcd-date {
+  color: var(--text-faint);
+}
+
+/* ── Canvas area ─────────────────────────────────────────────── */
+.pcd-canvas-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #1e1b32;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  min-height: 300px;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.pcd-canvas {
+  display: block;
+  border-radius: 12px;
+}
+
+.pcd-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 60px;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.pcd-error {
+  padding: 32px;
+  color: var(--error-text);
+  font-size: 14px;
+  text-align: center;
+}
+
+.pcd-no-image {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 60px 40px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.pcd-no-image-icon {
+  font-size: 48px;
+  margin-bottom: 8px;
+}
+
+.pcd-no-image p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  max-width: 360px;
+}

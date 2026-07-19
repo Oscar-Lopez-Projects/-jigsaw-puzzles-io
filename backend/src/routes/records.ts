@@ -49,7 +49,7 @@ router.get('/user/:userId', async (req, res) => {
 // Create a new record (protected)
 // Stars are calculated server-side to prevent cheating.
 router.post('/', requireAuth, async (req: AuthRequest, res) => {
-  const { puzzle_id, piece_count, completion_time_sec, difficulty, image_reference } = req.body;
+  const { puzzle_id, piece_count, completion_time_sec, difficulty, image_reference, image_url } = req.body;
 
   if (!piece_count || !completion_time_sec || !difficulty) {
     return res.status(400).json({ error: 'piece_count, completion_time_sec, and difficulty are required' });
@@ -87,6 +87,7 @@ router.post('/', requireAuth, async (req: AuthRequest, res) => {
       difficulty,
       stars,
       image_reference: image_reference || null,
+      image_url: image_url || null,
     })
     .select()
     .single();

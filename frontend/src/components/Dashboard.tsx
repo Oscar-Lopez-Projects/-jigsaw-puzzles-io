@@ -13,6 +13,7 @@ interface PuzzleRecord {
   completion_time_sec: number;
   stars: number;
   image_reference: string | null;
+  image_url: string | null;
   completed_at: string;
 }
 
@@ -30,6 +31,7 @@ interface DashboardProps {
   onViewProfile: (userId: string) => void;
   onStartPuzzle?: () => void;
   onViewChallenge?: (challengeId: string) => void;
+  onViewRecord?: (record: PuzzleRecord) => void;
   onAcceptChallenge?: (challenge: { id: string; image_url: string; puzzle_title: string; piece_count: number; difficulty: string; challenger_time_sec: number; challenger_stars: number }) => void;
   onResumeSave?: (save: SavedGame) => void;
 }
@@ -84,7 +86,7 @@ function DateCell({ iso }: { iso: string }) {
   );
 }
 
-export default function Dashboard({ onBack, onViewProfile, onStartPuzzle, onViewChallenge, onAcceptChallenge, onResumeSave }: DashboardProps) {
+export default function Dashboard({ onBack, onViewProfile, onStartPuzzle, onViewChallenge, onViewRecord, onAcceptChallenge, onResumeSave }: DashboardProps) {
   const { user, session, logout, updateUser } = useAuth();
   const [records, setRecords] = useState<PuzzleRecord[]>([]);
   const [profile, setProfile] = useState<ProfileData | null>(null);
@@ -321,8 +323,17 @@ export default function Dashboard({ onBack, onViewProfile, onStartPuzzle, onView
               </tr></thead>
               <tbody>
                 {sortedRecords.length > 0 ? sortedRecords.map((r) => (
-                  <tr key={r.id}>
-                    <td className="dash-hist-name">{r.image_reference || 'Puzzle'}<br/><span className="dash-hist-by">{r.difficulty}</span></td>
+                  <tr
+                    key={r.id}
+                    className={!r.puzzle_id ? 'dash-hist-row--clickable' : ''}
+                    onClick={() => !r.puzzle_id && onViewRecord?.(r)}
+                    title={!r.puzzle_id ? 'View completed puzzle' : undefined}
+                  >
+                    <td className="dash-hist-name">
+                      {r.image_reference || 'Puzzle'}
+                      {!r.puzzle_id && <span className="dash-hist-view-hint">↗</span>}
+                      <br/><span className="dash-hist-by">{r.difficulty}</span>
+                    </td>
                     <td>{r.piece_count}</td>
                     <td className="dash-hist-stars">{'★'.repeat(r.stars)}{'☆'.repeat(3 - r.stars)}</td>
                     <td>{formatTime(r.completion_time_sec)}</td>

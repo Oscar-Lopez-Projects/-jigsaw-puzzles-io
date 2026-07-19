@@ -123,6 +123,18 @@ router.post('/upload', requireAuth, upload.single('image'), async (req: AuthRequ
   res.status(201).json(data);
 });
 
+// Get a single puzzle by ID (public)
+router.get('/:puzzleId', async (req, res) => {
+  const { puzzleId } = req.params;
+  const { data, error } = await supabase
+    .from('puzzles')
+    .select('id, title, image_url, piece_count, plays, category, created_at, user_id, users ( username )')
+    .eq('id', puzzleId)
+    .single();
+  if (error) return res.status(404).json({ error: 'Puzzle not found' });
+  res.json(data);
+});
+
 // Increment play count when someone starts a community puzzle
 router.post('/:puzzleId/play', async (req, res) => {
   const { puzzleId } = req.params;

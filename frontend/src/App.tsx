@@ -7,6 +7,7 @@ import PuzzleBoardErrorBoundary from './components/PuzzleBoardErrorBoundary';
 import WinOverlay from './components/WinOverlay';
 import ChallengeResult from './components/ChallengeResult';
 import ChallengeDetails from './components/ChallengeDetails';
+import PuzzleCompletionDetail from './components/PuzzleCompletionDetail';
 import ChallengePicker from './components/ChallengePicker';
 import StartPuzzleModal from './components/StartPuzzleModal';
 import SoloPlayModal from './components/SoloPlayModal';
@@ -24,7 +25,7 @@ import type { PuzzlePiece } from './types/puzzle';
 import './App.css';
 
 type Phase = 'setup' | 'generating' | 'puzzle';
-type View = 'game' | 'dashboard' | 'community' | 'leaderboard' | 'profile' | 'friends' | 'challenge-details';
+type View = 'game' | 'dashboard' | 'community' | 'leaderboard' | 'profile' | 'friends' | 'challenge-details' | 'puzzle-completion';
 
 export default function App() {
   // ── Auth ─────────────────────────────────────────────────────
@@ -50,6 +51,7 @@ export default function App() {
       friends: '#/friends',
       profile: opts?.profileId ? `#/profile/${opts.profileId}` : '#/profile',
       'challenge-details': `#/challenge/${challengeDetailsId || ''}`,
+      'puzzle-completion': `#/completion/${completionRecord?.id || ''}`,
     };
     window.history.replaceState(null, '', `${window.location.pathname}${hashMap[v]}`);
   }, []);
@@ -84,6 +86,11 @@ export default function App() {
   const [showGlobalSoloModal, setShowGlobalSoloModal] = useState(false);
   const [showGlobalUploadModal, setShowGlobalUploadModal] = useState(false);
   const [challengeDetailsId, setChallengeDetailsId] = useState<string | null>(null);
+  const [completionRecord, setCompletionRecord] = useState<{
+    id: string; puzzle_id: string | null; piece_count: number; difficulty: string;
+    completion_time_sec: number; stars: number; image_reference: string | null;
+    image_url: string | null; completed_at: string;
+  } | null>(null);
   const [challengeResult, setChallengeResult] = useState<{
     challengerName: string; opponentName: string;
     challengerTime: number; challengerStars: number;
@@ -225,6 +232,8 @@ export default function App() {
                 difficulty: difficultyMap[pieceCount] || 'easy',
                 image_reference: imageFileName || null,
                 puzzle_id: activePuzzleId || null,
+                // Store image URL (non-data URLs only) so the completion detail page can show the image
+                image_url: selectedImage && !selectedImage.startsWith('data:') ? selectedImage : null,
               },
             });
             console.log('[Record]', msg, res);
@@ -520,6 +529,7 @@ export default function App() {
           onBack={() => setView('game')}
           onStartPuzzle={() => setShowGlobalStartModal(true)}
           onViewChallenge={(id) => { setChallengeDetailsId(id); setPreviousView('dashboard'); setView('challenge-details'); }}
+          onViewRecord={(rec) => { setCompletionRecord(rec); setPreviousView('dashboard'); setView('puzzle-completion'); }}
           onViewProfile={(id) => navigate('profile', { profileId: id, prev: 'dashboard' })}
           onAcceptChallenge={(challenge) => {
             setActiveChallengeId(challenge.id);
@@ -601,6 +611,8 @@ export default function App() {
         />
       ) : view === 'challenge-details' && challengeDetailsId ? (
         <ChallengeDetails challengeId={challengeDetailsId} onBack={() => setView(previousView)} />
+      ) : view === 'puzzle-completion' && completionRecord ? (
+        <PuzzleCompletionDetail record={completionRecord} onBack={() => setView(previousView)} />
       ) : (
       <>
       <main className={`main-content${phase === 'puzzle' ? ' main-content--puzzle' : ''}`}>
