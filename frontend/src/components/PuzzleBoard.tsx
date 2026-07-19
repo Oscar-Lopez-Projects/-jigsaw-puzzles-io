@@ -237,7 +237,7 @@ interface PuzzleBoardProps {
 }
 
 export interface PuzzleBoardHandle {
-  /** Capture the current stage as a PNG data URL. Returns null if not ready. */
+  /** Capture the completed puzzle area as a PNG data URL. Returns null if not ready. */
   captureSnapshot: () => Promise<string | null>;
 }
 
@@ -246,24 +246,29 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const stageWrapRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage>(null);
+  // Keep current crop params in a ref so captureSnapshot always reads latest values
+  const cropRef = useRef({ targetOX: 0, targetOY: 0, targetW: 0, targetH: 0, scale: 1 });
 
   // Expose captureSnapshot to parent via ref
   useImperativeHandle(ref, () => ({
     captureSnapshot: async () => {
-      const el = stageWrapRef.current;
-      if (!el) return null;
+      const stage = stageRef.current;
+      if (!stage) return null;
       try {
-        const { default: html2canvas } = await import('html2canvas');
-        const canvas = await html2canvas(el, {
-          useCORS: true,
-          allowTaint: true,
-          backgroundColor: '#2f2d3e',
-          scale: 1,
-          logging: false,
+        const { targetOX, targetOY, targetW, targetH, scale } = cropRef.current;
+        // Use Konva's built-in toDataURL with pixel-based crop on the world coords.
+        // x/y/width/height are in world (unscaled) coordinates.
+        const dataUrl = stage.toDataURL({
+          x: targetOX,
+          y: targetOY,
+          width: targetW,
+          height: targetH,
+          pixelRatio: 1 / scale, // compensate for the CSS scale so output = natural image size
+          mimeType: 'image/png',
         });
-        return canvas.toDataURL('image/png');
+        return dataUrl || null;
       } catch (err) {
-        console.warn('[captureSnapshot] html2canvas failed:', err);
+        console.warn('[captureSnapshot] toDataURL failed:', err);
         return null;
       }
     },
@@ -351,6 +356,9 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
   const safeScale = baseScale * zoomLevel;
   const stageW = worldW * safeScale;
   const stageH = worldH * safeScale;
+
+  // Keep cropRef in sync so captureSnapshot always reads the latest values
+  cropRef.current = { targetOX, targetOY, targetW, targetH, scale: safeScale };
 
   // Scatter pieces around the border ring first, then overflow into the middle.
   // Re-runs whenever every piece is back at the origin (e.g. after a Reset).
