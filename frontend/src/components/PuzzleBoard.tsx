@@ -259,25 +259,34 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
       }
       try {
         const { targetOX, targetOY, targetW, targetH, scale } = cropRef.current;
-        console.log('[captureSnapshot] crop params:', { targetOX, targetOY, targetW, targetH, scale });
 
-        // First try: full stage no crop to verify it works at all
-        const fullUrl = stage.toDataURL({ pixelRatio: 1 });
-        console.log('[captureSnapshot] full stage URL length:', fullUrl?.length, 'prefix:', fullUrl?.slice(0, 60));
+        // Step 1: capture the full stage at screen scale (what's actually rendered)
+        const fullDataUrl = stage.toDataURL({ pixelRatio: 1 });
+        if (!fullDataUrl || fullDataUrl === 'data:,') return null;
 
-        // Cropped capture
-        const dataUrl = stage.toDataURL({
-          x: targetOX,
-          y: targetOY,
-          width: targetW,
-          height: targetH,
-          pixelRatio: 1 / scale,
-          mimeType: 'image/png',
+        // Step 2: crop to just the target area using a temporary canvas
+        // The stage is rendered at safeScale, so world coords → screen coords = * scale
+        const sx = Math.round(targetOX * scale);
+        const sy = Math.round(targetOY * scale);
+        const sw = Math.round(targetW  * scale);
+        const sh = Math.round(targetH  * scale);
+
+        return new Promise<string | null>((resolve) => {
+          const img = new Image();
+          img.onload = () => {
+            const out = document.createElement('canvas');
+            out.width  = sw;
+            out.height = sh;
+            const ctx = out.getContext('2d');
+            if (!ctx) { resolve(null); return; }
+            ctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+            resolve(out.toDataURL('image/png'));
+          };
+          img.onerror = () => resolve(null);
+          img.src = fullDataUrl;
         });
-        console.log('[captureSnapshot] cropped URL length:', dataUrl?.length, 'prefix:', dataUrl?.slice(0, 60));
-        return dataUrl || null;
       } catch (err) {
-        console.warn('[captureSnapshot] toDataURL failed:', err);
+        console.warn('[captureSnapshot] failed:', err);
         return null;
       }
     },

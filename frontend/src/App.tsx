@@ -222,8 +222,7 @@ export default function App() {
       // ── DEBUG: show what we have at win time ──────────────────
       const refExists = !!puzzleBoardRef.current;
       const hasCaptureMethod = typeof puzzleBoardRef.current?.captureSnapshot === 'function';
-      const crop = JSON.stringify({ /* filled by capture */ });
-      alert(`[WIN DEBUG]\npuzzleBoardRef exists: ${refExists}\ncaptureSnapshot method: ${hasCaptureMethod}\ncrop: ${crop}`);
+      alert(`[WIN DEBUG]\npuzzleBoardRef exists: ${refExists}\ncaptureSnapshot method: ${hasCaptureMethod}`);
       // ─────────────────────────────────────────────────────────
 
       // Start the screenshot capture and keep the Promise so win flow can await it
