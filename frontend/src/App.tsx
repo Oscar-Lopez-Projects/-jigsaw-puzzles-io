@@ -112,7 +112,8 @@ export default function App() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const puzzleScreenRef = useRef<HTMLDivElement>(null);
   const puzzleBoardRef  = useRef<PuzzleBoardHandle>(null);
-  const snapshotRef     = useRef<string | null>(null); // PNG data URL captured at win
+  const snapshotRef     = useRef<string | null>(null);        // PNG data URL captured at win
+  const snapshotPromise = useRef<Promise<string | null> | null>(null); // in-flight capture
   const hintTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── Uploaded image tracking ───────────────────────────────────
@@ -217,8 +218,10 @@ export default function App() {
     if (allSnapped) {
       stopTimer();
       setFinalTime(elapsedRef.current);
-      // Capture the Konva stage as a PNG — this is the exact image the user sees
-      snapshotRef.current = puzzleBoardRef.current?.captureSnapshot() ?? null;
+      // Start the screenshot capture and keep the Promise so win flow can await it
+      const capture = puzzleBoardRef.current?.captureSnapshot() ?? Promise.resolve(null);
+      snapshotPromise.current = capture;
+      capture.then((url) => { snapshotRef.current = url; });
       setIsWon(true);
       playWinSound();
     }
@@ -262,13 +265,8 @@ export default function App() {
             // resolveImageUrl() always returns the same Promise — never a second upload.
             const { imageUrl: resolvedUrl, uploadId } = await resolveImageUrl();
 
-            // Prefer the snapshot (exact canvas capture) over the uploaded URL.
-            // The snapshot is a data URL — too large to store in the DB directly,
-            // so we use it only for the completion detail page within this session.
-            // For the DB record we store the uploaded remote URL.
-            const dbImageUrl = resolvedUrl;
-            // Store snapshot in session for the completion detail view
-            const sessionSnapshot = snapshotRef.current;
+            // Also await the snapshot if still in progress
+            const snapshot = await (snapshotPromise.current ?? Promise.resolve(null));
 
             // Save puzzle record
             const res = await apiFetch('/api/records', {
@@ -280,12 +278,12 @@ export default function App() {
                 difficulty: difficultyMap[pieceCount] || 'easy',
                 image_reference: imageFileName || null,
                 puzzle_id: activePuzzleId || null,
-                image_url: dbImageUrl,
+                image_url: resolvedUrl,
               },
             });
-            // Attach the snapshot to the record for the completion detail page
-            if (res && sessionSnapshot) {
-              (res as Record<string, unknown>)._snapshot = sessionSnapshot;
+            // Attach snapshot for the completion detail view (in-session only, not stored in DB)
+            if (res && snapshot) {
+              (res as Record<string, unknown>)._snapshot = snapshot;
             }
             console.log('[Record]', msg, res);
             setDebugMsg((prev) => prev + ' | RECORD SAVED');
@@ -407,6 +405,7 @@ export default function App() {
     uploadTask.current?.abandon();
     uploadTask.current = null;
     snapshotRef.current = null;
+    snapshotPromise.current = null;
   };
 
   // ── Save Game (solo only) ─────────────────────────────────────

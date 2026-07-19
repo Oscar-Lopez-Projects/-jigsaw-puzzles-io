@@ -238,7 +238,7 @@ interface PuzzleBoardProps {
 
 export interface PuzzleBoardHandle {
   /** Capture the current stage as a PNG data URL. Returns null if not ready. */
-  captureSnapshot: () => string | null;
+  captureSnapshot: () => Promise<string | null>;
 }
 
 const PuzzleBoard = forwardRef<PuzzleBoardHandle, PuzzleBoardProps>(
@@ -249,7 +249,24 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
 
   // Expose captureSnapshot to parent via ref
   useImperativeHandle(ref, () => ({
-    captureSnapshot: () => stageRef.current?.toDataURL({ pixelRatio: 1 }) ?? null,
+    captureSnapshot: async () => {
+      const el = stageWrapRef.current;
+      if (!el) return null;
+      try {
+        const { default: html2canvas } = await import('html2canvas');
+        const canvas = await html2canvas(el, {
+          useCORS: true,
+          allowTaint: true,
+          backgroundColor: '#2f2d3e',
+          scale: 1,
+          logging: false,
+        });
+        return canvas.toDataURL('image/png');
+      } catch (err) {
+        console.warn('[captureSnapshot] html2canvas failed:', err);
+        return null;
+      }
+    },
   }));
   const [containerW, setContainerW] = useState(0);
   const [containerH, setContainerH] = useState(0);
