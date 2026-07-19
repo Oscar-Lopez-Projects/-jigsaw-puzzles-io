@@ -92,12 +92,12 @@ function drawCompletedPuzzle(
       drawPiecePath(ctx, x, y, cellW, cellH, tabSize, topDir as 0|1|-1, rightDir as 0|1|-1, bottomDir as 0|1|-1, leftDir as 0|1|-1);
 
       // Glow effect: thick semi-transparent outer stroke
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.18)';
+      ctx.strokeStyle = 'rgba(34, 197, 94, 0.25)';
       ctx.lineWidth = 3.5;
       ctx.stroke();
 
       // Sharp inner line
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
+      ctx.strokeStyle = 'rgba(34, 197, 94, 0.7)';
       ctx.lineWidth = 1.2;
       ctx.stroke();
 
