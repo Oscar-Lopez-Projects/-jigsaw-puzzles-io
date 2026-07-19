@@ -253,19 +253,28 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
   useImperativeHandle(ref, () => ({
     captureSnapshot: async () => {
       const stage = stageRef.current;
-      if (!stage) return null;
+      if (!stage) {
+        console.warn('[captureSnapshot] stageRef is null');
+        return null;
+      }
       try {
         const { targetOX, targetOY, targetW, targetH, scale } = cropRef.current;
-        // Use Konva's built-in toDataURL with pixel-based crop on the world coords.
-        // x/y/width/height are in world (unscaled) coordinates.
+        console.log('[captureSnapshot] crop params:', { targetOX, targetOY, targetW, targetH, scale });
+
+        // First try: full stage no crop to verify it works at all
+        const fullUrl = stage.toDataURL({ pixelRatio: 1 });
+        console.log('[captureSnapshot] full stage URL length:', fullUrl?.length, 'prefix:', fullUrl?.slice(0, 60));
+
+        // Cropped capture
         const dataUrl = stage.toDataURL({
           x: targetOX,
           y: targetOY,
           width: targetW,
           height: targetH,
-          pixelRatio: 1 / scale, // compensate for the CSS scale so output = natural image size
+          pixelRatio: 1 / scale,
           mimeType: 'image/png',
         });
+        console.log('[captureSnapshot] cropped URL length:', dataUrl?.length, 'prefix:', dataUrl?.slice(0, 60));
         return dataUrl || null;
       } catch (err) {
         console.warn('[captureSnapshot] toDataURL failed:', err);

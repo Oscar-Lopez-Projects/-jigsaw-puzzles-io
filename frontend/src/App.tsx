@@ -221,7 +221,10 @@ export default function App() {
       // Start the screenshot capture and keep the Promise so win flow can await it
       const capture = puzzleBoardRef.current?.captureSnapshot() ?? Promise.resolve(null);
       snapshotPromise.current = capture;
-      capture.then((url) => { snapshotRef.current = url; });
+      capture.then((url) => {
+        console.log('[win] snapshot result:', url ? `data URL length=${url.length}, prefix=${url.slice(0,60)}` : 'NULL');
+        snapshotRef.current = url;
+      });
       setIsWon(true);
       playWinSound();
     }
