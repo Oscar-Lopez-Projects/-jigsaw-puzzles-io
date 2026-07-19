@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useImperativeHandle, forwardRef } from 'react';
 import { Stage, Layer, Image as KonvaImage, Rect, Group } from 'react-konva';
 import type Konva from 'konva';
 import type { PuzzlePiece } from '../types/puzzle';
@@ -236,9 +236,21 @@ interface PuzzleBoardProps {
   hintPieceId?: string | null;
 }
 
-export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }: PuzzleBoardProps) {
+export interface PuzzleBoardHandle {
+  /** Capture the current stage as a PNG data URL. Returns null if not ready. */
+  captureSnapshot: () => string | null;
+}
+
+const PuzzleBoard = forwardRef<PuzzleBoardHandle, PuzzleBoardProps>(
+function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const stageWrapRef = useRef<HTMLDivElement>(null);
+  const stageRef = useRef<Konva.Stage>(null);
+
+  // Expose captureSnapshot to parent via ref
+  useImperativeHandle(ref, () => ({
+    captureSnapshot: () => stageRef.current?.toDataURL({ pixelRatio: 1 }) ?? null,
+  }));
   const [containerW, setContainerW] = useState(0);
   const [containerH, setContainerH] = useState(0);
   const [zoomLevel, setZoomLevel] = useState(1);
@@ -547,6 +559,7 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPi
           style={{ transform: `translate(${panOffset.x}px, ${panOffset.y}px)` }}
         >
           <Stage
+            ref={stageRef}
             width={stageW}
             height={stageH}
             scaleX={safeScale}
@@ -678,4 +691,6 @@ export default function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPi
       </div>
     </div>
   );
-}
+});
+
+export default PuzzleBoard;

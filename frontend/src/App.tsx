@@ -2,7 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import Header from './components/Header';
 import AuthModal from './components/AuthModal';
 import { type PieceCount } from './components/DifficultySelector';
-import PuzzleBoard from './components/PuzzleBoard';
+import PuzzleBoard, { type PuzzleBoardHandle } from './components/PuzzleBoard';
 import PuzzleBoardErrorBoundary from './components/PuzzleBoardErrorBoundary';
 import WinOverlay from './components/WinOverlay';
 import ChallengeResult from './components/ChallengeResult';
@@ -90,7 +90,7 @@ export default function App() {
   const [completionRecord, setCompletionRecord] = useState<{
     id: string; puzzle_id: string | null; piece_count: number; difficulty: string;
     completion_time_sec: number; stars: number; image_reference: string | null;
-    image_url: string | null; completed_at: string;
+    image_url: string | null; completed_at: string; _snapshot?: string | null;
   } | null>(null);
   const [challengeResult, setChallengeResult] = useState<{
     challengerName: string; opponentName: string;
@@ -111,6 +111,8 @@ export default function App() {
   const [hintPieceId, setHintPieceId] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const puzzleScreenRef = useRef<HTMLDivElement>(null);
+  const puzzleBoardRef  = useRef<PuzzleBoardHandle>(null);
+  const snapshotRef     = useRef<string | null>(null); // PNG data URL captured at win
   const hintTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── Uploaded image tracking ───────────────────────────────────
@@ -215,6 +217,8 @@ export default function App() {
     if (allSnapped) {
       stopTimer();
       setFinalTime(elapsedRef.current);
+      // Capture the Konva stage as a PNG — this is the exact image the user sees
+      snapshotRef.current = puzzleBoardRef.current?.captureSnapshot() ?? null;
       setIsWon(true);
       playWinSound();
     }
@@ -258,6 +262,14 @@ export default function App() {
             // resolveImageUrl() always returns the same Promise — never a second upload.
             const { imageUrl: resolvedUrl, uploadId } = await resolveImageUrl();
 
+            // Prefer the snapshot (exact canvas capture) over the uploaded URL.
+            // The snapshot is a data URL — too large to store in the DB directly,
+            // so we use it only for the completion detail page within this session.
+            // For the DB record we store the uploaded remote URL.
+            const dbImageUrl = resolvedUrl;
+            // Store snapshot in session for the completion detail view
+            const sessionSnapshot = snapshotRef.current;
+
             // Save puzzle record
             const res = await apiFetch('/api/records', {
               method: 'POST',
@@ -268,9 +280,13 @@ export default function App() {
                 difficulty: difficultyMap[pieceCount] || 'easy',
                 image_reference: imageFileName || null,
                 puzzle_id: activePuzzleId || null,
-                image_url: resolvedUrl,
+                image_url: dbImageUrl,
               },
             });
+            // Attach the snapshot to the record for the completion detail page
+            if (res && sessionSnapshot) {
+              (res as Record<string, unknown>)._snapshot = sessionSnapshot;
+            }
             console.log('[Record]', msg, res);
             setDebugMsg((prev) => prev + ' | RECORD SAVED');
 
@@ -390,6 +406,7 @@ export default function App() {
     // abandon() is safe to call even if the upload already resolved or failed.
     uploadTask.current?.abandon();
     uploadTask.current = null;
+    snapshotRef.current = null;
   };
 
   // ── Save Game (solo only) ─────────────────────────────────────
@@ -830,6 +847,7 @@ export default function App() {
             {/* Board */}
             <PuzzleBoardErrorBoundary onReset={handleBackToSetup}>
               <PuzzleBoard
+                ref={puzzleBoardRef}
                 pieces={pieces}
                 cols={gridCols}
                 rows={gridRows}
