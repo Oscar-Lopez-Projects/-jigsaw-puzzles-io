@@ -218,10 +218,19 @@ export default function App() {
     if (allSnapped) {
       stopTimer();
       setFinalTime(elapsedRef.current);
+
+      // ── DEBUG: show what we have at win time ──────────────────
+      const refExists = !!puzzleBoardRef.current;
+      const hasCaptureMethod = typeof puzzleBoardRef.current?.captureSnapshot === 'function';
+      const crop = JSON.stringify({ /* filled by capture */ });
+      alert(`[WIN DEBUG]\npuzzleBoardRef exists: ${refExists}\ncaptureSnapshot method: ${hasCaptureMethod}\ncrop: ${crop}`);
+      // ─────────────────────────────────────────────────────────
+
       // Start the screenshot capture and keep the Promise so win flow can await it
       const capture = puzzleBoardRef.current?.captureSnapshot() ?? Promise.resolve(null);
       snapshotPromise.current = capture;
       capture.then((url) => {
+        alert(`[SNAPSHOT RESULT]\n${url ? `length=${url.length}\nprefix=${url.slice(0,80)}` : 'NULL — captureSnapshot returned null'}`);
         console.log('[win] snapshot result:', url ? `data URL length=${url.length}, prefix=${url.slice(0,60)}` : 'NULL');
         snapshotRef.current = url;
       });
