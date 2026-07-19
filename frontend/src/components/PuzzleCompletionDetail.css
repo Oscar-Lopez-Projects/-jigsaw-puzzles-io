@@ -152,3 +152,34 @@
   line-height: 1.6;
   max-width: 360px;
 }
+
+/* ── Download button ─────────────────────────────────────────── */
+.pcd-download-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  background: #22c55e;
+  border: none;
+  border-radius: 99px;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+}
+
+.pcd-download-btn svg {
+  width: 13px;
+  height: 13px;
+}
+
+.pcd-download-btn:hover {
+  background: #16a34a;
+  transform: translateY(-1px);
+}
+
+.pcd-download-btn:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}

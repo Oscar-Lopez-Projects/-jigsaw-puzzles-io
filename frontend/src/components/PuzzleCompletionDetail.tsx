@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { apiFetch } from '../lib/api';
-import { getGrid } from '../utils/puzzleUtils';
+import { getGrid, generatePieces } from '../utils/puzzleUtils';
 import './PuzzleCompletionDetail.css';
 
 interface CompletionRecord {
@@ -32,173 +32,171 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' });
 }
 
-/** Draw the solved jigsaw grid on a canvas: the full image with glowing piece outlines. */
-function drawCompletedPuzzle(
-  canvas: HTMLCanvasElement,
-  img: HTMLImageElement,
+/**
+ * Composite all puzzle pieces onto one canvas at their solved positions.
+ * Uses the exact same piece images from generatePieces — identical to what
+ * the user saw during the game.
+ *
+ * Each piece canvas is (pieceW + 2*tabSize) × (pieceH + 2*tabSize) and its
+ * correctX/Y already accounts for the tab offset, so we just draw each piece
+ * at (correctX, correctY) on the composite canvas.
+ */
+async function buildCompletedCanvas(
+  imageUrl: string,
   cols: number,
-  rows: number
-) {
-  const W = img.naturalWidth;
-  const H = img.naturalHeight;
+  rows: number,
+): Promise<HTMLCanvasElement> {
+  const pieces = await generatePieces(imageUrl, cols, rows);
 
-  // Scale to fit within 900×700 max, maintaining aspect ratio
-  const maxW = Math.min(900, window.innerWidth - 80);
-  const maxH = Math.min(700, window.innerHeight - 260);
-  const scale = Math.min(maxW / W, maxH / H, 1);
-  const dW = Math.round(W * scale);
-  const dH = Math.round(H * scale);
+  if (pieces.length === 0) throw new Error('No pieces generated');
 
-  canvas.width = dW;
-  canvas.height = dH;
+  // The composite canvas size = the full image without tab overflow.
+  // correctX of the last column's piece + pieceWidth (not canvasW) = imgW.
+  // Easiest: load the image and use its natural size, then scale for display.
+  const firstPiece  = pieces[0];
+  const pw = firstPiece.pieceWidth;   // canvas width including tabs
+  const ph = firstPiece.pieceHeight;  // canvas height including tabs
+
+  // The tab offset is baked into correctX/Y (they are negative for col=0, row=0).
+  // minX / minY tell us the top-left of the entire assembled puzzle in "world" coords.
+  const minX = Math.min(...pieces.map((p) => p.correctX));
+  const minY = Math.min(...pieces.map((p) => p.correctY));
+  const maxX = Math.max(...pieces.map((p) => p.correctX + pw));
+  const maxY = Math.max(...pieces.map((p) => p.correctY + ph));
+
+  const totalW = maxX - minX;
+  const totalH = maxY - minY;
+
+  // Scale to fit screen
+  const maxW = Math.min(960, window.innerWidth - 80);
+  const maxH = Math.min(720, window.innerHeight - 260);
+  const scale = Math.min(maxW / totalW, maxH / totalH, 1);
+
+  const canvas = document.createElement('canvas');
+  canvas.width  = Math.round(totalW * scale);
+  canvas.height = Math.round(totalH * scale);
 
   const ctx = canvas.getContext('2d')!;
-  ctx.clearRect(0, 0, dW, dH);
 
-  // Draw full image
-  ctx.drawImage(img, 0, 0, dW, dH);
+  // Dark background matching the game board
+  ctx.fillStyle = '#2f2d3e';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // Draw a slight dark vignette over the image to make the piece lines pop
-  ctx.fillStyle = 'rgba(0,0,0,0.12)';
-  ctx.fillRect(0, 0, dW, dH);
-
-  // Draw full image again with slight brightness so it shows through
-  ctx.globalAlpha = 0.92;
-  ctx.drawImage(img, 0, 0, dW, dH);
-  ctx.globalAlpha = 1;
-
-  const cellW = dW / cols;
-  const cellH = dH / rows;
-  const tabSize = Math.floor(Math.min(cellW, cellH) * 0.18);
-
-  // Draw each piece outline using the same jigsaw path logic
-  for (let row = 0; row < rows; row++) {
-    for (let col = 0; col < cols; col++) {
-      const x = col * cellW;
-      const y = row * cellH;
-
-      ctx.save();
-      ctx.beginPath();
-
-      // Top edge
-      const topDir = row === 0 ? 0 : (((col * rows + row) % 2 === 0) ? 1 : -1);
-      // Right edge
-      const rightDir = col === cols - 1 ? 0 : (((col * rows + row + 1) % 2 === 0) ? 1 : -1);
-      // Bottom edge
-      const bottomDir = row === rows - 1 ? 0 : (-topDir || ((col * rows + row + 2) % 2 === 0 ? 1 : -1));
-      // Left edge
-      const leftDir = col === 0 ? 0 : (-rightDir || ((col * rows + row + 3) % 2 === 0 ? 1 : -1));
-
-      drawPiecePath(ctx, x, y, cellW, cellH, tabSize, topDir as 0|1|-1, rightDir as 0|1|-1, bottomDir as 0|1|-1, leftDir as 0|1|-1);
-
-      // Glow effect: thick semi-transparent outer stroke
-      ctx.strokeStyle = 'rgba(34, 197, 94, 0.25)';
-      ctx.lineWidth = 3.5;
-      ctx.stroke();
-
-      // Sharp inner line
-      ctx.strokeStyle = 'rgba(34, 197, 94, 0.7)';
-      ctx.lineWidth = 1.2;
-      ctx.stroke();
-
-      ctx.restore();
-    }
-  }
-}
-
-function drawPiecePath(
-  ctx: CanvasRenderingContext2D,
-  x: number, y: number,
-  w: number, h: number,
-  tabSize: number,
-  top: 0|1|-1, right: 0|1|-1, bottom: 0|1|-1, left: 0|1|-1
-) {
-  const tabH = tabSize * 0.8;
-  ctx.beginPath();
-  ctx.moveTo(x, y);
-
-  // Top edge
-  if (top === 0) {
-    ctx.lineTo(x + w, y);
-  } else {
-    ctx.lineTo(x + w * 0.35, y);
-    ctx.bezierCurveTo(x + w*0.35, y - top*tabH*0.1, x + w*0.38, y - top*tabH*0.8, x + w*0.44, y - top*tabH);
-    ctx.bezierCurveTo(x + w*0.50, y - top*tabH*1.1, x + w*0.56, y - top*tabH*1.1, x + w*0.56, y - top*tabH);
-    ctx.bezierCurveTo(x + w*0.62, y - top*tabH*0.8, x + w*0.65, y - top*tabH*0.1, x + w*0.65, y);
-    ctx.lineTo(x + w, y);
+  // Draw each piece at its correct position
+  for (const piece of pieces) {
+    const img = new Image();
+    img.src = piece.imageUrl;
+    // imageUrl is a data URL — already loaded synchronously by generatePieces
+    const dx = Math.round((piece.correctX - minX) * scale);
+    const dy = Math.round((piece.correctY - minY) * scale);
+    const dw = Math.round(pw * scale);
+    const dh = Math.round(ph * scale);
+    ctx.drawImage(img, dx, dy, dw, dh);
   }
 
-  // Right edge
-  if (right === 0) {
-    ctx.lineTo(x + w, y + h);
-  } else {
-    ctx.lineTo(x + w, y + h*0.35);
-    ctx.bezierCurveTo(x+w+right*tabH*0.1, y+h*0.35, x+w+right*tabH*0.8, y+h*0.38, x+w+right*tabH, y+h*0.44);
-    ctx.bezierCurveTo(x+w+right*tabH*1.1, y+h*0.50, x+w+right*tabH*1.1, y+h*0.56, x+w+right*tabH, y+h*0.56);
-    ctx.bezierCurveTo(x+w+right*tabH*0.8, y+h*0.62, x+w+right*tabH*0.1, y+h*0.65, x+w, y+h*0.65);
-    ctx.lineTo(x + w, y + h);
+  // Green piece-outline highlight overlay — draw on top of composited image
+  // Use the same tab proportion as generatePieces (18% of min side)
+  const tabSize = Math.min(pw, ph) * 0.18 * scale;
+  const cellW = (totalW / cols) * scale;
+  const cellH = (totalH / rows) * scale;
+
+  for (const piece of pieces) {
+    const cx = Math.round((piece.correctX - minX) * scale) + tabSize;
+    const cy = Math.round((piece.correctY - minY) * scale) + tabSize;
+
+    ctx.save();
+    // Clip to the piece canvas bounds so highlights don't bleed outside
+    ctx.beginPath();
+    ctx.rect(
+      Math.round((piece.correctX - minX) * scale),
+      Math.round((piece.correctY - minY) * scale),
+      Math.round(pw * scale),
+      Math.round(ph * scale),
+    );
+    ctx.clip();
+
+    // Outer glow
+    ctx.strokeStyle = 'rgba(34, 197, 94, 0.3)';
+    ctx.lineWidth = 3.5;
+    ctx.strokeRect(cx, cy, cellW, cellH);
+
+    // Sharp line
+    ctx.strokeStyle = 'rgba(34, 197, 94, 0.75)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(cx, cy, cellW, cellH);
+
+    ctx.restore();
   }
 
-  // Bottom edge (right to left)
-  if (bottom === 0) {
-    ctx.lineTo(x, y + h);
-  } else {
-    ctx.lineTo(x + w*0.65, y + h);
-    ctx.bezierCurveTo(x+w*0.65, y+h+bottom*tabH*0.1, x+w*0.62, y+h+bottom*tabH*0.8, x+w*0.56, y+h+bottom*tabH);
-    ctx.bezierCurveTo(x+w*0.50, y+h+bottom*tabH*1.1, x+w*0.44, y+h+bottom*tabH*1.1, x+w*0.44, y+h+bottom*tabH);
-    ctx.bezierCurveTo(x+w*0.38, y+h+bottom*tabH*0.8, x+w*0.35, y+h+bottom*tabH*0.1, x+w*0.35, y+h);
-    ctx.lineTo(x, y + h);
-  }
-
-  // Left edge (bottom to top)
-  if (left === 0) {
-    ctx.lineTo(x, y);
-  } else {
-    ctx.lineTo(x, y + h*0.65);
-    ctx.bezierCurveTo(x-left*tabH*0.1, y+h*0.65, x-left*tabH*0.8, y+h*0.62, x-left*tabH, y+h*0.56);
-    ctx.bezierCurveTo(x-left*tabH*1.1, y+h*0.50, x-left*tabH*1.1, y+h*0.44, x-left*tabH, y+h*0.44);
-    ctx.bezierCurveTo(x-left*tabH*0.8, y+h*0.38, x-left*tabH*0.1, y+h*0.35, x, y+h*0.35);
-    ctx.lineTo(x, y);
-  }
-
-  ctx.closePath();
+  return canvas;
 }
 
 export default function PuzzleCompletionDetail({ record, onBack }: PuzzleCompletionDetailProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [imageUrl, setImageUrl] = useState<string | null>(record.image_url || null);
+  const canvasRef     = useRef<HTMLCanvasElement>(null);
+  const builtCanvas   = useRef<HTMLCanvasElement | null>(null); // for download
+  const [imageUrl, setImageUrl]       = useState<string | null>(record.image_url || null);
   const [puzzleTitle, setPuzzleTitle] = useState<string>(record.image_reference || 'Puzzle');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading]         = useState(true);
+  const [error, setError]             = useState<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
 
-  // If it's a community puzzle and we don't have the image URL, fetch it
+  const { cols, rows } = getGrid(record.piece_count as Parameters<typeof getGrid>[0]) ??
+    { cols: Math.round(Math.sqrt(record.piece_count * 1.5)), rows: Math.round(Math.sqrt(record.piece_count / 1.5)) };
+
+  // Fetch community puzzle image URL if not stored on the record
   useEffect(() => {
     if (imageUrl) { setLoading(false); return; }
     if (!record.puzzle_id) { setLoading(false); return; }
 
     apiFetch<{ image_url: string; title: string }>(`/api/puzzles/${record.puzzle_id}`)
-      .then((data) => {
-        setImageUrl(data.image_url);
-        setPuzzleTitle(data.title);
-      })
+      .then((data) => { setImageUrl(data.image_url); setPuzzleTitle(data.title); })
       .catch(() => setError('Could not load puzzle image.'))
       .finally(() => setLoading(false));
   }, [record.puzzle_id, imageUrl]);
 
-  // Draw the completed puzzle on the canvas once the image is ready
+  // Once we have the image URL, run generatePieces to get the exact piece shapes
+  // and composite them onto the canvas.
   useEffect(() => {
     if (!imageUrl || !canvasRef.current) return;
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => {
-      if (!canvasRef.current) return;
-      const { cols, rows } = getGrid(record.piece_count as Parameters<typeof getGrid>[0]) ||
-        { cols: Math.round(Math.sqrt(record.piece_count * 1.5)), rows: Math.round(Math.sqrt(record.piece_count / 1.5)) };
-      drawCompletedPuzzle(canvasRef.current, img, cols, rows);
-    };
-    img.onerror = () => setError('Could not render puzzle image.');
-    img.src = imageUrl;
-  }, [imageUrl, record.piece_count]);
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+
+    buildCompletedCanvas(imageUrl, cols, rows)
+      .then((built) => {
+        if (cancelled || !canvasRef.current) return;
+        builtCanvas.current = built;
+
+        // Copy the built canvas onto the displayed canvas
+        const display = canvasRef.current;
+        display.width  = built.width;
+        display.height = built.height;
+        display.getContext('2d')!.drawImage(built, 0, 0);
+        setLoading(false);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : 'Could not render puzzle.');
+          setLoading(false);
+        }
+      });
+
+    return () => { cancelled = true; };
+  }, [imageUrl, cols, rows]);
+
+  // Download the full-resolution completed puzzle as a PNG
+  const handleDownload = useCallback(() => {
+    if (!builtCanvas.current) return;
+    setDownloading(true);
+    try {
+      const link = document.createElement('a');
+      link.download = `${puzzleTitle.replace(/[^a-z0-9]/gi, '_')}_completed.png`;
+      link.href = builtCanvas.current.toDataURL('image/png');
+      link.click();
+    } finally {
+      setDownloading(false);
+    }
+  }, [puzzleTitle]);
 
   const stars = record.stars;
 
@@ -208,7 +206,8 @@ export default function PuzzleCompletionDetail({ record, onBack }: PuzzleComplet
       <div className="pcd-header">
         <button type="button" className="pcd-back-btn" onClick={onBack}>
           <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
-            <path d="M10 3L5 8l5 5" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M10 3L5 8l5 5" stroke="currentColor" strokeWidth="1.75"
+              strokeLinecap="round" strokeLinejoin="round" />
           </svg>
           Back to Dashboard
         </button>
@@ -222,6 +221,23 @@ export default function PuzzleCompletionDetail({ record, onBack }: PuzzleComplet
           <span className="pcd-meta-pill">⏱ {formatTime(record.completion_time_sec)}</span>
           <span className="pcd-meta-pill pcd-stars">{'★'.repeat(stars)}{'☆'.repeat(3 - stars)}</span>
           <span className="pcd-meta-pill pcd-date">{formatDate(record.completed_at)}</span>
+          {/* Download button — only show when canvas is ready */}
+          {!loading && !error && imageUrl && (
+            <button
+              type="button"
+              className="pcd-download-btn"
+              onClick={handleDownload}
+              disabled={downloading}
+              title="Download completed puzzle as PNG"
+            >
+              <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path d="M8 2v8M5 7l3 3 3-3" stroke="currentColor" strokeWidth="1.6"
+                  strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M2 12h12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+              </svg>
+              {downloading ? 'Downloading…' : 'Download'}
+            </button>
+          )}
         </div>
       </div>
 
@@ -230,7 +246,7 @@ export default function PuzzleCompletionDetail({ record, onBack }: PuzzleComplet
         {loading && (
           <div className="pcd-loading">
             <span className="spinner" style={{ width: 32, height: 32, borderWidth: 3 }} />
-            <span>Loading puzzle…</span>
+            <span>Rendering puzzle…</span>
           </div>
         )}
         {error && <div className="pcd-error">{error}</div>}
@@ -241,7 +257,11 @@ export default function PuzzleCompletionDetail({ record, onBack }: PuzzleComplet
             <p>Future solo plays will show the completed image here.</p>
           </div>
         )}
-        {imageUrl && <canvas ref={canvasRef} className="pcd-canvas" />}
+        <canvas
+          ref={canvasRef}
+          className="pcd-canvas"
+          style={{ display: loading || error || !imageUrl ? 'none' : 'block' }}
+        />
       </div>
     </div>
   );
