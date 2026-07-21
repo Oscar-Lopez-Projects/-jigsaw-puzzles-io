@@ -372,10 +372,18 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
   // An iPhone photo can be a 15×10 grid but still taller than wide.
   const isPortrait = ready ? targetH > targetW : rows > cols;
 
-  // Portrait: zero top/bottom margin (fills full height), large side margin for pieces.
-  // Landscape: default margins all around.
+  // Portrait: no top/bottom margin (fills full height).
+  // Side margin: calculated so the total world fills the container width exactly —
+  // the image takes its natural width at height-scale, sides get the remainder.
+  // This eliminates the dark gaps on the edges.
+  const portraitScale = ready && containerH > 0 ? containerH / targetH : 1;
+  const imageScreenW  = targetW * portraitScale;
+  const sideScreenW   = Math.max((containerW - imageScreenW) / 2, pw * 2);
+  // Convert back to world coords: sideScreenW / portraitScale
+  const portraitMarginX = ready ? sideScreenW / portraitScale : Math.max(pw * 3, targetW * PORTRAIT_SIDE_RATIO);
+
   const marginX = isPortrait
-    ? Math.max(pw * 3, targetW * PORTRAIT_SIDE_RATIO)
+    ? portraitMarginX
     : Math.max(pw * 3, targetW * MARGIN_RATIO_X);
   const marginY = isPortrait
     ? 0
