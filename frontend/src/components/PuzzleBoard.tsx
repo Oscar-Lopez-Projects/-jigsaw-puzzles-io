@@ -303,6 +303,8 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
   const [zoomLevel, setZoomLevel] = useState(1);
   const [panMode, setPanMode] = useState(false);
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
+  // Vertical scroll offset for the side panels (moves the canvas view up/down)
+  const [sideScrollY, setSideScrollY] = useState(0);
 
   // Pan drag tracking — stored in a ref so pointer handlers don't go stale
   const panDrag = useRef<{ startX: number; startY: number; originX: number; originY: number } | null>(null);
@@ -317,6 +319,7 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
 
   const handleCenterBoard = useCallback(() => {
     setPanOffset({ x: 0, y: 0 });
+    setSideScrollY(0);
   }, []);
 
   // ── Side scroll: wheel events on left/right margins pan the canvas vertically ──
