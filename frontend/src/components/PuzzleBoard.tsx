@@ -11,10 +11,7 @@ const MARGIN_RATIO_X = 0.30; // default horizontal margin ratio (landscape / sma
 const MARGIN_RATIO_Y = 0.12; // default vertical margin ratio
 
 // For portrait images: no top/bottom margin (fills full height),
-// and a moderate side margin. Keeping it at ~0.5× image width per side
-// leaves enough room for pieces without overwhelming the layout.
-// A scrollbar will be added later for overflow.
-const PORTRAIT_SIDE_RATIO = 0.5;
+// side margins are computed dynamically from remaining screen width.
 
 // ─── useImage hook ─────────────────────────────────────────────
 function useImage(src: string): HTMLImageElement | null {
