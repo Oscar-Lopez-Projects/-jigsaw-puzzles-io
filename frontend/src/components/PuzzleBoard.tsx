@@ -322,7 +322,9 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
   // ── Expand board level (state only — logic computed after targetW/H below) ─
   const totalPieces = cols * rows;
   const canExpand = EXPAND_PIECE_COUNTS.has(totalPieces);
-  const [expandLevel, setExpandLevel] = useState(0);
+  const [expandLevel, setExpandLevel] = useState(() =>
+    canExpand && rows > cols ? 1 : 0
+  );
   const cycleExpand = useCallback(() => {
     setExpandLevel((l) => (l + 1) % EXPAND_RATIOS.length);
   }, []);
