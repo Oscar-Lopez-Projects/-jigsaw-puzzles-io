@@ -7,15 +7,13 @@ import './PuzzleBoard.css';
 
 // ─── layout constants ─────────────────────────────────────────
 const SNAP_THRESHOLD = 0.5;
-const MARGIN_RATIO_X = 0.30; // default horizontal margin ratio
+const MARGIN_RATIO_X = 0.30; // default horizontal margin ratio (landscape / small counts)
 const MARGIN_RATIO_Y = 0.12; // default vertical margin ratio
 
-// Expansion multipliers for marginX (portrait) and marginY (landscape).
-// Level 0 = default, level 1 = expanded, level 2 = max (fills screen).
-const EXPAND_RATIOS = [1, 2.2, 4.0] as const;
-
-// Only show the expand button for these piece counts (100+)
-const EXPAND_PIECE_COUNTS = new Set([100, 150, 300]);
+// For portrait images: no top/bottom margin (fills full height),
+// and a large side margin so pieces spread left and right.
+// This ratio is relative to targetW — 1.8 means 1.8× the image width on each side.
+const PORTRAIT_SIDE_RATIO = 1.8;
 
 // ─── useImage hook ─────────────────────────────────────────────
 function useImage(src: string): HTMLImageElement | null {
@@ -319,15 +317,8 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
     setPanOffset({ x: 0, y: 0 });
   }, []);
 
-  // ── Expand board level (state only — logic computed after targetW/H below) ─
-  const totalPieces = cols * rows;
-  const canExpand = EXPAND_PIECE_COUNTS.has(totalPieces);
-  const [expandLevel, setExpandLevel] = useState(() =>
-    canExpand && rows > cols ? 1 : 0
-  );
-  const cycleExpand = useCallback(() => {
-    setExpandLevel((l) => (l + 1) % EXPAND_RATIOS.length);
-  }, []);
+  // ── Portrait images: always max side space, no user toggle ─────
+  // No expand state needed — determined purely by isPortrait below.
 
   // Pointer handlers for free-range pan (tracked on the whole wrap, no DOM clipping)
   const handlePanPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
@@ -380,34 +371,26 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
   // An iPhone photo can be a 15×10 grid but still taller than wide.
   const isPortrait = ready ? targetH > targetW : rows > cols;
 
-  // World: target + margins.
-  // Expand level grows the relevant margin axis:
-  //   Portrait  → expand marginX (pieces go to left/right sides)
-  //   Landscape → expand marginY (pieces go to top/bottom)
-  const expandMult = EXPAND_RATIOS[expandLevel];
-  const rawMarginX = Math.max(pw * 3, targetW * MARGIN_RATIO_X);
-  const rawMarginY = Math.max(ph * 2, targetH * MARGIN_RATIO_Y);
-  // Portrait: no top/bottom margin — target fills full height, all pieces go left/right
-  // Landscape: no left/right margin at default, pieces go top/bottom when expanded
-  const marginX = isPortrait  ? rawMarginX * expandMult : rawMarginX;
-  const marginY = isPortrait  ? 0                       : rawMarginY * (expandLevel > 0 ? expandMult : 1);
+  // Portrait: zero top/bottom margin (fills full height), large side margin for pieces.
+  // Landscape: default margins all around.
+  const marginX = isPortrait
+    ? Math.max(pw * 3, targetW * PORTRAIT_SIDE_RATIO)
+    : Math.max(pw * 3, targetW * MARGIN_RATIO_X);
+  const marginY = isPortrait
+    ? 0
+    : Math.max(ph * 2, targetH * MARGIN_RATIO_Y);
   const worldW = targetW + marginX * 2;
   const worldH = targetH + marginY * 2;
   const targetOX = marginX;
   const targetOY = marginY;
 
-  // Scale: for portrait images, height is the dominant axis — fill the container height
-  // and let the wider world extend horizontally (more scatter space on sides).
-  // For landscape, width is dominant.
-  // At expandLevel > 0 the world grows along the non-dominant axis, so we must
-  // clamp to whichever axis would overflow first.
+  // Scale: portrait fills container height (image is the vertical focus).
+  // Landscape fits both dimensions.
   const scaleByW = ready ? containerW / worldW : 1;
   const scaleByH = ready && containerH > 0 ? containerH / worldH : scaleByW;
-  // For portrait: prefer scaleByH (fill height), but cap at scaleByW so we never clip horizontally
-  // For landscape: prefer scaleByW (fill width), but cap at scaleByH
   const baseScale = isPortrait
-    ? Math.min(scaleByH, scaleByW)   // height-dominant: fills screen height, clips sides only if needed
-    : Math.min(scaleByW, scaleByH);  // width-dominant (same as before)
+    ? Math.min(scaleByH, scaleByW)
+    : Math.min(scaleByW, scaleByH);
   const safeScale = baseScale * zoomLevel;
   const stageW = worldW * safeScale;
   const stageH = worldH * safeScale;
@@ -415,19 +398,11 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
   // Keep cropRef in sync so captureSnapshot always reads the latest values
   cropRef.current = { targetOX, targetOY, targetW, targetH, scale: safeScale };
 
-  // Scatter pieces into the border zones.
-  // Fires on initial load (allAtOrigin) AND when expandLevel changes mid-game
-  // so pieces redistribute into the newly available space.
-  const prevExpandLevel = useRef(expandLevel);
+  // Scatter pieces into the border zones on initial load / after Reset.
   useEffect(() => {
     if (!ready) return;
-
     const allAtOrigin = pieces.every((p) => p.currentX === 0 && p.currentY === 0 && !p.snapped);
-    const expandChanged = expandLevel !== prevExpandLevel.current;
-    prevExpandLevel.current = expandLevel;
-
-    // Only scatter on initial load or when expand level changes
-    if (!allAtOrigin && !expandChanged) return;
+    if (!allAtOrigin) return;
 
     const gap = 6;
     const cellW = pw + gap;
@@ -456,32 +431,12 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
     const shuffle = <T,>(arr: T[]) => [...arr].sort(() => Math.random() - 0.5);
     const ordered = [...shuffle(border), ...shuffle(interior)];
 
-    if (allAtOrigin) {
-      // Initial scatter — all pieces
-      const scattered = pieces.map((p, i) => {
-        const pos = ordered[i % ordered.length];
-        return { ...p, currentX: pos?.x ?? 0, currentY: pos?.y ?? 0, zone: 'free' as const };
-      });
-      onPiecesChange(scattered);
-    } else {
-      // Expand changed mid-game — only redistribute unsnapped, non-grouped pieces
-      // into border slots so they're symmetrically spread in the new wider area.
-      // Keep snapped and grouped pieces exactly where they are.
-      const freePieceIds = pieces
-        .filter((p) => !p.snapped && p.groupId == null)
-        .map((p) => p.id);
-
-      let slotIdx = 0;
-      const updated = pieces.map((p) => {
-        if (!freePieceIds.includes(p.id)) return p; // snapped or grouped — don't move
-        // Only place in border slots (leave interior empty for building area)
-        const pos = border[slotIdx % border.length];
-        slotIdx++;
-        return { ...p, currentX: pos?.x ?? p.currentX, currentY: pos?.y ?? p.currentY, zone: 'free' as const };
-      });
-      onPiecesChange(updated);
-    }
-  }, [ready, expandLevel, worldW, worldH, pw, ph, targetOX, targetOY, targetW, targetH]); // eslint-disable-line
+    const scattered = pieces.map((p, i) => {
+      const pos = ordered[i % ordered.length];
+      return { ...p, currentX: pos?.x ?? 0, currentY: pos?.y ?? 0, zone: 'free' as const };
+    });
+    onPiecesChange(scattered);
+  }, [ready, worldW, worldH, pw, ph, targetOX, targetOY, targetW, targetH]); // eslint-disable-line
 
   // Locked pieces (placed correctly on the board) — immovable, green outline
   const lockedPieces = pieces.filter((p) => p.snapped);
@@ -725,64 +680,6 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
           )}
         </Stage>
         </div>
-
-        {/* Floating expand arrows on the edges of the board — portrait gets left/right, landscape gets top/bottom */}
-        {canExpand && isPortrait && (
-          <>
-            <button
-              type="button"
-              className={`puzzle-expand-arrow puzzle-expand-arrow--left${expandLevel > 0 ? ' puzzle-expand-arrow--active' : ''}`}
-              onClick={cycleExpand}
-              aria-label={expandLevel < 2 ? 'Expand board sideways' : 'Reset board width'}
-              title={expandLevel < 2 ? 'Expand board' : 'Reset to default'}
-            >
-              {expandLevel < 2
-                ? <svg viewBox="0 0 16 24" fill="none" aria-hidden="true"><path d="M10 4L4 12l6 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                : <svg viewBox="0 0 16 24" fill="none" aria-hidden="true"><path d="M6 4l6 8-6 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-              }
-            </button>
-            <button
-              type="button"
-              className={`puzzle-expand-arrow puzzle-expand-arrow--right${expandLevel > 0 ? ' puzzle-expand-arrow--active' : ''}`}
-              onClick={cycleExpand}
-              aria-label={expandLevel < 2 ? 'Expand board sideways' : 'Reset board width'}
-              title={expandLevel < 2 ? 'Expand board' : 'Reset to default'}
-            >
-              {expandLevel < 2
-                ? <svg viewBox="0 0 16 24" fill="none" aria-hidden="true"><path d="M6 4l6 8-6 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                : <svg viewBox="0 0 16 24" fill="none" aria-hidden="true"><path d="M10 4L4 12l6 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-              }
-            </button>
-          </>
-        )}
-        {canExpand && !isPortrait && (
-          <>
-            <button
-              type="button"
-              className={`puzzle-expand-arrow puzzle-expand-arrow--top${expandLevel > 0 ? ' puzzle-expand-arrow--active' : ''}`}
-              onClick={cycleExpand}
-              aria-label={expandLevel < 2 ? 'Expand board vertically' : 'Reset board height'}
-              title={expandLevel < 2 ? 'Expand board' : 'Reset to default'}
-            >
-              {expandLevel < 2
-                ? <svg viewBox="0 0 24 16" fill="none" aria-hidden="true"><path d="M4 10L12 4l8 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                : <svg viewBox="0 0 24 16" fill="none" aria-hidden="true"><path d="M4 6l8 6 8-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-              }
-            </button>
-            <button
-              type="button"
-              className={`puzzle-expand-arrow puzzle-expand-arrow--bottom${expandLevel > 0 ? ' puzzle-expand-arrow--active' : ''}`}
-              onClick={cycleExpand}
-              aria-label={expandLevel < 2 ? 'Expand board vertically' : 'Reset board height'}
-              title={expandLevel < 2 ? 'Expand board' : 'Reset to default'}
-            >
-              {expandLevel < 2
-                ? <svg viewBox="0 0 24 16" fill="none" aria-hidden="true"><path d="M4 6l8 6 8-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                : <svg viewBox="0 0 24 16" fill="none" aria-hidden="true"><path d="M4 10L12 4l8 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-              }
-            </button>
-          </>
-        )}
 
         {/* Zoom + pan controls — right side */}
         <div
