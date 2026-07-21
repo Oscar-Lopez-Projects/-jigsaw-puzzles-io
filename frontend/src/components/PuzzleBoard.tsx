@@ -405,45 +405,99 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
   // Keep cropRef in sync so captureSnapshot always reads the latest values
   cropRef.current = { targetOX, targetOY, targetW, targetH, scale: safeScale };
 
-  // Scatter pieces into the border zones on initial load / after Reset.
+  // Scatter pieces into the staging areas on initial load / after Reset.
   useEffect(() => {
     if (!ready) return;
     const allAtOrigin = pieces.every((p) => p.currentX === 0 && p.currentY === 0 && !p.snapped);
     if (!allAtOrigin) return;
 
-    const gap = 6;
+    const gap = 4;
     const cellW = pw + gap;
     const cellH = ph + gap;
 
-    const targetLeft   = targetOX;
-    const targetRight  = targetOX + targetW;
-    const targetTop    = targetOY;
-    const targetBottom = targetOY + targetH;
-
-    // All slots across the world
-    const border: { x: number; y: number }[] = [];
-    const interior: { x: number; y: number }[] = [];
-
-    for (let y = gap; y + ph < worldH - gap; y += cellH) {
-      for (let x = gap; x + pw < worldW - gap; x += cellW) {
-        const cx = x + pw / 2;
-        const cy = y + ph / 2;
-        const insideTarget =
-          cx > targetLeft && cx < targetRight && cy > targetTop && cy < targetBottom;
-        if (insideTarget) interior.push({ x, y });
-        else border.push({ x, y });
-      }
-    }
-
     const shuffle = <T,>(arr: T[]) => [...arr].sort(() => Math.random() - 0.5);
-    const ordered = [...shuffle(border), ...shuffle(interior)];
 
-    const scattered = pieces.map((p, i) => {
-      const pos = ordered[i % ordered.length];
-      return { ...p, currentX: pos?.x ?? 0, currentY: pos?.y ?? 0, zone: 'free' as const };
-    });
-    onPiecesChange(scattered);
-  }, [ready, worldW, worldH, pw, ph, targetOX, targetOY, targetW, targetH]); // eslint-disable-line
+    if (isPortrait) {
+      // Portrait: two explicit side panels (left strip and right strip).
+      // Fill them tightly top-to-bottom, no unused rows.
+      const leftSlots: { x: number; y: number }[] = [];
+      const rightSlots: { x: number; y: number }[] = [];
+
+      // Left panel: x from 0 to targetOX
+      for (let y = gap; y + ph <= worldH - gap; y += cellH) {
+        for (let x = gap; x + pw <= targetOX - gap; x += cellW) {
+          leftSlots.push({ x, y });
+        }
+      }
+      // Right panel: x from targetOX + targetW to worldW
+      const rightStart = targetOX + targetW + gap;
+      for (let y = gap; y + ph <= worldH - gap; y += cellH) {
+        for (let x = rightStart; x + pw <= worldW - gap; x += cellW) {
+          rightSlots.push({ x, y });
+        }
+      }
+
+      // If no slots (e.g. side too narrow), fall back to interior
+      const allSideSlots = [...shuffle(leftSlots), ...shuffle(rightSlots)];
+      const interiorSlots: { x: number; y: number }[] = [];
+      if (allSideSlots.length < pieces.length) {
+        for (let y = targetOY + gap; y + ph <= targetOY + targetH - gap; y += cellH) {
+          for (let x = targetOX + gap; x + pw <= targetOX + targetW - gap; x += cellW) {
+            interiorSlots.push({ x, y });
+          }
+        }
+      }
+      const allSlots = [...allSideSlots, ...shuffle(interiorSlots)];
+
+      // Distribute evenly: alternate left/right
+      const shuffledLeft  = shuffle(leftSlots);
+      const shuffledRight = shuffle(rightSlots);
+      let li = 0, ri = 0, si = 0;
+      const scattered = pieces.map((p) => {
+        let pos: { x: number; y: number } | undefined;
+        // Alternate left/right for even distribution
+        if (li <= ri && li < shuffledLeft.length) {
+          pos = shuffledLeft[li++];
+        } else if (ri < shuffledRight.length) {
+          pos = shuffledRight[ri++];
+        } else if (li < shuffledLeft.length) {
+          pos = shuffledLeft[li++];
+        } else {
+          // Overflow into interior or wrap
+          pos = allSlots[si++ % Math.max(allSlots.length, 1)];
+        }
+        return { ...p, currentX: pos?.x ?? gap, currentY: pos?.y ?? gap, zone: 'free' as const };
+      });
+      onPiecesChange(scattered);
+    } else {
+      // Landscape: standard border ring scatter
+      const targetLeft   = targetOX;
+      const targetRight  = targetOX + targetW;
+      const targetTop    = targetOY;
+      const targetBottom = targetOY + targetH;
+
+      const border: { x: number; y: number }[] = [];
+      const interior: { x: number; y: number }[] = [];
+
+      for (let y = gap; y + ph < worldH - gap; y += cellH) {
+        for (let x = gap; x + pw < worldW - gap; x += cellW) {
+          const cx = x + pw / 2;
+          const cy = y + ph / 2;
+          const insideTarget =
+            cx > targetLeft && cx < targetRight && cy > targetTop && cy < targetBottom;
+          if (insideTarget) interior.push({ x, y });
+          else border.push({ x, y });
+        }
+      }
+
+      const ordered = [...shuffle(border), ...shuffle(interior)];
+      const scattered = pieces.map((p, i) => {
+        const pos = ordered[i % ordered.length];
+        return { ...p, currentX: pos?.x ?? 0, currentY: pos?.y ?? 0, zone: 'free' as const };
+      });
+      onPiecesChange(scattered);
+    }
+  }, [ready, isPortrait, worldW, worldH, pw, ph, targetOX, targetOY, targetW, targetH]); // eslint-disable-line
 
   // When world dimensions change mid-game (e.g. fullscreen toggle), re-clamp all
   // unsnapped pieces into the new bounds. Pieces that fall outside get packed
@@ -466,20 +520,29 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
     );
     if (!hasOutsiders) return;
 
-    // Build border slot grid — same as scatter logic
-    const gap = 6;
+    // Build border slot grid for new world
+    const gap = 4;
     const cellW = pw + gap;
     const cellH = ph + gap;
     const border: { x: number; y: number }[] = [];
-    for (let y = gap; y + ph < worldH - gap; y += cellH) {
-      for (let x = gap; x + pw < worldW - gap; x += cellW) {
-        const cx = x + pw / 2;
-        const cy = y + ph / 2;
-        const insideTarget =
-          cx > targetOX && cx < targetOX + targetW &&
-          cy > targetOY && cy < targetOY + targetH;
-        if (!insideTarget) border.push({ x, y });
-      }
+
+    if (isPortrait) {
+      // Left panel
+      for (let y = gap; y + ph <= worldH - gap; y += cellH)
+        for (let x = gap; x + pw <= targetOX - gap; x += cellW)
+          border.push({ x, y });
+      // Right panel
+      const rightStart = targetOX + targetW + gap;
+      for (let y = gap; y + ph <= worldH - gap; y += cellH)
+        for (let x = rightStart; x + pw <= worldW - gap; x += cellW)
+          border.push({ x, y });
+    } else {
+      for (let y = gap; y + ph < worldH - gap; y += cellH)
+        for (let x = gap; x + pw < worldW - gap; x += cellW) {
+          const cx = x + pw / 2, cy = y + ph / 2;
+          if (!(cx > targetOX && cx < targetOX + targetW && cy > targetOY && cy < targetOY + targetH))
+            border.push({ x, y });
+        }
     }
 
     // Re-place only pieces that are outside bounds
@@ -497,7 +560,7 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
       return { ...p, currentX: slot?.x ?? gap, currentY: slot?.y ?? gap };
     });
     onPiecesChange(updated);
-  }, [ready, worldW, worldH, pw, ph, targetOX, targetOY, targetW, targetH]); // eslint-disable-line
+  }, [ready, isPortrait, worldW, worldH, pw, ph, targetOX, targetOY, targetW, targetH]); // eslint-disable-line
 
   // Locked pieces (placed correctly on the board) — immovable, green outline
   const lockedPieces = pieces.filter((p) => p.snapped);
