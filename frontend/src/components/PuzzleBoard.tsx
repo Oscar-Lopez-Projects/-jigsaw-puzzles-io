@@ -372,15 +372,15 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
   // An iPhone photo can be a 15×10 grid but still taller than wide.
   const isPortrait = ready ? targetH > targetW : rows > cols;
 
-  // Portrait: no top/bottom margin (fills full height).
-  // Side margin: calculated so the total world fills the container width exactly —
-  // the image takes its natural width at height-scale, sides get the remainder.
-  // This eliminates the dark gaps on the edges.
+  // Portrait layout: fill full container height, use remaining width for side panels.
+  // Step 1: scale the image to fill container height exactly (ignore side margins for now)
   const portraitScale = ready && containerH > 0 ? containerH / targetH : 1;
+  // Step 2: how much horizontal space is left after the image
   const imageScreenW  = targetW * portraitScale;
-  const sideScreenW   = Math.max((containerW - imageScreenW) / 2, pw * 2);
-  // Convert back to world coords: sideScreenW / portraitScale
-  const portraitMarginX = ready ? sideScreenW / portraitScale : Math.max(pw * 3, targetW * PORTRAIT_SIDE_RATIO);
+  const leftoverW     = Math.max(containerW - imageScreenW, pw * 4); // at least 2 pieces per side
+  const sideScreenW   = leftoverW / 2;
+  // Step 3: convert back to world coords for marginX
+  const portraitMarginX = sideScreenW / portraitScale;
 
   const marginX = isPortrait
     ? portraitMarginX
@@ -393,15 +393,13 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
   const targetOX = marginX;
   const targetOY = marginY;
 
-  // Scale: portrait fills container height first — the image locks to full viewport height.
-  // Then the side margins use whatever horizontal space is left.
-  // We must still cap by scaleByW to avoid horizontal overflow.
+  // Scale: portrait locks to container height (image fills full height).
+  // Side margins are sized to fit the remaining width, so scaleByW = 1 exactly.
+  // Landscape: standard fit-both.
   const scaleByW = ready ? containerW / worldW : 1;
   const scaleByH = ready && containerH > 0 ? containerH / worldH : scaleByW;
-  // Portrait: scale by height, but never exceed width limit
-  // Landscape: scale to fit both (standard letterbox)
   const baseScale = isPortrait
-    ? Math.min(scaleByH, scaleByW)
+    ? portraitScale                  // always fill height — sides are derived from this
     : Math.min(scaleByW, scaleByH);
   const safeScale = baseScale * zoomLevel;
   const stageW = worldW * safeScale;
