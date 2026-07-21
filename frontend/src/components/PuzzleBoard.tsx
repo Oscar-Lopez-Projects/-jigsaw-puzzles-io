@@ -385,8 +385,10 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
   const expandMult = EXPAND_RATIOS[expandLevel];
   const rawMarginX = Math.max(pw * 3, targetW * MARGIN_RATIO_X);
   const rawMarginY = Math.max(ph * 2, targetH * MARGIN_RATIO_Y);
+  // Portrait: no top/bottom margin — target fills full height, all pieces go left/right
+  // Landscape: no left/right margin at default, pieces go top/bottom when expanded
   const marginX = isPortrait  ? rawMarginX * expandMult : rawMarginX;
-  const marginY = !isPortrait ? rawMarginY * expandMult : rawMarginY;
+  const marginY = isPortrait  ? 0                       : rawMarginY * (expandLevel > 0 ? expandMult : 1);
   const worldW = targetW + marginX * 2;
   const worldH = targetH + marginY * 2;
   const targetOX = marginX;
