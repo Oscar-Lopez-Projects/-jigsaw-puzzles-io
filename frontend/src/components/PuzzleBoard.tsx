@@ -11,9 +11,10 @@ const MARGIN_RATIO_X = 0.30; // default horizontal margin ratio (landscape / sma
 const MARGIN_RATIO_Y = 0.12; // default vertical margin ratio
 
 // For portrait images: no top/bottom margin (fills full height),
-// and a large side margin so pieces spread left and right.
-// This ratio is relative to targetW — 1.8 means 1.8× the image width on each side.
-const PORTRAIT_SIDE_RATIO = 1.8;
+// and a moderate side margin. Keeping it at ~0.5× image width per side
+// leaves enough room for pieces without overwhelming the layout.
+// A scrollbar will be added later for overflow.
+const PORTRAIT_SIDE_RATIO = 0.5;
 
 // ─── useImage hook ─────────────────────────────────────────────
 function useImage(src: string): HTMLImageElement | null {
@@ -384,10 +385,13 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
   const targetOX = marginX;
   const targetOY = marginY;
 
-  // Scale: portrait fills container height (image is the vertical focus).
-  // Landscape fits both dimensions.
+  // Scale: portrait fills container height first — the image locks to full viewport height.
+  // Then the side margins use whatever horizontal space is left.
+  // We must still cap by scaleByW to avoid horizontal overflow.
   const scaleByW = ready ? containerW / worldW : 1;
   const scaleByH = ready && containerH > 0 ? containerH / worldH : scaleByW;
+  // Portrait: scale by height, but never exceed width limit
+  // Landscape: scale to fit both (standard letterbox)
   const baseScale = isPortrait
     ? Math.min(scaleByH, scaleByW)
     : Math.min(scaleByW, scaleByH);
