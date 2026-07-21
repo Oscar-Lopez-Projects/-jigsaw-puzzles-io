@@ -469,12 +469,16 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
       const piece = pieces.find((p) => p.id === id);
       if (!piece) return;
 
+      // Clamp to world bounds — ensures no piece can ever escape the staging area
+      const clampedWx = Math.max(0, Math.min(wx, worldW - piece.pieceWidth));
+      const clampedWy = Math.max(0, Math.min(wy, worldH - piece.pieceHeight));
+
       // 1. Snap to the correct final board position → lock it
       const correctWorldX = targetOX + piece.correctX;
       const correctWorldY = targetOY + piece.correctY;
       const distToTarget = Math.hypot(
-        (wx + pw / 2) - (correctWorldX + pw / 2),
-        (wy + ph / 2) - (correctWorldY + ph / 2)
+        (clampedWx + pw / 2) - (correctWorldX + pw / 2),
+        (clampedWy + ph / 2) - (correctWorldY + ph / 2)
       );
 
       if (distToTarget <= gridCellW * SNAP_THRESHOLD) {
@@ -500,31 +504,28 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
         const expectedDy = (piece.correctRow - neighbor.correctRow) * gridCellH;
         const expectedX = neighbor.currentX + expectedDx;
         const expectedY = neighbor.currentY + expectedDy;
-        const snapDist = Math.hypot(wx - expectedX, wy - expectedY);
+        const snapDist = Math.hypot(clampedWx - expectedX, clampedWy - expectedY);
 
         if (snapDist <= gridCellW * SNAP_THRESHOLD) {
           playSnapSound();
-          // Merge into the neighbor's group (or start a new one) — permanent
           const gid = neighbor.groupId ?? nextGroupId(pieces);
           let updated = pieces.map((p) => {
             if (p.id === id) return { ...p, currentX: expectedX, currentY: expectedY, groupId: gid };
             if (p.id === neighbor.id && p.groupId == null) return { ...p, groupId: gid };
             return p;
           });
-          // If connecting placed the piece exactly on its board slot (e.g. neighbor
-          // was already locked), lock it (and any others now correct).
           updated = lockCorrectPieces(updated, targetOX, targetOY);
           onPiecesChange(updated);
           return;
         }
       }
 
-      // 3. No snap — leave piece where dropped
+      // 3. No snap — drop at clamped position
       onPiecesChange(pieces.map((p) =>
-        p.id === id ? { ...p, currentX: wx, currentY: wy } : p
+        p.id === id ? { ...p, currentX: clampedWx, currentY: clampedWy } : p
       ));
     },
-    [pieces, pw, ph, gridCellW, gridCellH, targetOX, targetOY, onPiecesChange]
+    [pieces, pw, ph, gridCellW, gridCellH, targetOX, targetOY, worldW, worldH, onPiecesChange]
   );
 
   // Group drag end: move all pieces in the group by the delta, then check snaps
@@ -598,10 +599,18 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
         }
       }
 
-      // 3. No snap — just move
+      // 3. No snap — clamp every piece in the group to world bounds then move
+      updated = updated.map((p) => {
+        if (!ids.includes(p.id)) return p;
+        return {
+          ...p,
+          currentX: Math.max(0, Math.min(p.currentX, worldW - p.pieceWidth)),
+          currentY: Math.max(0, Math.min(p.currentY, worldH - p.pieceHeight)),
+        };
+      });
       onPiecesChange(updated);
     },
-    [pieces, gridCellW, gridCellH, targetOX, targetOY, onPiecesChange]
+    [pieces, gridCellW, gridCellH, targetOX, targetOY, worldW, worldH, onPiecesChange]
   );
 
   if (!ready) {
