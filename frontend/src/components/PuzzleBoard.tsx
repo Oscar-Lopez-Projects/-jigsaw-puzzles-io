@@ -406,13 +406,6 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
   cropRef.current = { targetOX, targetOY, targetW, targetH, scale: safeScale };
 
   // ── Scatter / redistribute ──────────────────────────────────────
-  // Runs on initial load AND whenever world dimensions change (fullscreen, resize).
-  // Slots are built inline with current values — no stale closure possible.
-  // Hard rules:
-  //   1. Fill left panel columns completely (column-major, top→bottom)
-  //   2. Fill right panel columns equally
-  //   3. Overflow goes to puzzle board interior
-  //   4. No piece is ever outside world bounds
   const prevWorldSize = useRef({ w: 0, h: 0 });
   useEffect(() => {
     if (!ready) return;
@@ -423,93 +416,74 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
 
     if (!allAtOrigin && !worldChanged) return;
 
-    // ── Build slots inline with current layout values ──
     const gap = 4;
-    const cW = pw + gap; // cell width
-    const cH = ph + gap; // cell height
+    const cW = pw + gap;
+    const cH = ph + gap;
 
-    // Portrait side panels
-    const leftSlots:  { x: number; y: number }[] = [];
+    // How many columns fit in each side panel
+    const leftPanelW  = targetOX - gap;           // available pixels in left panel
+    const rightPanelW = worldW - (targetOX + targetW) - gap; // available pixels in right panel
+    const leftCols  = Math.max(1, Math.floor(leftPanelW  / cW));
+    const rightCols = Math.max(1, Math.floor(rightPanelW / cW));
+    // How many rows fit vertically
+    const rows_  = Math.max(1, Math.floor((worldH - gap * 2) / cH));
+
+    const leftCapacity  = leftCols  * rows_;
+    const rightCapacity = rightCols * rows_;
+    const sideCapacity  = leftCapacity + rightCapacity;
+
+    // Generate left slots: fill row by row (row-major so visual is left→right, top→bottom)
+    const leftSlots: { x: number; y: number }[] = [];
+    for (let row = 0; row < rows_; row++)
+      for (let col = 0; col < leftCols; col++)
+        leftSlots.push({ x: gap + col * cW, y: gap + row * cH });
+
+    // Generate right slots: same but starting after target area
+    const rightStartX = targetOX + targetW + gap;
     const rightSlots: { x: number; y: number }[] = [];
+    for (let row = 0; row < rows_; row++)
+      for (let col = 0; col < rightCols; col++)
+        rightSlots.push({ x: rightStartX + col * cW, y: gap + row * cH });
+
+    // Interior slots for overflow
     const interiorSlots: { x: number; y: number }[] = [];
+    for (let row = 0; row < Math.floor((targetH - gap * 2) / cH); row++)
+      for (let col = 0; col < Math.floor((targetW - gap * 2) / cW); col++)
+        interiorSlots.push({ x: targetOX + gap + col * cW, y: targetOY + gap + row * cH });
 
-    if (isPortrait) {
-      // Left: column by column (x outer, y inner) so pieces pack left→right, top→bottom per column
-      for (let x = gap; x + pw <= targetOX - gap; x += cW)
-        for (let y = gap; y + ph <= worldH - gap; y += cH)
-          leftSlots.push({ x, y });
+    // Split pieces into exactly left half and right half
+    const unsnapped = allAtOrigin ? [...pieces] : pieces.filter((p) => !p.snapped);
+    const shuffled = [...unsnapped].sort(() => Math.random() - 0.5);
 
-      // Right: same pattern
-      const rStart = targetOX + targetW + gap;
-      for (let x = rStart; x + pw <= worldW - gap; x += cW)
-        for (let y = gap; y + ph <= worldH - gap; y += cH)
-          rightSlots.push({ x, y });
-    } else {
-      // Landscape border ring
-      for (let x = gap; x + pw < worldW - gap; x += cW) {
-        for (let y = gap; y + ph < targetOY - gap; y += cH) leftSlots.push({ x, y });
-        for (let y = targetOY + targetH + gap; y + ph < worldH - gap; y += cH) leftSlots.push({ x, y });
-      }
-      for (let y = targetOY; y + ph < targetOY + targetH; y += cH) {
-        for (let x = gap; x + pw < targetOX - gap; x += cW) leftSlots.push({ x, y });
-        for (let x = targetOX + targetW + gap; x + pw < worldW - gap; x += cW) leftSlots.push({ x, y });
-      }
-    }
+    // Distribute: first leftCapacity pieces to left, next rightCapacity to right, rest to interior
+    const leftPieces  = shuffled.slice(0, leftCapacity);
+    const rightPieces = shuffled.slice(leftCapacity, sideCapacity);
+    const overflow    = shuffled.slice(sideCapacity);
 
-    // Interior overflow (puzzle board center)
-    for (let x = targetOX + gap; x + pw <= targetOX + targetW - gap; x += cW)
-      for (let y = targetOY + gap; y + ph <= targetOY + targetH - gap; y += cH)
-        interiorSlots.push({ x, y });
-
-    // ── Interleave left and right for even L/R distribution ──
-    // [L0, R0, L1, R1, L2, R2, ...] then remaining left, then remaining right, then interior
-    const orderedSlots: { x: number; y: number }[] = [];
-    const maxSide = Math.max(leftSlots.length, rightSlots.length);
-    for (let i = 0; i < maxSide; i++) {
-      if (i < leftSlots.length)  orderedSlots.push(leftSlots[i]);
-      if (i < rightSlots.length) orderedSlots.push(rightSlots[i]);
-    }
-    orderedSlots.push(...interiorSlots);
-
-    if (orderedSlots.length === 0) return;
+    const posMap = new Map<string, { x: number; y: number }>();
+    leftPieces.forEach((p, i)  => posMap.set(p.id, leftSlots[i]));
+    rightPieces.forEach((p, i) => posMap.set(p.id, rightSlots[i]));
+    overflow.forEach((p, i)    => posMap.set(p.id, interiorSlots[i % Math.max(interiorSlots.length, 1)]));
 
     if (allAtOrigin) {
-      // Fresh scatter: shuffle pieces, assign to slots in order
-      const shuffled = [...pieces].sort(() => Math.random() - 0.5);
-      const scattered = shuffled.map((p, i) => {
-        const s = orderedSlots[i % orderedSlots.length];
-        return { ...p, currentX: s.x, currentY: s.y, zone: 'free' as const };
+      const scattered = pieces.map((p) => {
+        const pos = posMap.get(p.id) ?? { x: gap, y: gap };
+        return { ...p, currentX: pos.x, currentY: pos.y, zone: 'free' as const };
       });
       onPiecesChange(scattered);
     } else {
-      // World resized: move only truly out-of-bounds pieces to available slots
-      const oob = pieces.filter(
-        (p) => !p.snapped &&
-          (p.currentX < 0 || p.currentX + pw > worldW || p.currentY < 0 || p.currentY + ph > worldH)
-      );
-      if (oob.length === 0) return;
-
-      // Use slots not already occupied
-      const occupied = new Set(
-        pieces
-          .filter((p) => !p.snapped && p.currentX >= 0 && p.currentX + pw <= worldW && p.currentY >= 0 && p.currentY + ph <= worldH)
-          .map((p) => `${Math.round(p.currentX)},${Math.round(p.currentY)}`)
-      );
-      const freeSlots = orderedSlots.filter((s) => !occupied.has(`${s.x},${s.y}`));
-      let si = 0;
-
       const updated = pieces.map((p) => {
         if (p.snapped) return p;
-        const inBounds = p.currentX >= 0 && p.currentX + pw <= worldW && p.currentY >= 0 && p.currentY + ph <= worldH;
+        const inBounds = p.currentX >= 0 && p.currentX + pw <= worldW &&
+                         p.currentY >= 0 && p.currentY + ph <= worldH;
         if (inBounds) return p;
-        const s = freeSlots[si] ?? orderedSlots[si % orderedSlots.length];
-        si++;
-        return { ...p, currentX: s.x, currentY: s.y };
+        const pos = posMap.get(p.id) ?? leftSlots[0] ?? { x: gap, y: gap };
+        return { ...p, currentX: pos.x, currentY: pos.y };
       });
       onPiecesChange(updated);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, worldW, worldH, targetOX, targetOY, targetW, targetH, pw, ph, isPortrait]);
+  }, [ready, worldW, worldH, targetOX, targetOY, targetW, targetH, pw, ph]);
 
   // Locked pieces (placed correctly on the board) — immovable, green outline
   const lockedPieces = pieces.filter((p) => p.snapped);
