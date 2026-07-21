@@ -416,7 +416,7 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
 
     if (!allAtOrigin && !worldChanged) return;
 
-    const gap = 4;
+    const gap = 10; // safe inset from world edges so no piece is ever half-clipped
     const cW = pw + gap;
     const cH = ph + gap;
 
