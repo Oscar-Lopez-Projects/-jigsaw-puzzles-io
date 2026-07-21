@@ -405,162 +405,110 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
   // Keep cropRef in sync so captureSnapshot always reads the latest values
   cropRef.current = { targetOX, targetOY, targetW, targetH, scale: safeScale };
 
-  // Scatter pieces into the staging areas on initial load / after Reset.
-  useEffect(() => {
-    if (!ready) return;
-    const allAtOrigin = pieces.every((p) => p.currentX === 0 && p.currentY === 0 && !p.snapped);
-    if (!allAtOrigin) return;
-
+  // ── Piece placement helper ─────────────────────────────────────
+  // Generates slots filling left+right panels column-by-column (portrait)
+  // or the full border ring (landscape), then overflows into the puzzle interior.
+  const buildSlots = useCallback(() => {
     const gap = 4;
     const cellW = pw + gap;
     const cellH = ph + gap;
 
-    const shuffle = <T,>(arr: T[]) => [...arr].sort(() => Math.random() - 0.5);
-
     if (isPortrait) {
-      // Portrait: two explicit side panels (left strip and right strip).
-      // Fill them tightly top-to-bottom, no unused rows.
-      const leftSlots: { x: number; y: number }[] = [];
-      const rightSlots: { x: number; y: number }[] = [];
+      const left:  { x: number; y: number }[] = [];
+      const right: { x: number; y: number }[] = [];
 
-      // Left panel: x from 0 to targetOX
-      for (let y = gap; y + ph <= worldH - gap; y += cellH) {
-        for (let x = gap; x + pw <= targetOX - gap; x += cellW) {
-          leftSlots.push({ x, y });
-        }
-      }
-      // Right panel: x from targetOX + targetW to worldW
+      // Column-major: fill each column top-to-bottom so there are no empty rows
+      // Left panel (x: 0 → targetOX)
+      for (let x = gap; x + pw <= targetOX - gap; x += cellW)
+        for (let y = gap; y + ph <= worldH - gap; y += cellH)
+          left.push({ x, y });
+
+      // Right panel (x: targetOX+targetW → worldW)
       const rightStart = targetOX + targetW + gap;
-      for (let y = gap; y + ph <= worldH - gap; y += cellH) {
-        for (let x = rightStart; x + pw <= worldW - gap; x += cellW) {
-          rightSlots.push({ x, y });
-        }
-      }
+      for (let x = rightStart; x + pw <= worldW - gap; x += cellW)
+        for (let y = gap; y + ph <= worldH - gap; y += cellH)
+          right.push({ x, y });
 
-      // If no slots (e.g. side too narrow), fall back to interior
-      const allSideSlots = [...shuffle(leftSlots), ...shuffle(rightSlots)];
-      const interiorSlots: { x: number; y: number }[] = [];
-      if (allSideSlots.length < pieces.length) {
-        for (let y = targetOY + gap; y + ph <= targetOY + targetH - gap; y += cellH) {
-          for (let x = targetOX + gap; x + pw <= targetOX + targetW - gap; x += cellW) {
-            interiorSlots.push({ x, y });
-          }
-        }
-      }
-      const allSlots = [...allSideSlots, ...shuffle(interiorSlots)];
+      // Interior overflow: puzzle board itself
+      const interior: { x: number; y: number }[] = [];
+      for (let x = targetOX + gap; x + pw <= targetOX + targetW - gap; x += cellW)
+        for (let y = targetOY + gap; y + ph <= targetOY + targetH - gap; y += cellH)
+          interior.push({ x, y });
 
-      // Distribute evenly: alternate left/right
-      const shuffledLeft  = shuffle(leftSlots);
-      const shuffledRight = shuffle(rightSlots);
-      let li = 0, ri = 0, si = 0;
-      const scattered = pieces.map((p) => {
-        let pos: { x: number; y: number } | undefined;
-        // Alternate left/right for even distribution
-        if (li <= ri && li < shuffledLeft.length) {
-          pos = shuffledLeft[li++];
-        } else if (ri < shuffledRight.length) {
-          pos = shuffledRight[ri++];
-        } else if (li < shuffledLeft.length) {
-          pos = shuffledLeft[li++];
-        } else {
-          // Overflow into interior or wrap
-          pos = allSlots[si++ % Math.max(allSlots.length, 1)];
-        }
-        return { ...p, currentX: pos?.x ?? gap, currentY: pos?.y ?? gap, zone: 'free' as const };
-      });
-      onPiecesChange(scattered);
+      return { left, right, interior };
     } else {
-      // Landscape: standard border ring scatter
-      const targetLeft   = targetOX;
-      const targetRight  = targetOX + targetW;
-      const targetTop    = targetOY;
-      const targetBottom = targetOY + targetH;
-
+      // Landscape: border ring then interior
       const border: { x: number; y: number }[] = [];
       const interior: { x: number; y: number }[] = [];
-
-      for (let y = gap; y + ph < worldH - gap; y += cellH) {
-        for (let x = gap; x + pw < worldW - gap; x += cellW) {
-          const cx = x + pw / 2;
-          const cy = y + ph / 2;
-          const insideTarget =
-            cx > targetLeft && cx < targetRight && cy > targetTop && cy < targetBottom;
-          if (insideTarget) interior.push({ x, y });
-          else border.push({ x, y });
-        }
-      }
-
-      const ordered = [...shuffle(border), ...shuffle(interior)];
-      const scattered = pieces.map((p, i) => {
-        const pos = ordered[i % ordered.length];
-        return { ...p, currentX: pos?.x ?? 0, currentY: pos?.y ?? 0, zone: 'free' as const };
-      });
-      onPiecesChange(scattered);
-    }
-  }, [ready, isPortrait, worldW, worldH, pw, ph, targetOX, targetOY, targetW, targetH]); // eslint-disable-line
-
-  // When world dimensions change mid-game (e.g. fullscreen toggle), re-clamp all
-  // unsnapped pieces into the new bounds. Pieces that fall outside get packed
-  // into border slots — stacking is allowed so nothing is ever invisible.
-  const prevWorldW = useRef(worldW);
-  const prevWorldH = useRef(worldH);
-  useEffect(() => {
-    if (!ready) return;
-    const worldChanged = worldW !== prevWorldW.current || worldH !== prevWorldH.current;
-    prevWorldW.current = worldW;
-    prevWorldH.current = worldH;
-    if (!worldChanged) return;
-
-    // Check if any unsnapped piece is now outside the new world
-    const hasOutsiders = pieces.some(
-      (p) => !p.snapped && (
-        p.currentX < 0 || p.currentX + pw > worldW ||
-        p.currentY < 0 || p.currentY + ph > worldH
-      )
-    );
-    if (!hasOutsiders) return;
-
-    // Build border slot grid for new world
-    const gap = 4;
-    const cellW = pw + gap;
-    const cellH = ph + gap;
-    const border: { x: number; y: number }[] = [];
-
-    if (isPortrait) {
-      // Left panel
-      for (let y = gap; y + ph <= worldH - gap; y += cellH)
-        for (let x = gap; x + pw <= targetOX - gap; x += cellW)
-          border.push({ x, y });
-      // Right panel
-      const rightStart = targetOX + targetW + gap;
-      for (let y = gap; y + ph <= worldH - gap; y += cellH)
-        for (let x = rightStart; x + pw <= worldW - gap; x += cellW)
-          border.push({ x, y });
-    } else {
       for (let y = gap; y + ph < worldH - gap; y += cellH)
         for (let x = gap; x + pw < worldW - gap; x += cellW) {
           const cx = x + pw / 2, cy = y + ph / 2;
-          if (!(cx > targetOX && cx < targetOX + targetW && cy > targetOY && cy < targetOY + targetH))
-            border.push({ x, y });
+          const inside = cx > targetOX && cx < targetOX + targetW &&
+                         cy > targetOY && cy < targetOY + targetH;
+          if (inside) interior.push({ x, y }); else border.push({ x, y });
         }
+      return { left: border, right: [], interior };
     }
+  }, [isPortrait, worldW, worldH, targetOX, targetOY, targetW, targetH, pw, ph]);
 
-    // Re-place only pieces that are outside bounds
-    // Use modulo so overflow pieces stack on existing slots
-    let slotIdx = 0;
-    const updated = pieces.map((p) => {
-      if (p.snapped) return p;
-      const inBounds =
-        p.currentX >= 0 && p.currentX + pw <= worldW &&
-        p.currentY >= 0 && p.currentY + ph <= worldH;
-      if (inBounds) return p;
-      // Place in next border slot (wraps around — stacking is fine)
-      const slot = border[slotIdx % Math.max(border.length, 1)];
-      slotIdx++;
-      return { ...p, currentX: slot?.x ?? gap, currentY: slot?.y ?? gap };
-    });
-    onPiecesChange(updated);
-  }, [ready, isPortrait, worldW, worldH, pw, ph, targetOX, targetOY, targetW, targetH]); // eslint-disable-line
+  // ── Scatter / redistribute effect ──────────────────────────────
+  // Runs on initial load (allAtOrigin) AND whenever the world size changes
+  // (fullscreen toggle, window resize). Always fills side panels completely
+  // before placing overflow in the puzzle board interior.
+  const prevWorldSize = useRef({ w: 0, h: 0 });
+  useEffect(() => {
+    if (!ready) return;
+
+    const allAtOrigin = pieces.every((p) => p.currentX === 0 && p.currentY === 0 && !p.snapped);
+    const worldChanged = worldW !== prevWorldSize.current.w || worldH !== prevWorldSize.current.h;
+    prevWorldSize.current = { w: worldW, h: worldH };
+
+    if (!allAtOrigin && !worldChanged) return;
+
+    const { left, right, interior } = buildSlots();
+    const shuffle = <T,>(arr: T[]) => [...arr].sort(() => Math.random() - 0.5);
+
+    if (allAtOrigin) {
+      // Fresh scatter: all pieces, alternate left/right then overflow
+      const sL = shuffle([...left]);
+      const sR = shuffle([...right]);
+      const sI = shuffle([...interior]);
+      let li = 0, ri = 0, ii = 0;
+
+      const scattered = pieces.map((p) => {
+        let pos: { x: number; y: number };
+        if (isPortrait) {
+          // Alternate: left, right, left, right… then interior overflow
+          if (li <= ri && li < sL.length)      pos = sL[li++];
+          else if (ri < sR.length)              pos = sR[ri++];
+          else if (li < sL.length)              pos = sL[li++];
+          else                                  pos = sI[ii++ % Math.max(sI.length, 1)] ?? { x: 4, y: 4 };
+        } else {
+          const all = [...sL, ...sI];
+          pos = all[(li++) % Math.max(all.length, 1)] ?? { x: 4, y: 4 };
+        }
+        return { ...p, currentX: pos.x, currentY: pos.y, zone: 'free' as const };
+      });
+      onPiecesChange(scattered);
+    } else {
+      // World resized: redistribute only out-of-bounds unsnapped pieces
+      const allSlots = isPortrait
+        ? [...left, ...right, ...interior]
+        : [...left, ...interior];
+      const sSlots = shuffle([...allSlots]);
+      let si = 0;
+
+      const updated = pieces.map((p) => {
+        if (p.snapped) return p;
+        const inBounds = p.currentX >= 0 && p.currentX + pw <= worldW &&
+                         p.currentY >= 0 && p.currentY + ph <= worldH;
+        if (inBounds) return p;
+        const slot = sSlots[si++ % Math.max(sSlots.length, 1)] ?? { x: 4, y: 4 };
+        return { ...p, currentX: slot.x, currentY: slot.y };
+      });
+      onPiecesChange(updated);
+    }
+  }, [ready, isPortrait, worldW, worldH, pw, ph, buildSlots]); // eslint-disable-line
 
   // Locked pieces (placed correctly on the board) — immovable, green outline
   const lockedPieces = pieces.filter((p) => p.snapped);
