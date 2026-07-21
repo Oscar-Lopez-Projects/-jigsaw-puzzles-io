@@ -404,6 +404,8 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
 
   // Keep cropRef in sync so captureSnapshot always reads the latest values
   cropRef.current = { targetOX, targetOY, targetW, targetH, scale: safeScale };
+  const safeScaleRef = useRef(safeScale);
+  safeScaleRef.current = safeScale;
 
   // ── Scatter / redistribute ──────────────────────────────────────
   const prevWorldSize = useRef({ w: 0, h: 0 });
@@ -416,13 +418,18 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
 
     if (!allAtOrigin && !worldChanged) return;
 
-    const gap = 10; // safe inset from world edges so no piece is ever half-clipped
+    const tabSize = Math.round(pw * 0.132); // ≈ pieceW * 0.18 / 1.36
+    const gap = Math.max(tabSize + 2, 12);  // safe inset from every edge
     const cW = pw + gap;
     const cH = ph + gap;
 
+    // Right panel: subtract zoom controls width (52px screen space converted to world coords)
+    const zoomControlsWorldW = Math.round(52 / safeScaleRef.current);
+    const rightPanelEndX = worldW - zoomControlsWorldW - gap;
+
     // How many columns fit in each side panel
-    const leftPanelW  = targetOX - gap;           // available pixels in left panel
-    const rightPanelW = worldW - (targetOX + targetW) - gap; // available pixels in right panel
+    const leftPanelW  = targetOX - gap;                 // left panel available width
+    const rightPanelW = rightPanelEndX - (targetOX + targetW + gap); // right panel available width
     const leftCols  = Math.max(1, Math.floor(leftPanelW  / cW));
     const rightCols = Math.max(1, Math.floor(rightPanelW / cW));
     // How many rows fit vertically
@@ -442,8 +449,10 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
     const rightStartX = targetOX + targetW + gap;
     const rightSlots: { x: number; y: number }[] = [];
     for (let row = 0; row < rows_; row++)
-      for (let col = 0; col < rightCols; col++)
-        rightSlots.push({ x: rightStartX + col * cW, y: gap + row * cH });
+      for (let col = 0; col < rightCols; col++) {
+        const sx = rightStartX + col * cW;
+        if (sx + pw <= rightPanelEndX) rightSlots.push({ x: sx, y: gap + row * cH });
+      }
 
     // Interior slots for overflow
     const interiorSlots: { x: number; y: number }[] = [];
