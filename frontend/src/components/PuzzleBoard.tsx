@@ -445,6 +445,60 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
     onPiecesChange(scattered);
   }, [ready, worldW, worldH, pw, ph, targetOX, targetOY, targetW, targetH]); // eslint-disable-line
 
+  // When world dimensions change mid-game (e.g. fullscreen toggle), re-clamp all
+  // unsnapped pieces into the new bounds. Pieces that fall outside get packed
+  // into border slots — stacking is allowed so nothing is ever invisible.
+  const prevWorldW = useRef(worldW);
+  const prevWorldH = useRef(worldH);
+  useEffect(() => {
+    if (!ready) return;
+    const worldChanged = worldW !== prevWorldW.current || worldH !== prevWorldH.current;
+    prevWorldW.current = worldW;
+    prevWorldH.current = worldH;
+    if (!worldChanged) return;
+
+    // Check if any unsnapped piece is now outside the new world
+    const hasOutsiders = pieces.some(
+      (p) => !p.snapped && (
+        p.currentX < 0 || p.currentX + pw > worldW ||
+        p.currentY < 0 || p.currentY + ph > worldH
+      )
+    );
+    if (!hasOutsiders) return;
+
+    // Build border slot grid — same as scatter logic
+    const gap = 6;
+    const cellW = pw + gap;
+    const cellH = ph + gap;
+    const border: { x: number; y: number }[] = [];
+    for (let y = gap; y + ph < worldH - gap; y += cellH) {
+      for (let x = gap; x + pw < worldW - gap; x += cellW) {
+        const cx = x + pw / 2;
+        const cy = y + ph / 2;
+        const insideTarget =
+          cx > targetOX && cx < targetOX + targetW &&
+          cy > targetOY && cy < targetOY + targetH;
+        if (!insideTarget) border.push({ x, y });
+      }
+    }
+
+    // Re-place only pieces that are outside bounds
+    // Use modulo so overflow pieces stack on existing slots
+    let slotIdx = 0;
+    const updated = pieces.map((p) => {
+      if (p.snapped) return p;
+      const inBounds =
+        p.currentX >= 0 && p.currentX + pw <= worldW &&
+        p.currentY >= 0 && p.currentY + ph <= worldH;
+      if (inBounds) return p;
+      // Place in next border slot (wraps around — stacking is fine)
+      const slot = border[slotIdx % Math.max(border.length, 1)];
+      slotIdx++;
+      return { ...p, currentX: slot?.x ?? gap, currentY: slot?.y ?? gap };
+    });
+    onPiecesChange(updated);
+  }, [ready, worldW, worldH, pw, ph, targetOX, targetOY, targetW, targetH]); // eslint-disable-line
+
   // Locked pieces (placed correctly on the board) — immovable, green outline
   const lockedPieces = pieces.filter((p) => p.snapped);
 
