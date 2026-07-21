@@ -200,31 +200,3 @@
 .puzzle-expand-arrow--right:hover { transform: translateY(-50%) scale(1.1); }
 .puzzle-expand-arrow--top:hover   { transform: translateX(-50%) scale(1.1); }
 .puzzle-expand-arrow--bottom:hover { transform: translateX(-50%) scale(1.1); }
-
-/* ── Side scroll overlay zones ──────────────────────────────── */
-/* Transparent hit areas over the left/right piece margins.
-   They intercept wheel events to scroll the canvas vertically.
-   A thin scrollbar track on the inner edge shows position. */
-.puzzle-side-scroll {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  z-index: 20;
-  pointer-events: auto;
-  /* Subtle inner edge indicator */
-  overflow: hidden;
-}
-
-.puzzle-side-scroll--left  { left: 0; border-right: 2px solid rgba(255,255,255,0.06); }
-.puzzle-side-scroll--right { right: 52px; border-left: 2px solid rgba(255,255,255,0.06); }
-
-/* Show a hover hint so users know they can scroll */
-.puzzle-side-scroll:hover {
-  border-color: rgba(124, 58, 237, 0.35);
-}
-
-/* Scroll indicator cursor */
-.puzzle-side-scroll--left,
-.puzzle-side-scroll--right {
-  cursor: ns-resize;
-}

@@ -303,8 +303,6 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
   const [zoomLevel, setZoomLevel] = useState(1);
   const [panMode, setPanMode] = useState(false);
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
-  // Vertical scroll offset for the side panels (moves the canvas view up/down)
-  const [sideScrollY, setSideScrollY] = useState(0);
 
   // Pan drag tracking — stored in a ref so pointer handlers don't go stale
   const panDrag = useRef<{ startX: number; startY: number; originX: number; originY: number } | null>(null);
@@ -319,23 +317,12 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
 
   const handleCenterBoard = useCallback(() => {
     setPanOffset({ x: 0, y: 0 });
-    setSideScrollY(0);
   }, []);
-
-  // ── Side scroll: wheel events on left/right margins pan the canvas vertically ──
-  const handleSideWheel = useCallback((e: React.WheelEvent) => {
-    if (panMode) return;
-    e.preventDefault();
-    setPanOffset((prev) => ({ x: prev.x, y: prev.y - e.deltaY * 0.8 }));
-  }, [panMode]);
 
   // ── Expand board level (state only — logic computed after targetW/H below) ─
   const totalPieces = cols * rows;
   const canExpand = EXPAND_PIECE_COUNTS.has(totalPieces);
-  // Portrait images auto-start at expand level 1 for best desktop UX
-  const [expandLevel, setExpandLevel] = useState(() =>
-    canExpand && rows > cols ? 1 : 0
-  );
+  const [expandLevel, setExpandLevel] = useState(0);
   const cycleExpand = useCallback(() => {
     setExpandLevel((l) => (l + 1) % EXPAND_RATIOS.length);
   }, []);
@@ -667,15 +654,6 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
       onPointerLeave={handlePanPointerUp}
     >
       <div className="puzzle-board-inner">
-        {/* Left scroll zone — covers the left margin, intercepts wheel for vertical scroll */}
-        {isPortrait && expandLevel > 0 && (
-          <div
-            className="puzzle-side-scroll puzzle-side-scroll--left"
-            style={{ width: Math.round(marginX * safeScale) }}
-            onWheel={handleSideWheel}
-          />
-        )}
-
         <div
           ref={stageWrapRef}
           className={`puzzle-single-stage${panMode ? ' puzzle-single-stage--pan' : ''}`}
@@ -745,15 +723,6 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
           )}
         </Stage>
         </div>
-
-        {/* Right scroll zone — mirrors left, placed after stage */}
-        {isPortrait && expandLevel > 0 && (
-          <div
-            className="puzzle-side-scroll puzzle-side-scroll--right"
-            style={{ width: Math.round(marginX * safeScale) }}
-            onWheel={handleSideWheel}
-          />
-        )}
 
         {/* Floating expand arrows on the edges of the board — portrait gets left/right, landscape gets top/bottom */}
         {canExpand && isPortrait && (
