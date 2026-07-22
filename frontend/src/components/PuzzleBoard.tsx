@@ -300,27 +300,6 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
   const [panMode, setPanMode] = useState(false);
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
 
-  // ── Side scrollbar state ───────────────────────────────────────
-  // Tracks the vertical scroll ratio (0 = top, 1 = bottom) for the side panels.
-  // Only relevant for portrait images where stageH > containerH.
-  const [scrollRatio, setScrollRatio] = useState(0);
-  const scrollDragging = useRef<{ side: 'left' | 'right'; startY: number; startRatio: number } | null>(null);
-
-  const handleScrollThumbPointerDown = useCallback((e: React.PointerEvent, side: 'left' | 'right') => {
-    e.stopPropagation();
-    e.currentTarget.setPointerCapture(e.pointerId);
-    scrollDragging.current = { side, startY: e.clientY, startRatio: scrollRatio };
-  }, [scrollRatio]);
-
-  const handleScrollThumbPointerMove = useCallback((e: React.PointerEvent) => {
-    if (!scrollDragging.current) return;
-    // Will be handled by wrapRef's pointer move — no-op here since we use global handlers
-  }, []);
-
-  const handleScrollThumbPointerUp = useCallback(() => {
-    scrollDragging.current = null;
-  }, []);
-
   // Pan drag tracking — stored in a ref so pointer handlers don't go stale
   const panDrag = useRef<{ startX: number; startY: number; originX: number; originY: number } | null>(null);
 
@@ -347,29 +326,10 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
   }, [panMode, panOffset]);
 
   const handlePanPointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    // Handle scroll thumb dragging
-    if (scrollDragging.current) {
-      const dy = e.clientY - scrollDragging.current.startY;
-      // Convert pixel drag to ratio change based on track height
-      const trackH = (wrapRef.current?.clientHeight ?? 1) - 40; // minus thumb min height
-      const deltaRatio = dy / trackH;
-      const newRatio = Math.max(0, Math.min(1, scrollDragging.current.startRatio + deltaRatio));
-      setScrollRatio(newRatio);
-      return;
-    }
     if (!panDrag.current) return;
     const dx = e.clientX - panDrag.current.startX;
     const dy = e.clientY - panDrag.current.startY;
     setPanOffset({ x: panDrag.current.originX + dx, y: panDrag.current.originY + dy });
-  }, []);
-
-  const handleWheelOnSide = useCallback((e: React.WheelEvent) => {
-    e.preventDefault();
-    // Scroll by moving panOffset.y
-    setPanOffset((prev) => ({
-      x: prev.x,
-      y: prev.y - e.deltaY * 0.6,
-    }));
   }, []);
 
   const handlePanPointerUp = useCallback(() => {
@@ -716,25 +676,6 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
       onPointerLeave={handlePanPointerUp}
     >
       <div className="puzzle-board-inner">
-        {/* Left scrollbar — only shown when stage taller than container */}
-        {isPortrait && stageH > (containerH || 0) && (
-          <div className="puzzle-scrollbar puzzle-scrollbar--left" onWheel={handleWheelOnSide}>
-            <div
-              className="puzzle-scrollbar-track"
-              onPointerDown={(e) => handleScrollThumbPointerDown(e, 'left')}
-              onPointerMove={handleScrollThumbPointerMove}
-              onPointerUp={handleScrollThumbPointerUp}
-            >
-              <div
-                className="puzzle-scrollbar-thumb"
-                style={{
-                  height: `${Math.max(30, (containerH / stageH) * 100)}%`,
-                  top: `${Math.min(100 - Math.max(30, (containerH / stageH) * 100), Math.max(0, (-panOffset.y / Math.max(1, stageH - containerH)) * (100 - Math.max(30, (containerH / stageH) * 100))))}%`,
-                }}
-              />
-            </div>
-          </div>
-        )}
         <div
           ref={stageWrapRef}
           className={`puzzle-single-stage${panMode ? ' puzzle-single-stage--pan' : ''}`}
@@ -804,26 +745,6 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
           )}
         </Stage>
         </div>
-
-        {/* Right scrollbar */}
-        {isPortrait && stageH > (containerH || 0) && (
-          <div className="puzzle-scrollbar puzzle-scrollbar--right" onWheel={handleWheelOnSide}>
-            <div
-              className="puzzle-scrollbar-track"
-              onPointerDown={(e) => handleScrollThumbPointerDown(e, 'right')}
-              onPointerMove={handleScrollThumbPointerMove}
-              onPointerUp={handleScrollThumbPointerUp}
-            >
-              <div
-                className="puzzle-scrollbar-thumb"
-                style={{
-                  height: `${Math.max(30, (containerH / stageH) * 100)}%`,
-                  top: `${Math.min(100 - Math.max(30, (containerH / stageH) * 100), Math.max(0, (-panOffset.y / Math.max(1, stageH - containerH)) * (100 - Math.max(30, (containerH / stageH) * 100))))}%`,
-                }}
-              />
-            </div>
-          </div>
-        )}
 
         {/* Zoom + pan controls — right side */}
         <div
