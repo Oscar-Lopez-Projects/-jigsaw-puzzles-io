@@ -315,6 +315,12 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
     setPanOffset({ x: 0, y: 0 });
   }, []);
 
+  // Wheel on side panels scrolls vertically
+  const handleSideWheel = useCallback((e: React.WheelEvent) => {
+    e.preventDefault();
+    setPanOffset((prev) => ({ x: prev.x, y: prev.y - e.deltaY * 0.7 }));
+  }, []);
+
   // ── Portrait images: always max side space, no user toggle ─────
   // No expand state needed — determined purely by isPortrait below.
 
@@ -427,52 +433,42 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
     const zoomControlsWorldW = Math.round(52 / safeScaleRef.current);
     const rightPanelEndX = worldW - zoomControlsWorldW - gap;
 
-    // How many columns fit in each side panel
-    const leftPanelW  = targetOX - gap;                 // left panel available width
-    const rightPanelW = rightPanelEndX - (targetOX + targetW + gap); // right panel available width
-    const leftCols  = Math.max(1, Math.floor(leftPanelW  / cW));
-    const rightCols = Math.max(1, Math.floor(rightPanelW / cW));
-    // How many rows fit vertically
-    const rows_  = Math.max(1, Math.floor((worldH - gap * 2) / cH));
+    // How many columns per side — max 7
+    const leftPanelW  = targetOX - gap;
+    const rightPanelW = rightPanelEndX - (targetOX + targetW + gap);
+    const leftCols  = Math.min(7, Math.max(1, Math.floor(leftPanelW  / cW)));
+    const rightCols = Math.min(7, Math.max(1, Math.floor(rightPanelW / cW)));
 
-    const leftCapacity  = leftCols  * rows_;
-    const rightCapacity = rightCols * rows_;
-    const sideCapacity  = leftCapacity + rightCapacity;
+    // Split pieces evenly: half left, half right (no board interior)
+    const unsnapped = allAtOrigin ? [...pieces] : pieces.filter((p) => !p.snapped);
+    const shuffled  = [...unsnapped].sort(() => Math.random() - 0.5);
+    const half        = Math.ceil(shuffled.length / 2);
+    const leftPieces  = shuffled.slice(0, half);
+    const rightPieces = shuffled.slice(half);
 
-    // Generate left slots: fill row by row (row-major so visual is left→right, top→bottom)
+    // Rows needed for each side (extends downward — scrollbar reveals overflow)
+    const leftRows  = Math.ceil(leftPieces.length  / leftCols);
+    const rightRows = Math.ceil(rightPieces.length / rightCols);
+
+    // Left slots row-major
     const leftSlots: { x: number; y: number }[] = [];
-    for (let row = 0; row < rows_; row++)
+    for (let row = 0; row < leftRows; row++)
       for (let col = 0; col < leftCols; col++)
         leftSlots.push({ x: gap + col * cW, y: gap + row * cH });
 
-    // Generate right slots: same but starting after target area
+    // Right slots row-major
     const rightStartX = targetOX + targetW + gap;
     const rightSlots: { x: number; y: number }[] = [];
-    for (let row = 0; row < rows_; row++)
+    for (let row = 0; row < rightRows; row++)
       for (let col = 0; col < rightCols; col++) {
         const sx = rightStartX + col * cW;
         if (sx + pw <= rightPanelEndX) rightSlots.push({ x: sx, y: gap + row * cH });
       }
 
-    // Interior slots for overflow
-    const interiorSlots: { x: number; y: number }[] = [];
-    for (let row = 0; row < Math.floor((targetH - gap * 2) / cH); row++)
-      for (let col = 0; col < Math.floor((targetW - gap * 2) / cW); col++)
-        interiorSlots.push({ x: targetOX + gap + col * cW, y: targetOY + gap + row * cH });
-
-    // Split pieces into exactly left half and right half
-    const unsnapped = allAtOrigin ? [...pieces] : pieces.filter((p) => !p.snapped);
-    const shuffled = [...unsnapped].sort(() => Math.random() - 0.5);
-
-    // Distribute: first leftCapacity pieces to left, next rightCapacity to right, rest to interior
-    const leftPieces  = shuffled.slice(0, leftCapacity);
-    const rightPieces = shuffled.slice(leftCapacity, sideCapacity);
-    const overflow    = shuffled.slice(sideCapacity);
-
+    // Every piece gets a side slot — no overflow to board interior
     const posMap = new Map<string, { x: number; y: number }>();
-    leftPieces.forEach((p, i)  => posMap.set(p.id, leftSlots[i]));
-    rightPieces.forEach((p, i) => posMap.set(p.id, rightSlots[i]));
-    overflow.forEach((p, i)    => posMap.set(p.id, interiorSlots[i % Math.max(interiorSlots.length, 1)]));
+    leftPieces.forEach((p, i)  => posMap.set(p.id, leftSlots[Math.min(i, leftSlots.length - 1)]));
+    rightPieces.forEach((p, i) => posMap.set(p.id, rightSlots[Math.min(i, rightSlots.length - 1)]));
 
     if (allAtOrigin) {
       const scattered = pieces.map((p) => {
@@ -676,6 +672,17 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
       onPointerLeave={handlePanPointerUp}
     >
       <div className="puzzle-board-inner">
+        {/* Scrollbar overlays — wheel area + visual track on outer edges */}
+        {isPortrait && (
+          <>
+            <div className="puzzle-sb puzzle-sb--left" onWheel={handleSideWheel}>
+              <div className="puzzle-sb-track"><div className="puzzle-sb-thumb" /></div>
+            </div>
+            <div className="puzzle-sb puzzle-sb--right" onWheel={handleSideWheel}>
+              <div className="puzzle-sb-track"><div className="puzzle-sb-thumb" /></div>
+            </div>
+          </>
+        )}
         <div
           ref={stageWrapRef}
           className={`puzzle-single-stage${panMode ? ' puzzle-single-stage--pan' : ''}`}
