@@ -333,8 +333,9 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
     setPanOffset({ x: 0, y: 0 });
   }, []);
 
-  // ── Portrait images: always max side space, no user toggle ─────
-  // No expand state needed — determined purely by isPortrait below.
+  // Refs for values used in callbacks before they're declared
+  const stageHRef = useRef(0);
+  const containerHRef = useRef(0);
 
   // Pointer handlers for free-range pan (tracked on the whole wrap, no DOM clipping)
   const handlePanPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
@@ -347,10 +348,11 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
     // Handle scroll thumb dragging
     if (scrollDragging.current) {
       const dy = e.clientY - scrollDragging.current.startY;
-      // Map pixel drag on track to world-space pan
       const trackH = wrapRef.current?.clientHeight ?? 1;
-      const maxPan = -(stageH - containerH);
-      const panDelta = (dy / trackH) * stageH;
+      const sh = stageHRef.current;
+      const ch = containerHRef.current;
+      const maxPan = -(sh - ch);
+      const panDelta = (dy / trackH) * sh;
       const newPanY = Math.max(maxPan, Math.min(0, scrollDragging.current.startPanY - panDelta));
       setPanOffset((prev) => ({ x: prev.x, y: newPanY }));
       return;
@@ -359,7 +361,7 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
     const dx = e.clientX - panDrag.current.startX;
     const dy = e.clientY - panDrag.current.startY;
     setPanOffset({ x: panDrag.current.originX + dx, y: panDrag.current.originY + dy });
-  }, [stageH, containerH]);
+  }, []);
 
   const handleWheelOnSide = useCallback((e: React.WheelEvent) => {
     e.preventDefault();
@@ -444,6 +446,8 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
   cropRef.current = { targetOX, targetOY, targetW, targetH, scale: safeScale };
   const safeScaleRef = useRef(safeScale);
   safeScaleRef.current = safeScale;
+  stageHRef.current = stageH;
+  containerHRef.current = containerH;
 
   // ── Scatter / redistribute ──────────────────────────────────────
   const prevWorldSize = useRef({ w: 0, h: 0 });
