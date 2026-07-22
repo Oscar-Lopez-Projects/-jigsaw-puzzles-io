@@ -315,19 +315,6 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
     setPanOffset({ x: 0, y: 0 });
   }, []);
 
-  // Wheel on the board scrolls vertically in portrait mode
-  const handleBoardWheel = useCallback((e: React.WheelEvent<HTMLDivElement>) => {
-    if (!isPortraitRef.current) return;
-    e.preventDefault();
-    const sh = worldHRef.current * safeScaleRef.current;
-    const ch = wrapRef.current?.clientHeight ?? sh;
-    const maxScrollDown = Math.max(0, sh - ch);
-    setPanOffset((prev) => ({
-      x: prev.x,
-      y: Math.min(0, Math.max(-(maxScrollDown * 2), prev.y - e.deltaY * 0.7)),
-    }));
-  }, []);
-
   // ── Portrait images: always max side space, no user toggle ─────
   // No expand state needed — determined purely by isPortrait below.
 
@@ -419,11 +406,6 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
   cropRef.current = { targetOX, targetOY, targetW, targetH, scale: safeScale };
   const safeScaleRef = useRef(safeScale);
   safeScaleRef.current = safeScale;
-  const stageWRef   = useRef(stageW);    stageWRef.current   = stageW;
-  const targetOXRef = useRef(targetOX);  targetOXRef.current = targetOX;
-  const targetWRef  = useRef(targetW);   targetWRef.current  = targetW;
-  const isPortraitRef = useRef(isPortrait); isPortraitRef.current = isPortrait;
-  const worldHRef = useRef(worldH); worldHRef.current = worldH;
 
   // ── Scatter / redistribute ──────────────────────────────────────
   const prevWorldSize = useRef({ w: 0, h: 0 });
@@ -445,44 +427,52 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
     const zoomControlsWorldW = Math.round(52 / safeScaleRef.current);
     const rightPanelEndX = worldW - zoomControlsWorldW - gap;
 
-    // How many columns per side — max 7
-    const leftPanelW  = targetOX - gap;
-    const rightPanelW = rightPanelEndX - (targetOX + targetW + gap);
-    const leftCols  = Math.min(7, Math.max(1, Math.floor(leftPanelW  / cW)));
-    const rightCols = Math.min(7, Math.max(1, Math.floor(rightPanelW / cW)));
+    // How many columns fit in each side panel
+    const leftPanelW  = targetOX - gap;                 // left panel available width
+    const rightPanelW = rightPanelEndX - (targetOX + targetW + gap); // right panel available width
+    const leftCols  = Math.max(1, Math.floor(leftPanelW  / cW));
+    const rightCols = Math.max(1, Math.floor(rightPanelW / cW));
+    // How many rows fit vertically
+    const rows_  = Math.max(1, Math.floor((worldH - gap * 2) / cH));
 
-    // Split pieces evenly: half left, half right (no board interior)
-    const unsnapped = allAtOrigin ? [...pieces] : pieces.filter((p) => !p.snapped);
-    const shuffled  = [...unsnapped].sort(() => Math.random() - 0.5);
-    const half        = Math.ceil(shuffled.length / 2);
-    const leftPieces  = shuffled.slice(0, half);
-    const rightPieces = shuffled.slice(half);
+    const leftCapacity  = leftCols  * rows_;
+    const rightCapacity = rightCols * rows_;
+    const sideCapacity  = leftCapacity + rightCapacity;
 
-    // Rows needed for each side (extends downward — scrollbar reveals overflow)
-    const leftRows  = Math.ceil(leftPieces.length  / leftCols);
-    const rightRows = Math.ceil(rightPieces.length / rightCols);
-
-    // Center the columns within each panel
-    const usedLeftW  = leftCols  * cW - gap;
-    const leftOffset  = Math.max(gap, Math.round((targetOX - usedLeftW) / 2));
-    const rightOffset = Math.max(gap, Math.round(((worldW - rightPanelEndX - gap) / 2)));
-
-    // Left slots row-major
+    // Generate left slots: fill row by row (row-major so visual is left→right, top→bottom)
     const leftSlots: { x: number; y: number }[] = [];
-    for (let row = 0; row < leftRows; row++)
+    for (let row = 0; row < rows_; row++)
       for (let col = 0; col < leftCols; col++)
-        leftSlots.push({ x: leftOffset + col * cW, y: gap + row * cH });
+        leftSlots.push({ x: gap + col * cW, y: gap + row * cH });
 
-    // Right slots row-major — generate all slots unconditionally (rightCols already bounds-checked)
-    const rightStartX = targetOX + targetW + gap + rightOffset;
+    // Generate right slots: same but starting after target area
+    const rightStartX = targetOX + targetW + gap;
     const rightSlots: { x: number; y: number }[] = [];
-    for (let row = 0; row < rightRows; row++)
-      for (let col = 0; col < rightCols; col++)
-        rightSlots.push({ x: rightStartX + col * cW, y: gap + row * cH });
-    // Every piece gets a side slot — no overflow to board interior
+    for (let row = 0; row < rows_; row++)
+      for (let col = 0; col < rightCols; col++) {
+        const sx = rightStartX + col * cW;
+        if (sx + pw <= rightPanelEndX) rightSlots.push({ x: sx, y: gap + row * cH });
+      }
+
+    // Interior slots for overflow
+    const interiorSlots: { x: number; y: number }[] = [];
+    for (let row = 0; row < Math.floor((targetH - gap * 2) / cH); row++)
+      for (let col = 0; col < Math.floor((targetW - gap * 2) / cW); col++)
+        interiorSlots.push({ x: targetOX + gap + col * cW, y: targetOY + gap + row * cH });
+
+    // Split pieces into exactly left half and right half
+    const unsnapped = allAtOrigin ? [...pieces] : pieces.filter((p) => !p.snapped);
+    const shuffled = [...unsnapped].sort(() => Math.random() - 0.5);
+
+    // Distribute: first leftCapacity pieces to left, next rightCapacity to right, rest to interior
+    const leftPieces  = shuffled.slice(0, leftCapacity);
+    const rightPieces = shuffled.slice(leftCapacity, sideCapacity);
+    const overflow    = shuffled.slice(sideCapacity);
+
     const posMap = new Map<string, { x: number; y: number }>();
-    leftPieces.forEach((p, i)  => posMap.set(p.id, leftSlots[Math.min(i, leftSlots.length - 1)]));
-    rightPieces.forEach((p, i) => posMap.set(p.id, rightSlots[Math.min(i, rightSlots.length - 1)]));
+    leftPieces.forEach((p, i)  => posMap.set(p.id, leftSlots[i]));
+    rightPieces.forEach((p, i) => posMap.set(p.id, rightSlots[i]));
+    overflow.forEach((p, i)    => posMap.set(p.id, interiorSlots[i % Math.max(interiorSlots.length, 1)]));
 
     if (allAtOrigin) {
       const scattered = pieces.map((p) => {
@@ -680,42 +670,12 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
     <div
       className={`puzzle-board-wrap${panMode ? ' puzzle-board-wrap--pan' : ''}`}
       ref={wrapRef}
-      onWheel={handleBoardWheel}
       onPointerDown={handlePanPointerDown}
       onPointerMove={handlePanPointerMove}
       onPointerUp={handlePanPointerUp}
       onPointerLeave={handlePanPointerUp}
     >
       <div className="puzzle-board-inner">
-        {/* Scrollbar overlays — visual track on outer edges */}
-        {isPortrait && (() => {
-          // Compute thumb position from panOffset.y
-          const tabSz = Math.round(pw * 0.132);
-          const gp = Math.max(tabSz + 2, 12);
-          const cellH = ph + gp;
-          const lCols = Math.min(7, Math.max(1, Math.floor((targetOX - gp) / (pw + gp))));
-          const lRows = Math.ceil((pieces.length / 2) / lCols);
-          const totalH = Math.max(containerH, lRows * cellH * safeScale);
-          const thumbPct = Math.max(10, Math.min(90, (containerH / totalH) * 100));
-          const scrollable = totalH - containerH;
-          const thumbTop = scrollable > 0
-            ? Math.max(0, Math.min(100 - thumbPct, (-panOffset.y / scrollable) * (100 - thumbPct)))
-            : 0;
-          return (
-            <>
-              <div className="puzzle-sb puzzle-sb--left">
-                <div className="puzzle-sb-track">
-                  <div className="puzzle-sb-thumb" style={{ height: `${thumbPct}%`, top: `${thumbTop}%` }} />
-                </div>
-              </div>
-              <div className="puzzle-sb puzzle-sb--right">
-                <div className="puzzle-sb-track">
-                  <div className="puzzle-sb-thumb" style={{ height: `${thumbPct}%`, top: `${thumbTop}%` }} />
-                </div>
-              </div>
-            </>
-          );
-        })()}
         <div
           ref={stageWrapRef}
           className={`puzzle-single-stage${panMode ? ' puzzle-single-stage--pan' : ''}`}
@@ -724,13 +684,13 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
           <Stage
             ref={stageRef}
             width={stageW}
-            height={stageH * 4}
+            height={stageH}
             scaleX={safeScale}
             scaleY={safeScale}
           >
-          {/* Background — extends tall enough to cover all piece rows */}
+          {/* Background — single uniform color, no borders */}
           <Layer listening={false}>
-            <Rect x={0} y={0} width={worldW} height={worldH * 4} fill="#3d3b4a" />
+            <Rect x={0} y={0} width={worldW} height={worldH} fill="#3d3b4a" />
             {/* Target area: slightly different shade so user knows where to build */}
             <Rect x={targetOX} y={targetOY} width={targetW} height={targetH}
               fill="#2f2d3e" cornerRadius={4} listening={false} />

@@ -44,9 +44,9 @@
   overflow: hidden;
   cursor: default;
   will-change: transform;
-  /* Center horizontally only — vertical alignment handled by panOffset */
+  /* Center the Konva canvas horizontally and vertically */
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: center;
 }
 
@@ -200,33 +200,3 @@
 .puzzle-expand-arrow--right:hover { transform: translateY(-50%) scale(1.1); }
 .puzzle-expand-arrow--top:hover   { transform: translateX(-50%) scale(1.1); }
 .puzzle-expand-arrow--bottom:hover { transform: translateX(-50%) scale(1.1); }
-
-/* ── Side scrollbars ─────────────────────────────────────────── */
-.puzzle-sb {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 6px;
-  z-index: 60;
-  pointer-events: none; /* wheel handled by wrap div */
-}
-.puzzle-sb--left  { left: 2px; }
-.puzzle-sb--right { right: 56px; }
-
-.puzzle-sb-track {
-  position: relative;
-  width: 6px;
-  height: 100%;
-  background: rgba(255,255,255,0.08);
-  border-radius: 3px;
-}
-.puzzle-sb-thumb {
-  position: absolute;
-  left: 0;
-  right: 0;
-  min-height: 20px;
-  background: var(--accent, #7c3aed);
-  border-radius: 3px;
-  opacity: 0.75;
-  transition: top 0.1s ease;
-}
