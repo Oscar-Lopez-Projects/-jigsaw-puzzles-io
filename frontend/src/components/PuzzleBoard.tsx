@@ -52,10 +52,11 @@ function DraggablePieceTile({ piece, x, y, worldW, worldH, scale, onDragEnd }: P
   );
 
   // Keep the piece fully inside the world bounds while dragging
+  // Use a large maxY so pieces placed below worldH (via scroll) are still draggable
   const dragBound = useCallback(
     (pos: { x: number; y: number }) => {
       const maxX = Math.max(0, (worldW - piece.pieceWidth) * scale);
-      const maxY = Math.max(0, (worldH - piece.pieceHeight) * scale);
+      const maxY = Math.max(0, (worldH * 4 - piece.pieceHeight) * scale); // allow scroll overflow
       return {
         x: Math.max(0, Math.min(pos.x, maxX)),
         y: Math.max(0, Math.min(pos.y, maxY)),
@@ -469,52 +470,43 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
     const zoomControlsWorldW = Math.round(52 / safeScaleRef.current);
     const rightPanelEndX = worldW - zoomControlsWorldW - gap;
 
-    // How many columns fit in each side panel
-    const leftPanelW  = targetOX - gap;                 // left panel available width
-    const rightPanelW = rightPanelEndX - (targetOX + targetW + gap); // right panel available width
-    const leftCols  = Math.max(1, Math.floor(leftPanelW  / cW));
-    const rightCols = Math.max(1, Math.floor(rightPanelW / cW));
-    // How many rows fit vertically
-    const rows_  = Math.max(1, Math.floor((worldH - gap * 2) / cH));
+    // How many columns fit in each side panel — max 7 columns
+    const leftPanelW  = targetOX - gap;
+    const rightPanelW = rightPanelEndX - (targetOX + targetW + gap);
+    const leftCols  = Math.min(7, Math.max(1, Math.floor(leftPanelW  / cW)));
+    const rightCols = Math.min(7, Math.max(1, Math.floor(rightPanelW / cW)));
 
-    const leftCapacity  = leftCols  * rows_;
-    const rightCapacity = rightCols * rows_;
-    const sideCapacity  = leftCapacity + rightCapacity;
+    // Split pieces evenly: half left, half right
+    const unsnapped = allAtOrigin ? [...pieces] : pieces.filter((p) => !p.snapped);
+    const shuffled  = [...unsnapped].sort(() => Math.random() - 0.5);
+    const half       = Math.ceil(shuffled.length / 2);
+    const leftPieces  = shuffled.slice(0, half);
+    const rightPieces = shuffled.slice(half);
 
-    // Generate left slots: fill row by row (row-major so visual is left→right, top→bottom)
+    // Rows needed: enough to hold each half in their column count
+    // Slots extend downward beyond the visible area — scrollbar reveals the rest
+    const leftRows  = Math.ceil(leftPieces.length  / leftCols);
+    const rightRows = Math.ceil(rightPieces.length / rightCols);
+
+    // Generate left slots (row-major)
     const leftSlots: { x: number; y: number }[] = [];
-    for (let row = 0; row < rows_; row++)
+    for (let row = 0; row < leftRows; row++)
       for (let col = 0; col < leftCols; col++)
         leftSlots.push({ x: gap + col * cW, y: gap + row * cH });
 
-    // Generate right slots: same but starting after target area
+    // Generate right slots
     const rightStartX = targetOX + targetW + gap;
     const rightSlots: { x: number; y: number }[] = [];
-    for (let row = 0; row < rows_; row++)
+    for (let row = 0; row < rightRows; row++)
       for (let col = 0; col < rightCols; col++) {
         const sx = rightStartX + col * cW;
         if (sx + pw <= rightPanelEndX) rightSlots.push({ x: sx, y: gap + row * cH });
       }
 
-    // Interior slots for overflow
-    const interiorSlots: { x: number; y: number }[] = [];
-    for (let row = 0; row < Math.floor((targetH - gap * 2) / cH); row++)
-      for (let col = 0; col < Math.floor((targetW - gap * 2) / cW); col++)
-        interiorSlots.push({ x: targetOX + gap + col * cW, y: targetOY + gap + row * cH });
-
-    // Split pieces into exactly left half and right half
-    const unsnapped = allAtOrigin ? [...pieces] : pieces.filter((p) => !p.snapped);
-    const shuffled = [...unsnapped].sort(() => Math.random() - 0.5);
-
-    // Distribute: first leftCapacity pieces to left, next rightCapacity to right, rest to interior
-    const leftPieces  = shuffled.slice(0, leftCapacity);
-    const rightPieces = shuffled.slice(leftCapacity, sideCapacity);
-    const overflow    = shuffled.slice(sideCapacity);
-
+    // Every piece gets a slot — no board interior overflow
     const posMap = new Map<string, { x: number; y: number }>();
-    leftPieces.forEach((p, i)  => posMap.set(p.id, leftSlots[i]));
-    rightPieces.forEach((p, i) => posMap.set(p.id, rightSlots[i]));
-    overflow.forEach((p, i)    => posMap.set(p.id, interiorSlots[i % Math.max(interiorSlots.length, 1)]));
+    leftPieces.forEach((p, i)  => posMap.set(p.id, leftSlots[i]  ?? leftSlots[leftSlots.length - 1]  ?? { x: gap, y: gap }));
+    rightPieces.forEach((p, i) => posMap.set(p.id, rightSlots[i] ?? rightSlots[rightSlots.length - 1] ?? { x: gap, y: gap }));
 
     if (allAtOrigin) {
       const scattered = pieces.map((p) => {
@@ -743,7 +735,7 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
           <Stage
             ref={stageRef}
             width={stageW}
-            height={stageH}
+            height={Math.max(stageH, stageH * 3)}
             scaleX={safeScale}
             scaleY={safeScale}
           >
