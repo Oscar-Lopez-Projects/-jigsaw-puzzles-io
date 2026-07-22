@@ -7,7 +7,6 @@ import './PuzzleBoard.css';
 
 // ─── constants ────────────────────────────────────────────────
 const SNAP_THRESHOLD = 0.5;
-const TRAY_GAP = 12; // padding inside each tray
 
 // ─── useImage hook ─────────────────────────────────────────────
 function useImage(src: string): HTMLImageElement | null {
@@ -21,9 +20,20 @@ function useImage(src: string): HTMLImageElement | null {
 }
 
 // ─── Slot helpers ──────────────────────────────────────────────
-function computeTrayLayout(trayPixelW: number, pw: number, ph: number, pieceCount: number) {
-  const colCount = Math.max(1, Math.floor((trayPixelW - TRAY_GAP * 2) / (pw + TRAY_GAP)));
+const TRAY_GAP    = 12;  // gap between pieces and from edges (in world coords)
+const TRAY_COLS   = 4;   // target columns per tray — scale is derived from this
+
+// Compute the tray scale so TRAY_COLS fit within the visible tray pixel width.
+// All slot coords use world units; the Stage scaleX/Y converts to screen pixels.
+function computeTrayScale(trayPixelW: number, pw: number): number {
+  const totalColWidth = TRAY_COLS * pw + (TRAY_COLS + 1) * TRAY_GAP;
+  return Math.max(0.1, trayPixelW / totalColWidth);
+}
+
+function computeTrayLayout(pw: number, ph: number, pieceCount: number) {
+  const colCount = TRAY_COLS;
   const rowCount = Math.ceil(pieceCount / colCount);
+  // Content height in world coords
   const contentH = rowCount * (ph + TRAY_GAP) + TRAY_GAP;
   return { colCount, rowCount, contentH };
 }
@@ -265,13 +275,15 @@ interface TrayProps {
 }
 
 function ScrollableTray({ side, pieces, trayW, trayH, pw, ph, scrollY, onScrollY, onDragOutOfTray }: TrayProps) {
-  const { colCount, contentH } = computeTrayLayout(trayW, pw, ph, pieces.length);
-  const maxScrollY = Math.max(0, contentH - trayH);
+  const trayScale = computeTrayScale(trayW, pw);
+  const { colCount, contentH } = computeTrayLayout(pw, ph, pieces.length);
+  // contentH is in world coords; convert to screen pixels for scrolling
+  const contentHScreen = contentH * trayScale;
+  const maxScrollY = Math.max(0, contentHScreen - trayH);
   const clampedScrollY = Math.min(scrollY, maxScrollY);
 
-  // Thumb
   const trackH = trayH;
-  const thumbH = Math.max(40, (trayH / Math.max(contentH, trayH)) * trackH);
+  const thumbH = Math.max(40, (trayH / Math.max(contentHScreen, trayH)) * trackH);
   const thumbTop = maxScrollY > 0 ? (clampedScrollY / maxScrollY) * (trackH - thumbH) : 0;
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
@@ -281,7 +293,6 @@ function ScrollableTray({ side, pieces, trayW, trayH, pw, ph, scrollY, onScrollY
   }, [clampedScrollY, maxScrollY, onScrollY]);
 
   const thumbDrag = useRef<{ startY: number; startScrollY: number } | null>(null);
-
   const handleThumbPointerDown = (e: React.PointerEvent) => {
     e.stopPropagation();
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -296,6 +307,8 @@ function ScrollableTray({ side, pieces, trayW, trayH, pw, ph, scrollY, onScrollY
   const handleThumbPointerUp = () => { thumbDrag.current = null; };
 
   const SCROLLBAR_W = 8;
+  // Stage world dimensions
+  const stageWorldW = TRAY_COLS * (pw + TRAY_GAP) + TRAY_GAP;
 
   return (
     <div
@@ -303,11 +316,11 @@ function ScrollableTray({ side, pieces, trayW, trayH, pw, ph, scrollY, onScrollY
       style={{ width: trayW, height: trayH, position: 'relative', overflow: 'hidden', flexShrink: 0 }}
       onWheel={handleWheel}
     >
-      {/* Konva stage for tray pieces — offset by scroll */}
-      <div style={{ position: 'absolute', top: 0, left: 0, width: trayW, height: contentH, transform: `translateY(${-clampedScrollY}px)` }}>
-        <Stage width={trayW} height={contentH}>
+      {/* Stage offset by scroll — translateY moves content up */}
+      <div style={{ position: 'absolute', top: 0, left: 0, width: trayW, height: contentHScreen, transform: `translateY(${-clampedScrollY}px)` }}>
+        <Stage width={trayW} height={contentHScreen} scaleX={trayScale} scaleY={trayScale}>
           <Layer>
-            <Rect x={0} y={0} width={trayW} height={contentH} fill="#2a2838" />
+            <Rect x={0} y={0} width={stageWorldW} height={contentH} fill="#2a2838" />
           </Layer>
           <Layer>
             {pieces.map((piece, i) => {
@@ -318,9 +331,12 @@ function ScrollableTray({ side, pieces, trayW, trayH, pw, ph, scrollY, onScrollY
                   piece={piece}
                   trayX={x}
                   trayY={y}
-                  trayW={trayW}
+                  trayW={stageWorldW}
                   contentH={contentH}
-                  onDragOutOfTray={onDragOutOfTray}
+                  onDragOutOfTray={(id, cx, cy) => {
+                    // Adjust pointer coords: tray stage has trayScale applied
+                    onDragOutOfTray(id, cx, cy);
+                  }}
                 />
               );
             })}
@@ -328,21 +344,19 @@ function ScrollableTray({ side, pieces, trayW, trayH, pw, ph, scrollY, onScrollY
         </Stage>
       </div>
       {/* Custom scrollbar */}
-      {maxScrollY > 0 && (
+      <div
+        className={`puzzle-tray-scrollbar puzzle-tray-scrollbar--${side}`}
+        style={{ position: 'absolute', top: 0, [side === 'left' ? 'left' : 'right']: 0, width: SCROLLBAR_W, height: trayH, background: 'rgba(0,0,0,0.25)', zIndex: 10 }}
+      >
         <div
-          className={`puzzle-tray-scrollbar puzzle-tray-scrollbar--${side}`}
-          style={{ position: 'absolute', top: 0, [side === 'left' ? 'left' : 'right']: 0, width: SCROLLBAR_W, height: trayH, background: 'rgba(0,0,0,0.2)', zIndex: 10 }}
-        >
-          <div
-            className="puzzle-tray-thumb"
-            style={{ position: 'absolute', top: thumbTop, left: 0, width: SCROLLBAR_W, height: thumbH, borderRadius: 4, background: '#7c3aed', cursor: 'pointer' }}
-            onPointerDown={handleThumbPointerDown}
-            onPointerMove={handleThumbPointerMove}
-            onPointerUp={handleThumbPointerUp}
-            onPointerLeave={handleThumbPointerUp}
-          />
-        </div>
-      )}
+          className="puzzle-tray-thumb"
+          style={{ position: 'absolute', top: thumbTop, left: 0, width: SCROLLBAR_W, height: thumbH, borderRadius: 4, background: '#7c3aed', cursor: 'pointer', opacity: maxScrollY > 0 ? 1 : 0.3 }}
+          onPointerDown={handleThumbPointerDown}
+          onPointerMove={handleThumbPointerMove}
+          onPointerUp={handleThumbPointerUp}
+          onPointerLeave={handleThumbPointerUp}
+        />
+      </div>
     </div>
   );
 }
