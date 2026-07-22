@@ -208,21 +208,25 @@
   bottom: 0;
   width: 6px;
   z-index: 60;
-  pointer-events: auto;
+  pointer-events: none; /* wheel handled by wrap div */
 }
 .puzzle-sb--left  { left: 2px; }
 .puzzle-sb--right { right: 56px; }
 
 .puzzle-sb-track {
+  position: relative;
   width: 6px;
   height: 100%;
   background: rgba(255,255,255,0.08);
   border-radius: 3px;
 }
 .puzzle-sb-thumb {
-  width: 100%;
-  height: 40%;
+  position: absolute;
+  left: 0;
+  right: 0;
+  min-height: 20px;
   background: var(--accent, #7c3aed);
   border-radius: 3px;
-  opacity: 0.7;
+  opacity: 0.75;
+  transition: top 0.1s ease;
 }

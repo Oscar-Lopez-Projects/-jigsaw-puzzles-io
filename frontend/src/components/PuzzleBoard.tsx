@@ -315,11 +315,29 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
     setPanOffset({ x: 0, y: 0 });
   }, []);
 
-  // Wheel on side panels scrolls vertically
-  const handleSideWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault();
-    setPanOffset((prev) => ({ x: prev.x, y: prev.y - e.deltaY * 0.7 }));
-  }, []);
+  // Wheel anywhere on the board scrolls vertically when in portrait mode.
+  // We detect if the pointer is over a side panel and scroll accordingly.
+  const handleBoardWheel = useCallback((e: React.WheelEvent<HTMLDivElement>) => {
+    if (!isPortrait) return;
+    // Get the stage element bounds to find where side panels are
+    const wrap = wrapRef.current;
+    if (!wrap) return;
+    const rect = wrap.getBoundingClientRect();
+    const relX = e.clientX - rect.left; // pointer x relative to board
+    // Stage is centered — compute side panel screen widths
+    const stageScreenW = stageWRef.current;
+    const stageLeft = (rect.width - stageScreenW) / 2;
+    const stageRight = stageLeft + stageScreenW;
+    const targetScreenLeft  = stageLeft  + targetOXRef.current * safeScaleRef.current;
+    const targetScreenRight = stageLeft  + (targetOXRef.current + targetWRef.current) * safeScaleRef.current;
+    // Only scroll if pointer is over a side panel (left of target or right of target)
+    const inLeftPanel  = relX >= stageLeft  && relX < targetScreenLeft;
+    const inRightPanel = relX > targetScreenRight && relX <= stageRight;
+    if (inLeftPanel || inRightPanel) {
+      e.preventDefault();
+      setPanOffset((prev) => ({ x: prev.x, y: prev.y - e.deltaY * 0.7 }));
+    }
+  }, [isPortrait]);
 
   // ── Portrait images: always max side space, no user toggle ─────
   // No expand state needed — determined purely by isPortrait below.
@@ -412,6 +430,9 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
   cropRef.current = { targetOX, targetOY, targetW, targetH, scale: safeScale };
   const safeScaleRef = useRef(safeScale);
   safeScaleRef.current = safeScale;
+  const stageWRef   = useRef(stageW);    stageWRef.current   = stageW;
+  const targetOXRef = useRef(targetOX);  targetOXRef.current = targetOX;
+  const targetWRef  = useRef(targetW);   targetWRef.current  = targetW;
 
   // ── Scatter / redistribute ──────────────────────────────────────
   const prevWorldSize = useRef({ w: 0, h: 0 });
@@ -450,21 +471,26 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
     const leftRows  = Math.ceil(leftPieces.length  / leftCols);
     const rightRows = Math.ceil(rightPieces.length / rightCols);
 
+    // Center the columns within each panel
+    const usedLeftW  = leftCols  * cW - gap; // total width used by left columns
+    const usedRightW = rightCols * cW - gap; // total width used by right columns
+    const leftOffset  = Math.max(gap, Math.round((targetOX - usedLeftW) / 2));
+    const rightOffset = Math.max(gap, Math.round(((worldW - rightPanelEndX - gap) / 2)));
+
     // Left slots row-major
     const leftSlots: { x: number; y: number }[] = [];
     for (let row = 0; row < leftRows; row++)
       for (let col = 0; col < leftCols; col++)
-        leftSlots.push({ x: gap + col * cW, y: gap + row * cH });
+        leftSlots.push({ x: leftOffset + col * cW, y: gap + row * cH });
 
     // Right slots row-major
-    const rightStartX = targetOX + targetW + gap;
+    const rightStartX = targetOX + targetW + gap + rightOffset;
     const rightSlots: { x: number; y: number }[] = [];
     for (let row = 0; row < rightRows; row++)
       for (let col = 0; col < rightCols; col++) {
         const sx = rightStartX + col * cW;
         if (sx + pw <= rightPanelEndX) rightSlots.push({ x: sx, y: gap + row * cH });
       }
-
     // Every piece gets a side slot — no overflow to board interior
     const posMap = new Map<string, { x: number; y: number }>();
     leftPieces.forEach((p, i)  => posMap.set(p.id, leftSlots[Math.min(i, leftSlots.length - 1)]));
@@ -666,23 +692,43 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
     <div
       className={`puzzle-board-wrap${panMode ? ' puzzle-board-wrap--pan' : ''}`}
       ref={wrapRef}
+      onWheel={handleBoardWheel}
       onPointerDown={handlePanPointerDown}
       onPointerMove={handlePanPointerMove}
       onPointerUp={handlePanPointerUp}
       onPointerLeave={handlePanPointerUp}
     >
       <div className="puzzle-board-inner">
-        {/* Scrollbar overlays — wheel area + visual track on outer edges */}
-        {isPortrait && (
-          <>
-            <div className="puzzle-sb puzzle-sb--left" onWheel={handleSideWheel}>
-              <div className="puzzle-sb-track"><div className="puzzle-sb-thumb" /></div>
-            </div>
-            <div className="puzzle-sb puzzle-sb--right" onWheel={handleSideWheel}>
-              <div className="puzzle-sb-track"><div className="puzzle-sb-thumb" /></div>
-            </div>
-          </>
-        )}
+        {/* Scrollbar overlays — visual track on outer edges */}
+        {isPortrait && (() => {
+          // Compute thumb position from panOffset.y
+          const tabSz = Math.round(pw * 0.132);
+          const gp = Math.max(tabSz + 2, 12);
+          const cellH = ph + gp;
+          const lCols = Math.min(7, Math.max(1, Math.floor((targetOX - gp) / (pw + gp))));
+          const rCols = Math.min(7, Math.max(1, Math.floor((worldW - (targetOX + targetW + gp) - Math.round(52 / safeScale) - gp) / (pw + gp))));
+          const lRows = Math.ceil((pieces.length / 2) / lCols);
+          const totalH = Math.max(containerH, lRows * cellH * safeScale);
+          const thumbPct = Math.max(10, Math.min(90, (containerH / totalH) * 100));
+          const scrollable = totalH - containerH;
+          const thumbTop = scrollable > 0
+            ? Math.max(0, Math.min(100 - thumbPct, (-panOffset.y / scrollable) * (100 - thumbPct)))
+            : 0;
+          return (
+            <>
+              <div className="puzzle-sb puzzle-sb--left">
+                <div className="puzzle-sb-track">
+                  <div className="puzzle-sb-thumb" style={{ height: `${thumbPct}%`, top: `${thumbTop}%` }} />
+                </div>
+              </div>
+              <div className="puzzle-sb puzzle-sb--right">
+                <div className="puzzle-sb-track">
+                  <div className="puzzle-sb-thumb" style={{ height: `${thumbPct}%`, top: `${thumbTop}%` }} />
+                </div>
+              </div>
+            </>
+          );
+        })()}
         <div
           ref={stageWrapRef}
           className={`puzzle-single-stage${panMode ? ' puzzle-single-stage--pan' : ''}`}
