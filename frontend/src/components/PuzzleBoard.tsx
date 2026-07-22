@@ -5,13 +5,9 @@ import type { PuzzlePiece } from '../types/puzzle';
 import { playSnapSound } from '../lib/sounds';
 import './PuzzleBoard.css';
 
-// ─── layout constants ─────────────────────────────────────────
+// ─── constants ────────────────────────────────────────────────
 const SNAP_THRESHOLD = 0.5;
-const MARGIN_RATIO_X = 0.30; // default horizontal margin ratio (landscape / small counts)
-const MARGIN_RATIO_Y = 0.12; // default vertical margin ratio
-
-// For portrait images: no top/bottom margin (fills full height),
-// side margins are computed dynamically from remaining screen width.
+const TRAY_GAP = 12; // padding inside each tray
 
 // ─── useImage hook ─────────────────────────────────────────────
 function useImage(src: string): HTMLImageElement | null {
@@ -24,7 +20,24 @@ function useImage(src: string): HTMLImageElement | null {
   return img;
 }
 
-// ─── PieceTile (Konva draggable) ──────────────────────────────
+// ─── Slot helpers ──────────────────────────────────────────────
+function computeTrayLayout(trayPixelW: number, pw: number, ph: number, pieceCount: number) {
+  const colCount = Math.max(1, Math.floor((trayPixelW - TRAY_GAP * 2) / (pw + TRAY_GAP)));
+  const rowCount = Math.ceil(pieceCount / colCount);
+  const contentH = rowCount * (ph + TRAY_GAP) + TRAY_GAP;
+  return { colCount, rowCount, contentH };
+}
+
+function slotCoords(index: number, colCount: number, pw: number, ph: number) {
+  const col = index % colCount;
+  const row = Math.floor(index / colCount);
+  return {
+    x: TRAY_GAP + col * (pw + TRAY_GAP),
+    y: TRAY_GAP + row * (ph + TRAY_GAP),
+  };
+}
+
+// ─── PieceTile (Konva draggable single piece) ─────────────────
 interface PieceTileProps {
   piece: PuzzlePiece;
   x: number;
@@ -51,7 +64,6 @@ function DraggablePieceTile({ piece, x, y, worldW, worldH, scale, onDragEnd }: P
     [piece.id, onDragEnd]
   );
 
-  // Keep the piece fully inside the world bounds while dragging
   const dragBound = useCallback(
     (pos: { x: number; y: number }) => {
       const maxX = Math.max(0, (worldW - piece.pieceWidth) * scale);
@@ -65,7 +77,6 @@ function DraggablePieceTile({ piece, x, y, worldW, worldH, scale, onDragEnd }: P
   );
 
   if (!img) return null;
-
   return (
     <Group
       x={x} y={y}
@@ -73,16 +84,8 @@ function DraggablePieceTile({ piece, x, y, worldW, worldH, scale, onDragEnd }: P
       dragBoundFunc={!piece.snapped ? dragBound : undefined}
       onDragStart={!piece.snapped ? handleDragStart : undefined}
       onDragEnd={!piece.snapped ? handleDragEndInner : undefined}
-      onMouseEnter={(e) => {
-        if (piece.snapped) return;
-        const stage = e.target.getStage();
-        if (stage) stage.container().style.cursor = 'grab';
-      }}
-      onMouseLeave={(e) => {
-        if (piece.snapped) return;
-        const stage = e.target.getStage();
-        if (stage) stage.container().style.cursor = 'default';
-      }}
+      onMouseEnter={(e) => { if (piece.snapped) return; const s = e.target.getStage(); if (s) s.container().style.cursor = 'grab'; }}
+      onMouseLeave={(e) => { if (piece.snapped) return; const s = e.target.getStage(); if (s) s.container().style.cursor = 'default'; }}
     >
       <KonvaImage
         image={img} x={0} y={0}
@@ -97,7 +100,7 @@ function DraggablePieceTile({ piece, x, y, worldW, worldH, scale, onDragEnd }: P
   );
 }
 
-// ─── Piece Group (multiple snapped pieces that move together) ──
+// ─── Piece Group ───────────────────────────────────────────────
 interface PieceGroupProps {
   groupPieces: PuzzlePiece[];
   offsetX: number;
@@ -110,8 +113,6 @@ interface PieceGroupProps {
 
 function DraggablePieceGroup({ groupPieces, offsetX, offsetY, worldW, worldH, scale, onGroupDragEnd }: PieceGroupProps) {
   const startPos = useRef({ x: offsetX, y: offsetY });
-
-  // Bounding size of the group (relative to its top-left offset)
   const groupW = Math.max(...groupPieces.map((p) => p.currentX - offsetX + p.pieceWidth));
   const groupH = Math.max(...groupPieces.map((p) => p.currentY - offsetY + p.pieceHeight));
 
@@ -128,15 +129,11 @@ function DraggablePieceGroup({ groupPieces, offsetX, offsetY, worldW, worldH, sc
     e.target.getStage()!.container().style.cursor = 'default';
   }, [groupPieces, onGroupDragEnd]);
 
-  // Keep the whole group inside the world bounds while dragging
   const dragBound = useCallback(
     (pos: { x: number; y: number }) => {
       const maxX = Math.max(0, (worldW - groupW) * scale);
       const maxY = Math.max(0, (worldH - groupH) * scale);
-      return {
-        x: Math.max(0, Math.min(pos.x, maxX)),
-        y: Math.max(0, Math.min(pos.y, maxY)),
-      };
+      return { x: Math.max(0, Math.min(pos.x, maxX)), y: Math.max(0, Math.min(pos.y, maxY)) };
     },
     [worldW, worldH, scale, groupW, groupH]
   );
@@ -148,14 +145,8 @@ function DraggablePieceGroup({ groupPieces, offsetX, offsetY, worldW, worldH, sc
       dragBoundFunc={dragBound}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
-      onMouseEnter={(e) => {
-        const stage = e.target.getStage();
-        if (stage) stage.container().style.cursor = 'grab';
-      }}
-      onMouseLeave={(e) => {
-        const stage = e.target.getStage();
-        if (stage) stage.container().style.cursor = 'default';
-      }}
+      onMouseEnter={(e) => { const s = e.target.getStage(); if (s) s.container().style.cursor = 'grab'; }}
+      onMouseLeave={(e) => { const s = e.target.getStage(); if (s) s.container().style.cursor = 'default'; }}
     >
       {groupPieces.map((piece) => (
         <PieceImage key={piece.id} piece={piece} relX={piece.currentX - offsetX} relY={piece.currentY - offsetY} />
@@ -167,12 +158,10 @@ function DraggablePieceGroup({ groupPieces, offsetX, offsetY, worldW, worldH, sc
 function PieceImage({ piece, relX, relY }: { piece: PuzzlePiece; relX: number; relY: number }) {
   const img = useImage(piece.imageUrl);
   if (!img) return null;
-  return (
-    <KonvaImage image={img} x={relX} y={relY} width={piece.pieceWidth} height={piece.pieceHeight} listening={true} />
-  );
+  return <KonvaImage image={img} x={relX} y={relY} width={piece.pieceWidth} height={piece.pieceHeight} listening={true} />;
 }
 
-// ─── Hint overlay: shows the piece shape at its slot + glows the real piece ──
+// ─── HintOverlay ───────────────────────────────────────────────
 function HintOverlay({ piece, targetOX, targetOY }: { piece: PuzzlePiece; targetOX: number; targetOY: number }) {
   const img = useImage(piece.imageUrl);
   if (!img) return null;
@@ -180,39 +169,72 @@ function HintOverlay({ piece, targetOX, targetOY }: { piece: PuzzlePiece; target
   const targetY = targetOY + piece.correctY;
   return (
     <>
-      {/* Ghost of the piece at its correct board slot — shows the jigsaw shape */}
-      <KonvaImage
-        image={img}
-        x={targetX} y={targetY}
+      <KonvaImage image={img} x={targetX} y={targetY}
         width={piece.pieceWidth} height={piece.pieceHeight}
-        opacity={0.55}
-        shadowColor="#22c55e"
-        shadowBlur={18}
-        shadowOpacity={1}
-        shadowOffset={{ x: 0, y: 0 }}
-        listening={false}
-      />
-      {/* Green glow around the actual piece so the player can find it */}
-      <KonvaImage
-        image={img}
-        x={piece.currentX} y={piece.currentY}
+        opacity={0.55} shadowColor="#22c55e" shadowBlur={18} shadowOpacity={1}
+        shadowOffset={{ x: 0, y: 0 }} listening={false} />
+      <KonvaImage image={img} x={piece.currentX} y={piece.currentY}
         width={piece.pieceWidth} height={piece.pieceHeight}
-        shadowColor="#22c55e"
-        shadowBlur={24}
-        shadowOpacity={1}
-        shadowOffset={{ x: 0, y: 0 }}
-        listening={false}
-      />
+        shadowColor="#22c55e" shadowBlur={24} shadowOpacity={1}
+        shadowOffset={{ x: 0, y: 0 }} listening={false} />
     </>
   );
 }
 
+// ─── TrayPieceTile (Konva piece inside a tray stage) ──────────
+interface TrayPieceTileProps {
+  piece: PuzzlePiece;
+  trayX: number; // tray-local X
+  trayY: number; // tray-local Y
+  trayW: number; // tray content width
+  contentH: number; // tray content height
+  onDragOutOfTray: (id: string, pointerClientX: number, pointerClientY: number) => void;
+}
+
+function TrayPieceTile({ piece, trayX, trayY, trayW, contentH, onDragOutOfTray }: TrayPieceTileProps) {
+  const img = useImage(piece.imageUrl);
+  const isDragging = useRef(false);
+
+  if (!img) return null;
+
+  return (
+    <Group
+      x={trayX} y={trayY}
+      draggable
+      dragBoundFunc={(pos) => {
+        // Allow free movement while in the tray stage — clamped to content area
+        const maxX = Math.max(0, trayW - piece.pieceWidth);
+        const maxY = Math.max(0, contentH - piece.pieceHeight);
+        return { x: Math.max(0, Math.min(pos.x, maxX)), y: Math.max(0, Math.min(pos.y, maxY)) };
+      }}
+      onDragStart={(e) => {
+        isDragging.current = true;
+        e.target.moveToTop();
+        const stage = e.target.getStage();
+        if (stage) stage.container().style.cursor = 'grabbing';
+      }}
+      onDragEnd={(e) => {
+        isDragging.current = false;
+        const stage = e.target.getStage();
+        if (stage) stage.container().style.cursor = 'default';
+        // Get the pointer position in client coordinates at drag end
+        const container = stage?.container();
+        if (!container) return;
+        const rect = container.getBoundingClientRect();
+        // Use the piece's screen position
+        const pieceScreenX = rect.left + e.target.x();
+        const pieceScreenY = rect.top + e.target.y();
+        onDragOutOfTray(piece.id, pieceScreenX + piece.pieceWidth / 2, pieceScreenY + piece.pieceHeight / 2);
+      }}
+      onMouseEnter={(e) => { const s = e.target.getStage(); if (s) s.container().style.cursor = 'grab'; }}
+      onMouseLeave={(e) => { if (isDragging.current) return; const s = e.target.getStage(); if (s) s.container().style.cursor = 'default'; }}
+    >
+      <KonvaImage image={img} x={0} y={0} width={piece.pieceWidth} height={piece.pieceHeight} />
+    </Group>
+  );
+}
+
 // ─── Helpers ───────────────────────────────────────────────────
-/**
- * Lock any non-locked piece that is sitting exactly at its correct final
- * board position. This catches pieces placed directly on the board as well
- * as pieces/groups that connect to an already-locked piece.
- */
 function lockCorrectPieces(arr: PuzzlePiece[], targetOX: number, targetOY: number): PuzzlePiece[] {
   return arr.map((p) => {
     if (p.snapped) return p;
@@ -225,12 +247,107 @@ function lockCorrectPieces(arr: PuzzlePiece[], targetOX: number, targetOY: numbe
   });
 }
 
-/** Next unused group id. */
 function nextGroupId(arr: PuzzlePiece[]): number {
   return arr.reduce((m, p) => Math.max(m, p.groupId ?? 0), 0) + 1;
 }
 
-// ─── PuzzleBoard ───────────────────────────────────────────────
+// ─── Scrollable Tray component ────────────────────────────────
+interface TrayProps {
+  side: 'left' | 'right';
+  pieces: PuzzlePiece[];
+  trayW: number;       // pixel width of the visible tray
+  trayH: number;       // pixel height of the visible tray
+  pw: number;          // piece width
+  ph: number;          // piece height
+  scrollY: number;
+  onScrollY: (y: number) => void;
+  onDragOutOfTray: (id: string, pointerClientX: number, pointerClientY: number) => void;
+}
+
+function ScrollableTray({ side, pieces, trayW, trayH, pw, ph, scrollY, onScrollY, onDragOutOfTray }: TrayProps) {
+  const { colCount, contentH } = computeTrayLayout(trayW, pw, ph, pieces.length);
+  const maxScrollY = Math.max(0, contentH - trayH);
+  const clampedScrollY = Math.min(scrollY, maxScrollY);
+
+  // Thumb
+  const trackH = trayH;
+  const thumbH = Math.max(40, (trayH / Math.max(contentH, trayH)) * trackH);
+  const thumbTop = maxScrollY > 0 ? (clampedScrollY / maxScrollY) * (trackH - thumbH) : 0;
+
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onScrollY(Math.max(0, Math.min(clampedScrollY + e.deltaY, maxScrollY)));
+  }, [clampedScrollY, maxScrollY, onScrollY]);
+
+  const thumbDrag = useRef<{ startY: number; startScrollY: number } | null>(null);
+
+  const handleThumbPointerDown = (e: React.PointerEvent) => {
+    e.stopPropagation();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    thumbDrag.current = { startY: e.clientY, startScrollY: clampedScrollY };
+  };
+  const handleThumbPointerMove = (e: React.PointerEvent) => {
+    if (!thumbDrag.current) return;
+    const dy = e.clientY - thumbDrag.current.startY;
+    const ratio = dy / (trackH - thumbH);
+    onScrollY(Math.max(0, Math.min(thumbDrag.current.startScrollY + ratio * maxScrollY, maxScrollY)));
+  };
+  const handleThumbPointerUp = () => { thumbDrag.current = null; };
+
+  const SCROLLBAR_W = 8;
+
+  return (
+    <div
+      className={`puzzle-tray puzzle-tray--${side}`}
+      style={{ width: trayW, height: trayH, position: 'relative', overflow: 'hidden', flexShrink: 0 }}
+      onWheel={handleWheel}
+    >
+      {/* Konva stage for tray pieces — offset by scroll */}
+      <div style={{ position: 'absolute', top: 0, left: 0, width: trayW, height: contentH, transform: `translateY(${-clampedScrollY}px)` }}>
+        <Stage width={trayW} height={contentH}>
+          <Layer>
+            <Rect x={0} y={0} width={trayW} height={contentH} fill="#2a2838" />
+          </Layer>
+          <Layer>
+            {pieces.map((piece, i) => {
+              const { x, y } = slotCoords(i, colCount, pw, ph);
+              return (
+                <TrayPieceTile
+                  key={piece.id}
+                  piece={piece}
+                  trayX={x}
+                  trayY={y}
+                  trayW={trayW}
+                  contentH={contentH}
+                  onDragOutOfTray={onDragOutOfTray}
+                />
+              );
+            })}
+          </Layer>
+        </Stage>
+      </div>
+      {/* Custom scrollbar */}
+      {maxScrollY > 0 && (
+        <div
+          className={`puzzle-tray-scrollbar puzzle-tray-scrollbar--${side}`}
+          style={{ position: 'absolute', top: 0, [side === 'left' ? 'left' : 'right']: 0, width: SCROLLBAR_W, height: trayH, background: 'rgba(0,0,0,0.2)', zIndex: 10 }}
+        >
+          <div
+            className="puzzle-tray-thumb"
+            style={{ position: 'absolute', top: thumbTop, left: 0, width: SCROLLBAR_W, height: thumbH, borderRadius: 4, background: '#7c3aed', cursor: 'pointer' }}
+            onPointerDown={handleThumbPointerDown}
+            onPointerMove={handleThumbPointerMove}
+            onPointerUp={handleThumbPointerUp}
+            onPointerLeave={handleThumbPointerUp}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── PuzzleBoard types ─────────────────────────────────────────
 interface PuzzleBoardProps {
   pieces: PuzzlePiece[];
   cols: number;
@@ -240,46 +357,34 @@ interface PuzzleBoardProps {
 }
 
 export interface PuzzleBoardHandle {
-  /** Capture the completed puzzle area as a PNG data URL. Returns null if not ready. */
   captureSnapshot: () => Promise<string | null>;
 }
 
+// ─── PuzzleBoard ───────────────────────────────────────────────
 const PuzzleBoard = forwardRef<PuzzleBoardHandle, PuzzleBoardProps>(
 function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
-  const wrapRef = useRef<HTMLDivElement>(null);
-  const stageWrapRef = useRef<HTMLDivElement>(null);
-  const stageRef = useRef<Konva.Stage>(null);
-  // Keep current crop params in a ref so captureSnapshot always reads latest values
-  const cropRef = useRef({ targetOX: 0, targetOY: 0, targetW: 0, targetH: 0, scale: 1 });
+  const wrapRef      = useRef<HTMLDivElement>(null);
+  const stageRef     = useRef<Konva.Stage>(null);
+  const cropRef      = useRef({ targetOX: 0, targetOY: 0, targetW: 0, targetH: 0, scale: 1 });
 
-  // Expose captureSnapshot to parent via ref
+  // ── captureSnapshot ─────────────────────────────────────────
   useImperativeHandle(ref, () => ({
     captureSnapshot: async () => {
       const stage = stageRef.current;
-      if (!stage) {
-        console.warn('[captureSnapshot] stageRef is null');
-        return null;
-      }
+      if (!stage) return null;
       try {
         const { targetOX, targetOY, targetW, targetH, scale } = cropRef.current;
-
-        // Step 1: capture the full stage at screen scale (what's actually rendered)
         const fullDataUrl = stage.toDataURL({ pixelRatio: 1 });
         if (!fullDataUrl || fullDataUrl === 'data:,') return null;
-
-        // Step 2: crop to just the target area using a temporary canvas
-        // The stage is rendered at safeScale, so world coords → screen coords = * scale
         const sx = Math.round(targetOX * scale);
         const sy = Math.round(targetOY * scale);
         const sw = Math.round(targetW  * scale);
         const sh = Math.round(targetH  * scale);
-
         return new Promise<string | null>((resolve) => {
           const img = new Image();
           img.onload = () => {
             const out = document.createElement('canvas');
-            out.width  = sw;
-            out.height = sh;
+            out.width = sw; out.height = sh;
             const ctx = out.getContext('2d');
             if (!ctx) { resolve(null); return; }
             ctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
@@ -294,47 +399,10 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
       }
     },
   }));
+
+  // ── Container size ──────────────────────────────────────────
   const [containerW, setContainerW] = useState(0);
   const [containerH, setContainerH] = useState(0);
-  const [zoomLevel, setZoomLevel] = useState(1);
-  const [panMode, setPanMode] = useState(false);
-  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
-
-  // Pan drag tracking — stored in a ref so pointer handlers don't go stale
-  const panDrag = useRef<{ startX: number; startY: number; originX: number; originY: number } | null>(null);
-
-  const handleZoomIn = useCallback(() => {
-    setZoomLevel((z) => Math.min(z + 0.2, 3));
-  }, []);
-
-  const handleZoomOut = useCallback(() => {
-    setZoomLevel((z) => Math.max(z - 0.2, 0.4));
-  }, []);
-
-  const handleCenterBoard = useCallback(() => {
-    setPanOffset({ x: 0, y: 0 });
-  }, []);
-
-  // ── Portrait images: always max side space, no user toggle ─────
-  // No expand state needed — determined purely by isPortrait below.
-
-  // Pointer handlers for free-range pan (tracked on the whole wrap, no DOM clipping)
-  const handlePanPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    if (!panMode) return;
-    e.currentTarget.setPointerCapture(e.pointerId);
-    panDrag.current = { startX: e.clientX, startY: e.clientY, originX: panOffset.x, originY: panOffset.y };
-  }, [panMode, panOffset]);
-
-  const handlePanPointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    if (!panDrag.current) return;
-    const dx = e.clientX - panDrag.current.startX;
-    const dy = e.clientY - panDrag.current.startY;
-    setPanOffset({ x: panDrag.current.originX + dx, y: panDrag.current.originY + dy });
-  }, []);
-
-  const handlePanPointerUp = useCallback(() => {
-    panDrag.current = null;
-  }, []);
 
   useEffect(() => {
     const el = wrapRef.current;
@@ -349,187 +417,233 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
     return () => ro.disconnect();
   }, []);
 
+  // ── Zoom / pan ──────────────────────────────────────────────
+  const [zoomLevel, setZoomLevel] = useState(1);
+  const [panMode, setPanMode] = useState(false);
+  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
+  const panDrag = useRef<{ startX: number; startY: number; originX: number; originY: number } | null>(null);
+
+  const handleZoomIn  = useCallback(() => setZoomLevel((z) => Math.min(z + 0.2, 3)), []);
+  const handleZoomOut = useCallback(() => setZoomLevel((z) => Math.max(z - 0.2, 0.4)), []);
+  const handleCenterBoard = useCallback(() => setPanOffset({ x: 0, y: 0 }), []);
+
+  const handlePanPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (!panMode) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    panDrag.current = { startX: e.clientX, startY: e.clientY, originX: panOffset.x, originY: panOffset.y };
+  }, [panMode, panOffset]);
+
+  const handlePanPointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (!panDrag.current) return;
+    const dx = e.clientX - panDrag.current.startX;
+    const dy = e.clientY - panDrag.current.startY;
+    setPanOffset({ x: panDrag.current.originX + dx, y: panDrag.current.originY + dy });
+  }, []);
+
+  const handlePanPointerUp = useCallback(() => { panDrag.current = null; }, []);
+
+  // ── Tray scroll state ──────────────────────────────────────
+  const [leftScrollY,  setLeftScrollY]  = useState(0);
+  const [rightScrollY, setRightScrollY] = useState(0);
+
+  // ── Piece dimensions ────────────────────────────────────────
   const pw = pieces[0]?.pieceWidth  ?? 0;
   const ph = pieces[0]?.pieceHeight ?? 0;
 
-  // Derive grid cell size
-  const piece0 = pieces.find((p) => p.correctCol === 0 && p.correctRow === 0);
-  const piece1 = pieces.find((p) => p.correctCol === 1 && p.correctRow === 0);
+  const piece0   = pieces.find((p) => p.correctCol === 0 && p.correctRow === 0);
+  const piece1   = pieces.find((p) => p.correctCol === 1 && p.correctRow === 0);
   const piece0r1 = pieces.find((p) => p.correctCol === 0 && p.correctRow === 1);
-  const gridCellW = piece0 && piece1 ? piece1.correctX - piece0.correctX : pw;
+  const gridCellW = piece0 && piece1   ? piece1.correctX  - piece0.correctX  : pw;
   const gridCellH = piece0 && piece0r1 ? piece0r1.correctY - piece0.correctY : ph;
 
-  // Target area dimensions
   const targetW = cols * gridCellW;
   const targetH = rows * gridCellH;
 
   const ready = pieces.length > 0 && containerW > 0 && pw > 0 && ph > 0;
 
-  // Portrait detection: by actual image dimensions, not grid shape.
-  // An iPhone photo can be a 15×10 grid but still taller than wide.
-  const isPortrait = ready ? targetH > targetW : rows > cols;
+  // ── Three-column layout calculations ───────────────────────
+  // Column percentages: 29% left tray, 42% board, 29% right tray
+  const TRAY_FRAC  = 0.29;
+  const BOARD_FRAC = 0.42;
 
-  // Portrait layout: fill full container height, use remaining width for side panels.
-  // Step 1: scale the image to fill container height exactly (ignore side margins for now)
-  const portraitScale = ready && containerH > 0 ? containerH / targetH : 1;
-  // Step 2: how much horizontal space is left after the image
-  const imageScreenW  = targetW * portraitScale;
-  const leftoverW     = Math.max(containerW - imageScreenW, pw * 4); // at least 2 pieces per side
-  const sideScreenW   = leftoverW / 2;
-  // Step 3: convert back to world coords for marginX
-  const portraitMarginX = sideScreenW / portraitScale;
+  const trayPixelW  = Math.floor(containerW * TRAY_FRAC);
+  const boardPixelW = Math.max(containerW - trayPixelW * 2, containerW * BOARD_FRAC);
+  const trayH       = containerH;
 
-  const marginX = isPortrait
-    ? portraitMarginX
-    : Math.max(pw * 3, targetW * MARGIN_RATIO_X);
-  const marginY = isPortrait
-    ? 0
-    : Math.max(ph * 2, targetH * MARGIN_RATIO_Y);
-  const worldW = targetW + marginX * 2;
-  const worldH = targetH + marginY * 2;
+  // Board world dimensions = just the target area + small margins
+  const marginX = Math.max(pw, 20);
+  const marginY = Math.max(ph, 20);
+  const worldW  = targetW + marginX * 2;
+  const worldH  = targetH + marginY * 2;
   const targetOX = marginX;
   const targetOY = marginY;
 
-  // Scale: portrait locks to container height (image fills full height).
-  // Side margins are sized to fit the remaining width, so scaleByW = 1 exactly.
-  // Landscape: standard fit-both.
-  const scaleByW = ready ? containerW / worldW : 1;
-  const scaleByH = ready && containerH > 0 ? containerH / worldH : scaleByW;
-  const baseScale = isPortrait
-    ? portraitScale                  // always fill height — sides are derived from this
-    : Math.min(scaleByW, scaleByH);
+  const scaleByW  = ready ? boardPixelW / worldW : 1;
+  const scaleByH  = ready && containerH > 0 ? containerH / worldH : scaleByW;
+  const baseScale = Math.min(scaleByW, scaleByH);
   const safeScale = baseScale * zoomLevel;
-  const stageW = worldW * safeScale;
-  const stageH = worldH * safeScale;
+  const stageW    = worldW * safeScale;
+  const stageH    = worldH * safeScale;
 
-  // Keep cropRef in sync so captureSnapshot always reads the latest values
   cropRef.current = { targetOX, targetOY, targetW, targetH, scale: safeScale };
   const safeScaleRef = useRef(safeScale);
   safeScaleRef.current = safeScale;
 
-  // ── Scatter / redistribute ──────────────────────────────────────
-  const prevWorldSize = useRef({ w: 0, h: 0 });
-  useEffect(() => {
-    if (!ready) return;
+  // ── Partition pieces: tray left/right and board (free) ─────
+  const leftTrayPieces  = pieces.filter((p) => !p.snapped && p.zone === 'left');
+  const rightTrayPieces = pieces.filter((p) => !p.snapped && p.zone === 'right');
+  const boardPieces     = pieces.filter((p) => p.snapped || p.zone === 'free');
 
-    const allAtOrigin = pieces.every((p) => p.currentX === 0 && p.currentY === 0 && !p.snapped);
-    const worldChanged = worldW !== prevWorldSize.current.w || worldH !== prevWorldSize.current.h;
-    prevWorldSize.current = { w: worldW, h: worldH };
-
-    if (!allAtOrigin && !worldChanged) return;
-
-    const tabSize = Math.round(pw * 0.132); // ≈ pieceW * 0.18 / 1.36
-    const gap = Math.max(tabSize + 2, 12);  // safe inset from every edge
-    const cW = pw + gap;
-    const cH = ph + gap;
-
-    // Right panel: subtract zoom controls width (52px screen space converted to world coords)
-    const zoomControlsWorldW = Math.round(52 / safeScaleRef.current);
-    const rightPanelEndX = worldW - zoomControlsWorldW - gap;
-
-    // How many columns fit in each side panel
-    const leftPanelW  = targetOX - gap;                 // left panel available width
-    const rightPanelW = rightPanelEndX - (targetOX + targetW + gap); // right panel available width
-    const leftCols  = Math.max(1, Math.floor(leftPanelW  / cW));
-    const rightCols = Math.max(1, Math.floor(rightPanelW / cW));
-    // How many rows fit vertically
-    const rows_  = Math.max(1, Math.floor((worldH - gap * 2) / cH));
-
-    const leftCapacity  = leftCols  * rows_;
-    const rightCapacity = rightCols * rows_;
-    const sideCapacity  = leftCapacity + rightCapacity;
-
-    // Generate left slots: fill row by row (row-major so visual is left→right, top→bottom)
-    const leftSlots: { x: number; y: number }[] = [];
-    for (let row = 0; row < rows_; row++)
-      for (let col = 0; col < leftCols; col++)
-        leftSlots.push({ x: gap + col * cW, y: gap + row * cH });
-
-    // Generate right slots: same but starting after target area
-    const rightStartX = targetOX + targetW + gap;
-    const rightSlots: { x: number; y: number }[] = [];
-    for (let row = 0; row < rows_; row++)
-      for (let col = 0; col < rightCols; col++) {
-        const sx = rightStartX + col * cW;
-        if (sx + pw <= rightPanelEndX) rightSlots.push({ x: sx, y: gap + row * cH });
-      }
-
-    // Interior slots for overflow
-    const interiorSlots: { x: number; y: number }[] = [];
-    for (let row = 0; row < Math.floor((targetH - gap * 2) / cH); row++)
-      for (let col = 0; col < Math.floor((targetW - gap * 2) / cW); col++)
-        interiorSlots.push({ x: targetOX + gap + col * cW, y: targetOY + gap + row * cH });
-
-    // Split pieces into exactly left half and right half
-    const unsnapped = allAtOrigin ? [...pieces] : pieces.filter((p) => !p.snapped);
-    const shuffled = [...unsnapped].sort(() => Math.random() - 0.5);
-
-    // Distribute: first leftCapacity pieces to left, next rightCapacity to right, rest to interior
-    const leftPieces  = shuffled.slice(0, leftCapacity);
-    const rightPieces = shuffled.slice(leftCapacity, sideCapacity);
-    const overflow    = shuffled.slice(sideCapacity);
-
-    const posMap = new Map<string, { x: number; y: number }>();
-    leftPieces.forEach((p, i)  => posMap.set(p.id, leftSlots[i]));
-    rightPieces.forEach((p, i) => posMap.set(p.id, rightSlots[i]));
-    overflow.forEach((p, i)    => posMap.set(p.id, interiorSlots[i % Math.max(interiorSlots.length, 1)]));
-
-    if (allAtOrigin) {
-      const scattered = pieces.map((p) => {
-        const pos = posMap.get(p.id) ?? { x: gap, y: gap };
-        return { ...p, currentX: pos.x, currentY: pos.y, zone: 'free' as const };
-      });
-      onPiecesChange(scattered);
-    } else {
-      const updated = pieces.map((p) => {
-        if (p.snapped) return p;
-        const inBounds = p.currentX >= 0 && p.currentX + pw <= worldW &&
-                         p.currentY >= 0 && p.currentY + ph <= worldH;
-        if (inBounds) return p;
-        const pos = posMap.get(p.id) ?? leftSlots[0] ?? { x: gap, y: gap };
-        return { ...p, currentX: pos.x, currentY: pos.y };
-      });
-      onPiecesChange(updated);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, worldW, worldH, targetOX, targetOY, targetW, targetH, pw, ph]);
-
-  // Locked pieces (placed correctly on the board) — immovable, green outline
-  const lockedPieces = pieces.filter((p) => p.snapped);
-
-  // Non-locked pieces grouped by their permanent connection groupId
+  const lockedPieces = boardPieces.filter((p) => p.snapped);
   const groupMap = new Map<number, PuzzlePiece[]>();
-  for (const p of pieces) {
+  for (const p of boardPieces) {
     if (!p.snapped && p.groupId != null) {
       const arr = groupMap.get(p.groupId) ?? [];
       arr.push(p);
       groupMap.set(p.groupId, arr);
     }
   }
-  const groups = [...groupMap.entries()];
+  const groups      = [...groupMap.entries()];
+  const freePieces  = boardPieces.filter((p) => !p.snapped && p.groupId == null);
+  const hintPiece   = hintPieceId ? pieces.find((p) => p.id === hintPieceId && !p.snapped) ?? null : null;
 
-  // Free, unconnected, unlocked pieces
-  const freePieces = pieces.filter((p) => !p.snapped && p.groupId == null);
-  const hintPiece = hintPieceId ? pieces.find((p) => p.id === hintPieceId && !p.snapped) ?? null : null;
+  // ── Scatter / redistribute into trays on reset ─────────────
+  const prevPieceCount = useRef(0);
+  useEffect(() => {
+    if (!ready) return;
 
-  // Single piece drag end — check board snap AND piece-to-piece snap
+    const allAtOrigin = pieces.every((p) => p.currentX === 0 && p.currentY === 0 && !p.snapped);
+    const countChanged = pieces.length !== prevPieceCount.current;
+    prevPieceCount.current = pieces.length;
+
+    if (!allAtOrigin && !countChanged) return;
+
+    // Reset tray scrolls
+    setLeftScrollY(0);
+    setRightScrollY(0);
+
+    // Split unsnapped pieces evenly into left/right trays
+    const unsnapped = pieces.filter((p) => !p.snapped);
+    const shuffled  = [...unsnapped].sort(() => Math.random() - 0.5);
+    const half      = Math.ceil(shuffled.length / 2);
+
+    const updated = pieces.map((p) => {
+      if (p.snapped) return p;
+      const idx = shuffled.findIndex((s) => s.id === p.id);
+      if (idx < half) {
+        return { ...p, zone: 'left'  as const, slotIndex: idx,        currentX: 0, currentY: 0 };
+      } else {
+        return { ...p, zone: 'right' as const, slotIndex: idx - half, currentX: 0, currentY: 0 };
+      }
+    });
+    onPiecesChange(updated);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, pieces.length]);
+
+  // ── Handle piece dragged out of tray onto board ─────────────
+  // This receives the pointer's client X/Y at drag-end from the tray stage.
+  // We convert it to board world coords and treat it like a board drag-end.
+  const boardWrapRef = useRef<HTMLDivElement>(null);
+
+  const handleDragOutOfTray = useCallback((id: string, pointerClientX: number, pointerClientY: number) => {
+    const piece = pieces.find((p) => p.id === id);
+    if (!piece) return;
+
+    // Get board stage position on screen
+    const boardRect = boardWrapRef.current?.getBoundingClientRect();
+    if (!boardRect) return;
+
+    // Convert pointer position to board world coords
+    const screenX = pointerClientX - boardRect.left;
+    const screenY = pointerClientY - boardRect.top;
+
+    // Check if the pointer is actually over the board area
+    const overBoard = screenX >= 0 && screenX <= boardRect.width && screenY >= 0 && screenY <= boardRect.height;
+
+    if (overBoard) {
+      // Convert screen coords to world coords
+      const wx = screenX / safeScaleRef.current - piece.pieceWidth / 2;
+      const wy = screenY / safeScaleRef.current - piece.pieceHeight / 2;
+      const clampedWx = Math.max(0, Math.min(wx, worldW - piece.pieceWidth));
+      const clampedWy = Math.max(0, Math.min(wy, worldH - piece.pieceHeight));
+
+      // Check snap to final position
+      const correctWorldX = targetOX + piece.correctX;
+      const correctWorldY = targetOY + piece.correctY;
+      const distToTarget  = Math.hypot(
+        (clampedWx + pw / 2) - (correctWorldX + pw / 2),
+        (clampedWy + ph / 2) - (correctWorldY + ph / 2)
+      );
+
+      if (distToTarget <= gridCellW * SNAP_THRESHOLD) {
+        playSnapSound();
+        let updated = pieces.map((p) =>
+          p.id === id ? { ...p, currentX: correctWorldX, currentY: correctWorldY, zone: 'free' as const } : p
+        );
+        updated = lockCorrectPieces(updated, targetOX, targetOY);
+        onPiecesChange(updated);
+        return;
+      }
+
+      // Check piece-to-piece snap
+      const neighbors = pieces.filter((other) => {
+        if (other.id === id || other.zone !== 'free') return false;
+        const colDiff = Math.abs(piece.correctCol - other.correctCol);
+        const rowDiff = Math.abs(piece.correctRow - other.correctRow);
+        return (colDiff === 1 && rowDiff === 0) || (colDiff === 0 && rowDiff === 1);
+      });
+      for (const neighbor of neighbors) {
+        const expectedDx = (piece.correctCol - neighbor.correctCol) * gridCellW;
+        const expectedDy = (piece.correctRow - neighbor.correctRow) * gridCellH;
+        const expectedX  = neighbor.currentX + expectedDx;
+        const expectedY  = neighbor.currentY + expectedDy;
+        const snapDist   = Math.hypot(clampedWx - expectedX, clampedWy - expectedY);
+        if (snapDist <= gridCellW * SNAP_THRESHOLD) {
+          playSnapSound();
+          const gid = neighbor.groupId ?? nextGroupId(pieces);
+          let updated = pieces.map((p) => {
+            if (p.id === id)       return { ...p, currentX: expectedX, currentY: expectedY, groupId: gid, zone: 'free' as const };
+            if (p.id === neighbor.id && p.groupId == null) return { ...p, groupId: gid };
+            return p;
+          });
+          updated = lockCorrectPieces(updated, targetOX, targetOY);
+          onPiecesChange(updated);
+          return;
+        }
+      }
+
+      // No snap — place freely on board
+      onPiecesChange(pieces.map((p) =>
+        p.id === id ? { ...p, currentX: clampedWx, currentY: clampedWy, zone: 'free' as const } : p
+      ));
+    } else {
+      // Dropped back on a tray side — return to nearest tray slot
+      const isLeftSide = pointerClientX < (boardRect.left); // left of board
+      const targetZone = isLeftSide ? 'left' : 'right';
+      const trayPieces = pieces.filter((p) => p.id !== id && p.zone === targetZone && !p.snapped);
+      const newSlotIndex = trayPieces.length; // append at end
+      onPiecesChange(pieces.map((p) =>
+        p.id === id ? { ...p, zone: targetZone, slotIndex: newSlotIndex, currentX: 0, currentY: 0 } : p
+      ));
+    }
+  }, [pieces, pw, ph, gridCellW, gridCellH, targetOX, targetOY, worldW, worldH, onPiecesChange]);
+
+  // ── Board drag end (pieces already on the board) ────────────
   const handleDragEnd = useCallback(
     (id: string, wx: number, wy: number) => {
       const piece = pieces.find((p) => p.id === id);
       if (!piece) return;
 
-      // Clamp to world bounds — ensures no piece can ever escape the staging area
       const clampedWx = Math.max(0, Math.min(wx, worldW - piece.pieceWidth));
       const clampedWy = Math.max(0, Math.min(wy, worldH - piece.pieceHeight));
 
-      // 1. Snap to the correct final board position → lock it
+      // 1. Snap to correct final board position
       const correctWorldX = targetOX + piece.correctX;
       const correctWorldY = targetOY + piece.correctY;
-      const distToTarget = Math.hypot(
+      const distToTarget  = Math.hypot(
         (clampedWx + pw / 2) - (correctWorldX + pw / 2),
         (clampedWy + ph / 2) - (correctWorldY + ph / 2)
       );
-
       if (distToTarget <= gridCellW * SNAP_THRESHOLD) {
         playSnapSound();
         let updated = pieces.map((p) =>
@@ -540,21 +654,19 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
         return;
       }
 
-      // 2. Piece-to-piece snap — connect to an adjacent neighbor
+      // 2. Piece-to-piece snap
       const neighbors = pieces.filter((other) => {
-        if (other.id === id) return false;
+        if (other.id === id || other.zone !== 'free') return false;
         const colDiff = Math.abs(piece.correctCol - other.correctCol);
         const rowDiff = Math.abs(piece.correctRow - other.correctRow);
         return (colDiff === 1 && rowDiff === 0) || (colDiff === 0 && rowDiff === 1);
       });
-
       for (const neighbor of neighbors) {
         const expectedDx = (piece.correctCol - neighbor.correctCol) * gridCellW;
         const expectedDy = (piece.correctRow - neighbor.correctRow) * gridCellH;
-        const expectedX = neighbor.currentX + expectedDx;
-        const expectedY = neighbor.currentY + expectedDy;
-        const snapDist = Math.hypot(clampedWx - expectedX, clampedWy - expectedY);
-
+        const expectedX  = neighbor.currentX + expectedDx;
+        const expectedY  = neighbor.currentY + expectedDy;
+        const snapDist   = Math.hypot(clampedWx - expectedX, clampedWy - expectedY);
         if (snapDist <= gridCellW * SNAP_THRESHOLD) {
           playSnapSound();
           const gid = neighbor.groupId ?? nextGroupId(pieces);
@@ -569,7 +681,7 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
         }
       }
 
-      // 3. No snap — drop at clamped position
+      // 3. No snap — drop freely
       onPiecesChange(pieces.map((p) =>
         p.id === id ? { ...p, currentX: clampedWx, currentY: clampedWy } : p
       ));
@@ -577,32 +689,25 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
     [pieces, pw, ph, gridCellW, gridCellH, targetOX, targetOY, worldW, worldH, onPiecesChange]
   );
 
-  // Group drag end: move all pieces in the group by the delta, then check snaps
+  // ── Group drag end ──────────────────────────────────────────
   const handleGroupDragEnd = useCallback(
     (ids: string[], dx: number, dy: number) => {
-      // Move every piece in the group by the drag delta
       let updated = pieces.map((p) =>
-        ids.includes(p.id)
-          ? { ...p, currentX: p.currentX + dx, currentY: p.currentY + dy }
-          : p
+        ids.includes(p.id) ? { ...p, currentX: p.currentX + dx, currentY: p.currentY + dy } : p
       );
-
       const groupPieces = updated.filter((p) => ids.includes(p.id));
 
-      // 1. Snap the whole group onto the board if ANY piece lands close enough
-      //    to its correct board slot (the group is rigid, so aligning one aligns all).
+      // 1. Snap group onto board
       for (const gp of groupPieces) {
-        const correctWX = targetOX + gp.correctX;
-        const correctWY = targetOY + gp.correctY;
+        const correctWX    = targetOX + gp.correctX;
+        const correctWY    = targetOY + gp.correctY;
         const distToTarget = Math.hypot(gp.currentX - correctWX, gp.currentY - correctWY);
         if (distToTarget <= gridCellW * SNAP_THRESHOLD) {
           const offX = correctWX - gp.currentX;
           const offY = correctWY - gp.currentY;
           playSnapSound();
           updated = updated.map((p) =>
-            ids.includes(p.id)
-              ? { ...p, currentX: p.currentX + offX, currentY: p.currentY + offY }
-              : p
+            ids.includes(p.id) ? { ...p, currentX: p.currentX + offX, currentY: p.currentY + offY } : p
           );
           updated = lockCorrectPieces(updated, targetOX, targetOY);
           onPiecesChange(updated);
@@ -610,33 +715,28 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
         }
       }
 
-      // 2. Connect the group to a neighboring piece/group outside it
+      // 2. Connect to neighboring piece/group
       for (const gPiece of groupPieces) {
         const neighbors = updated.filter((other) => {
-          if (ids.includes(other.id)) return false;
+          if (ids.includes(other.id) || other.zone !== 'free') return false;
           const colDiff = Math.abs(gPiece.correctCol - other.correctCol);
           const rowDiff = Math.abs(gPiece.correctRow - other.correctRow);
           return (colDiff === 1 && rowDiff === 0) || (colDiff === 0 && rowDiff === 1);
         });
-
         for (const neighbor of neighbors) {
-          const expectedDx = (gPiece.correctCol - neighbor.correctCol) * gridCellW;
-          const expectedDy = (gPiece.correctRow - neighbor.correctRow) * gridCellH;
-          const expectedX = neighbor.currentX + expectedDx;
-          const expectedY = neighbor.currentY + expectedDy;
-          const snapDist = Math.hypot(gPiece.currentX - expectedX, gPiece.currentY - expectedY);
-
+          const expectedDx      = (gPiece.correctCol - neighbor.correctCol) * gridCellW;
+          const expectedDy      = (gPiece.correctRow - neighbor.correctRow) * gridCellH;
+          const expectedX       = neighbor.currentX + expectedDx;
+          const expectedY       = neighbor.currentY + expectedDy;
+          const snapDist        = Math.hypot(gPiece.currentX - expectedX, gPiece.currentY - expectedY);
           if (snapDist <= gridCellW * SNAP_THRESHOLD) {
-            const offX = expectedX - gPiece.currentX;
-            const offY = expectedY - gPiece.currentY;
+            const offX          = expectedX - gPiece.currentX;
+            const offY          = expectedY - gPiece.currentY;
             playSnapSound();
-            // Merge this group and the neighbor's group under one permanent id
-            const gid = gPiece.groupId ?? neighbor.groupId ?? nextGroupId(updated);
+            const gid           = gPiece.groupId ?? neighbor.groupId ?? nextGroupId(updated);
             const neighborGroupId = neighbor.groupId;
             updated = updated.map((p) => {
-              if (ids.includes(p.id)) {
-                return { ...p, currentX: p.currentX + offX, currentY: p.currentY + offY, groupId: gid };
-              }
+              if (ids.includes(p.id)) return { ...p, currentX: p.currentX + offX, currentY: p.currentY + offY, groupId: gid };
               if (p.id === neighbor.id) return { ...p, groupId: gid };
               if (neighborGroupId != null && p.groupId === neighborGroupId) return { ...p, groupId: gid };
               return p;
@@ -648,14 +748,10 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
         }
       }
 
-      // 3. No snap — clamp every piece in the group to world bounds then move
+      // 3. No snap — clamp to world bounds
       updated = updated.map((p) => {
         if (!ids.includes(p.id)) return p;
-        return {
-          ...p,
-          currentX: Math.max(0, Math.min(p.currentX, worldW - p.pieceWidth)),
-          currentY: Math.max(0, Math.min(p.currentY, worldH - p.pieceHeight)),
-        };
+        return { ...p, currentX: Math.max(0, Math.min(p.currentX, worldW - p.pieceWidth)), currentY: Math.max(0, Math.min(p.currentY, worldH - p.pieceHeight)) };
       });
       onPiecesChange(updated);
     },
@@ -663,23 +759,37 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
   );
 
   if (!ready) {
-    return <div className="puzzle-board-wrap" ref={wrapRef} style={{ minHeight: 200 }} />;
+    return <div className="puzzle-layout-wrap" ref={wrapRef} style={{ minHeight: 200 }} />;
   }
 
   return (
-    <div
-      className={`puzzle-board-wrap${panMode ? ' puzzle-board-wrap--pan' : ''}`}
-      ref={wrapRef}
-      onPointerDown={handlePanPointerDown}
-      onPointerMove={handlePanPointerMove}
-      onPointerUp={handlePanPointerUp}
-      onPointerLeave={handlePanPointerUp}
-    >
-      <div className="puzzle-board-inner">
+    <div className="puzzle-layout-wrap" ref={wrapRef}>
+      {/* ── Left tray ── */}
+      <ScrollableTray
+        side="left"
+        pieces={leftTrayPieces}
+        trayW={trayPixelW}
+        trayH={trayH}
+        pw={pw}
+        ph={ph}
+        scrollY={leftScrollY}
+        onScrollY={setLeftScrollY}
+        onDragOutOfTray={handleDragOutOfTray}
+      />
+
+      {/* ── Center board ── */}
+      <div
+        className={`puzzle-board-center${panMode ? ' puzzle-board-center--pan' : ''}`}
+        ref={boardWrapRef}
+        style={{ width: boardPixelW, height: containerH, position: 'relative', flexShrink: 0, overflow: 'hidden' }}
+        onPointerDown={handlePanPointerDown}
+        onPointerMove={handlePanPointerMove}
+        onPointerUp={handlePanPointerUp}
+        onPointerLeave={handlePanPointerUp}
+      >
         <div
-          ref={stageWrapRef}
-          className={`puzzle-single-stage${panMode ? ' puzzle-single-stage--pan' : ''}`}
-          style={{ transform: `translate(${panOffset.x}px, ${panOffset.y}px)` }}
+          className="puzzle-board-stage-wrap"
+          style={{ transform: `translate(${panOffset.x}px, ${panOffset.y}px)`, display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}
         >
           <Stage
             ref={stageRef}
@@ -688,108 +798,76 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
             scaleX={safeScale}
             scaleY={safeScale}
           >
-          {/* Background — single uniform color, no borders */}
-          <Layer listening={false}>
-            <Rect x={0} y={0} width={worldW} height={worldH} fill="#3d3b4a" />
-            {/* Target area: slightly different shade so user knows where to build */}
-            <Rect x={targetOX} y={targetOY} width={targetW} height={targetH}
-              fill="#2f2d3e" cornerRadius={4} listening={false} />
-          </Layer>
-
-          {/* Locked pieces (correctly placed on board) — immovable, green glow */}
-          <Layer>
-            {lockedPieces.map((piece) => (
-              <DraggablePieceTile key={piece.id} piece={piece}
-                x={piece.currentX} y={piece.currentY}
-                worldW={worldW} worldH={worldH} scale={safeScale}
-                onDragEnd={handleDragEnd} />
-            ))}
-          </Layer>
-
-          {/* Connected groups (move together, permanently linked) */}
-          <Layer>
-            {groups.map(([gid, group]) => {
-              const minX = Math.min(...group.map((p) => p.currentX));
-              const minY = Math.min(...group.map((p) => p.currentY));
-              return (
-                <DraggablePieceGroup
-                  key={`group-${gid}`}
-                  groupPieces={group}
-                  offsetX={minX}
-                  offsetY={minY}
-                  worldW={worldW} worldH={worldH} scale={safeScale}
-                  onGroupDragEnd={handleGroupDragEnd}
-                />
-              );
-            })}
-          </Layer>
-
-          {/* Free, unconnected pieces */}
-          <Layer>
-            {freePieces.map((piece) => (
-              <DraggablePieceTile
-                key={piece.id}
-                piece={piece}
-                x={piece.currentX} y={piece.currentY}
-                worldW={worldW} worldH={worldH} scale={safeScale}
-                onDragEnd={handleDragEnd}
-              />
-            ))}
-          </Layer>
-
-          {/* Hint overlay — drawn on top so the glow is visible */}
-          {hintPiece && (
             <Layer listening={false}>
-              <HintOverlay piece={hintPiece} targetOX={targetOX} targetOY={targetOY} />
+              <Rect x={0} y={0} width={worldW} height={worldH} fill="#3d3b4a" />
+              <Rect x={targetOX} y={targetOY} width={targetW} height={targetH} fill="#2f2d3e" cornerRadius={4} listening={false} />
             </Layer>
-          )}
-        </Stage>
+            <Layer>
+              {lockedPieces.map((piece) => (
+                <DraggablePieceTile key={piece.id} piece={piece}
+                  x={piece.currentX} y={piece.currentY}
+                  worldW={worldW} worldH={worldH} scale={safeScale}
+                  onDragEnd={handleDragEnd} />
+              ))}
+            </Layer>
+            <Layer>
+              {groups.map(([gid, group]) => {
+                const minX = Math.min(...group.map((p) => p.currentX));
+                const minY = Math.min(...group.map((p) => p.currentY));
+                return (
+                  <DraggablePieceGroup
+                    key={`group-${gid}`}
+                    groupPieces={group}
+                    offsetX={minX}
+                    offsetY={minY}
+                    worldW={worldW} worldH={worldH} scale={safeScale}
+                    onGroupDragEnd={handleGroupDragEnd}
+                  />
+                );
+              })}
+            </Layer>
+            <Layer>
+              {freePieces.map((piece) => (
+                <DraggablePieceTile
+                  key={piece.id}
+                  piece={piece}
+                  x={piece.currentX} y={piece.currentY}
+                  worldW={worldW} worldH={worldH} scale={safeScale}
+                  onDragEnd={handleDragEnd}
+                />
+              ))}
+            </Layer>
+            {hintPiece && (
+              <Layer listening={false}>
+                <HintOverlay piece={hintPiece} targetOX={targetOX} targetOY={targetOY} />
+              </Layer>
+            )}
+          </Stage>
         </div>
 
-        {/* Zoom + pan controls — right side */}
-        <div
-          className="puzzle-zoom-controls"
-          onPointerDown={(e) => e.stopPropagation()}
-        >
-          {/* Pan / hand toggle */}
-          <button
-            type="button"
+        {/* Zoom + pan controls — attached to right edge of center board */}
+        <div className="puzzle-zoom-controls" onPointerDown={(e) => e.stopPropagation()}>
+          <button type="button"
             className={`puzzle-zoom-btn puzzle-pan-btn${panMode ? ' puzzle-zoom-btn--active' : ''}`}
             onClick={() => setPanMode((v) => !v)}
-            aria-label={panMode ? 'Disable pan mode' : 'Enable pan mode — drag to move the board'}
-            title={panMode ? 'Pan mode on — click to disable' : 'Pan mode — drag board to move'}
+            aria-label={panMode ? 'Disable pan mode' : 'Enable pan mode'}
+            title={panMode ? 'Pan mode on — click to disable' : 'Pan mode — drag to move'}
           >
             <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
               <path d="M8 3.5V10M8 3.5a1.5 1.5 0 0 1 3 0V10M11 5a1.5 1.5 0 0 1 3 0v2M14 7a1.5 1.5 0 0 1 3 0v4c0 3-2 5-5 5H9c-1.5 0-2.8-.7-3.6-1.8L3 11.5a1.5 1.5 0 0 1 2.4-1.8L6.5 11V3.5a1.5 1.5 0 0 1 3 0"
                 stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
-
-          {/* Center / reset board position */}
-          <button
-            type="button"
-            className="puzzle-zoom-btn"
-            onClick={handleCenterBoard}
-            aria-label="Reset board to center"
-            title="Reset board to center"
-          >
+          <button type="button" className="puzzle-zoom-btn" onClick={handleCenterBoard}
+            aria-label="Reset board to center" title="Reset board to center">
             <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
               <circle cx="10" cy="10" r="2.5" stroke="currentColor" strokeWidth="1.6" />
               <path d="M10 3v2M10 15v2M3 10h2M15 10h2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
               <path d="M5.5 5.5l1.4 1.4M13.1 13.1l1.4 1.4M13.1 6.9l-1.4 1.4M6.9 13.1l-1.4 1.4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
             </svg>
           </button>
-
-          {/* Divider */}
           <div className="puzzle-zoom-divider" />
-
-          <button
-            type="button"
-            className="puzzle-zoom-btn"
-            onClick={handleZoomIn}
-            aria-label="Zoom in"
-            title="Zoom in"
-          >
+          <button type="button" className="puzzle-zoom-btn" onClick={handleZoomIn} aria-label="Zoom in" title="Zoom in">
             <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
               <circle cx="9" cy="9" r="6.5" stroke="currentColor" strokeWidth="1.6" />
               <path d="M9 6.5v5M6.5 9h5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
@@ -797,13 +875,7 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
             </svg>
           </button>
           <span className="puzzle-zoom-level">{Math.round(zoomLevel * 100)}%</span>
-          <button
-            type="button"
-            className="puzzle-zoom-btn"
-            onClick={handleZoomOut}
-            aria-label="Zoom out"
-            title="Zoom out"
-          >
+          <button type="button" className="puzzle-zoom-btn" onClick={handleZoomOut} aria-label="Zoom out" title="Zoom out">
             <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
               <circle cx="9" cy="9" r="6.5" stroke="currentColor" strokeWidth="1.6" />
               <path d="M6.5 9h5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
@@ -812,6 +884,19 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
           </button>
         </div>
       </div>
+
+      {/* ── Right tray ── */}
+      <ScrollableTray
+        side="right"
+        pieces={rightTrayPieces}
+        trayW={trayPixelW}
+        trayH={trayH}
+        pw={pw}
+        ph={ph}
+        scrollY={rightScrollY}
+        onScrollY={setRightScrollY}
+        onDragOutOfTray={handleDragOutOfTray}
+      />
     </div>
   );
 });
