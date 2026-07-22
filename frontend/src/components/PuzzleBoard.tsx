@@ -419,6 +419,14 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
   // Step 3: convert back to world coords for marginX
   const portraitMarginX = sideScreenW / portraitScale;
 
+  // Portrait: worldH must be tall enough to hold all pieces in max-7-column panels.
+  // Estimate: each side gets half the pieces in ≤7 columns → rows needed.
+  // Use pw/ph if available, else fall back to targetH.
+  const estimatedPieceRows = ready && pw > 0 && ph > 0
+    ? Math.ceil((pieces.length / 2) / Math.min(7, Math.max(1, Math.floor((sideScreenW / portraitScale - 12) / (pw + 12)))))
+    : 0;
+  const minWorldH = ready && ph > 0 ? estimatedPieceRows * (ph + 12) + 24 : 0;
+
   const marginX = isPortrait
     ? portraitMarginX
     : Math.max(pw * 3, targetW * MARGIN_RATIO_X);
@@ -426,7 +434,9 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
     ? 0
     : Math.max(ph * 2, targetH * MARGIN_RATIO_Y);
   const worldW = targetW + marginX * 2;
-  const worldH = targetH + marginY * 2;
+  const worldH = isPortrait
+    ? Math.max(targetH, minWorldH)
+    : targetH + marginY * 2;
   const targetOX = marginX;
   const targetOY = marginY;
 
@@ -460,61 +470,52 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
 
     if (!allAtOrigin && !worldChanged) return;
 
-    const tabSize = Math.round(pw * 0.132); // ≈ pieceW * 0.18 / 1.36
-    const gap = Math.max(tabSize + 2, 12);  // safe inset from every edge
+    const tabSize = Math.round(pw * 0.132);
+    const gap = Math.max(tabSize + 2, 12);
     const cW = pw + gap;
     const cH = ph + gap;
 
-    // Right panel: subtract zoom controls width (52px screen space converted to world coords)
+    // Right panel end: clear the zoom controls (52px screen → world coords)
     const zoomControlsWorldW = Math.round(52 / safeScaleRef.current);
     const rightPanelEndX = worldW - zoomControlsWorldW - gap;
 
-    // How many columns fit in each side panel
-    const leftPanelW  = targetOX - gap;                 // left panel available width
-    const rightPanelW = rightPanelEndX - (targetOX + targetW + gap); // right panel available width
-    const leftCols  = Math.max(1, Math.floor(leftPanelW  / cW));
-    const rightCols = Math.max(1, Math.floor(rightPanelW / cW));
-    // How many rows fit vertically
-    const rows_  = Math.max(1, Math.floor((worldH - gap * 2) / cH));
+    // Max 7 columns per side — scrollbar handles overflow vertically
+    const leftPanelW  = targetOX - gap;
+    const rightPanelW = rightPanelEndX - (targetOX + targetW + gap);
+    const leftCols  = Math.min(7, Math.max(1, Math.floor(leftPanelW  / cW)));
+    const rightCols = Math.min(7, Math.max(1, Math.floor(rightPanelW / cW)));
 
-    const leftCapacity  = leftCols  * rows_;
-    const rightCapacity = rightCols * rows_;
-    const sideCapacity  = leftCapacity + rightCapacity;
+    const unsnapped = allAtOrigin ? [...pieces] : pieces.filter((p) => !p.snapped);
+    const shuffled  = [...unsnapped].sort(() => Math.random() - 0.5);
 
-    // Generate left slots: fill row by row (row-major so visual is left→right, top→bottom)
+    // Split evenly: first half goes left, second half goes right
+    const half       = Math.ceil(shuffled.length / 2);
+    const leftPieces = shuffled.slice(0, half);
+    const rightPieces = shuffled.slice(half);
+
+    // Generate enough rows to hold each half within their column count
+    const leftRows  = Math.ceil(leftPieces.length  / leftCols);
+    const rightRows = Math.ceil(rightPieces.length / rightCols);
+
+    // Generate left slots (row-major: row 0 col 0→leftCols, row 1 col 0→leftCols, …)
     const leftSlots: { x: number; y: number }[] = [];
-    for (let row = 0; row < rows_; row++)
+    for (let row = 0; row < leftRows; row++)
       for (let col = 0; col < leftCols; col++)
         leftSlots.push({ x: gap + col * cW, y: gap + row * cH });
 
-    // Generate right slots: same but starting after target area
+    // Generate right slots
     const rightStartX = targetOX + targetW + gap;
     const rightSlots: { x: number; y: number }[] = [];
-    for (let row = 0; row < rows_; row++)
+    for (let row = 0; row < rightRows; row++)
       for (let col = 0; col < rightCols; col++) {
         const sx = rightStartX + col * cW;
         if (sx + pw <= rightPanelEndX) rightSlots.push({ x: sx, y: gap + row * cH });
       }
 
-    // Interior slots for overflow
-    const interiorSlots: { x: number; y: number }[] = [];
-    for (let row = 0; row < Math.floor((targetH - gap * 2) / cH); row++)
-      for (let col = 0; col < Math.floor((targetW - gap * 2) / cW); col++)
-        interiorSlots.push({ x: targetOX + gap + col * cW, y: targetOY + gap + row * cH });
-
-    // Split pieces into exactly left half and right half
-    const unsnapped = allAtOrigin ? [...pieces] : pieces.filter((p) => !p.snapped);
-    const shuffled = [...unsnapped].sort(() => Math.random() - 0.5);
-
-    // Distribute: first leftCapacity pieces to left, next rightCapacity to right, rest to interior
-    const leftPieces  = shuffled.slice(0, leftCapacity);
-    const rightPieces = shuffled.slice(leftCapacity, sideCapacity);
-    const overflow    = shuffled.slice(sideCapacity);
-
+    // Assign every piece to a slot — no piece goes in the board interior
     const posMap = new Map<string, { x: number; y: number }>();
-    leftPieces.forEach((p, i)  => posMap.set(p.id, leftSlots[i]));
-    rightPieces.forEach((p, i) => posMap.set(p.id, rightSlots[i]));
-    overflow.forEach((p, i)    => posMap.set(p.id, interiorSlots[i % Math.max(interiorSlots.length, 1)]));
+    leftPieces.forEach((p, i)  => posMap.set(p.id, leftSlots[i]  ?? leftSlots[leftSlots.length - 1]));
+    rightPieces.forEach((p, i) => posMap.set(p.id, rightSlots[i] ?? rightSlots[rightSlots.length - 1]));
 
     if (allAtOrigin) {
       const scattered = pieces.map((p) => {
