@@ -312,7 +312,7 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
     scrollDragging.current = { side, startY: e.clientY, startRatio: scrollRatio };
   }, [scrollRatio]);
 
-  const handleScrollThumbPointerMove = useCallback((_e: React.PointerEvent) => {
+  const handleScrollThumbPointerMove = useCallback((e: React.PointerEvent) => {
     if (!scrollDragging.current) return;
     // Will be handled by wrapRef's pointer move — no-op here since we use global handlers
   }, []);
