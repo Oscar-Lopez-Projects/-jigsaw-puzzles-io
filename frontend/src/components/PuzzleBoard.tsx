@@ -319,17 +319,14 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
   const handleBoardWheel = useCallback((e: React.WheelEvent<HTMLDivElement>) => {
     if (!isPortraitRef.current) return;
     e.preventDefault();
-    // Clamp so the board never scrolls off screen entirely
-    // maxScrollDown = how many extra pixels of pieces exist below the viewport
-    const sh = stageHRef.current;
-    const ch = containerHRef.current;
+    const sh = worldH * safeScaleRef.current;  // stage screen height
+    const ch = wrapRef.current?.clientHeight ?? sh;
     const maxScrollDown = Math.max(0, sh - ch);
-    // Also allow scrolling up a bit (pieces at top always visible)
     setPanOffset((prev) => ({
       x: prev.x,
       y: Math.min(0, Math.max(-(maxScrollDown * 2), prev.y - e.deltaY * 0.7)),
     }));
-  }, []);
+  }, [worldH]);
 
   // ── Portrait images: always max side space, no user toggle ─────
   // No expand state needed — determined purely by isPortrait below.
