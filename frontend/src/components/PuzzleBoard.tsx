@@ -319,14 +319,14 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
   const handleBoardWheel = useCallback((e: React.WheelEvent<HTMLDivElement>) => {
     if (!isPortraitRef.current) return;
     e.preventDefault();
-    const sh = worldH * safeScaleRef.current;  // stage screen height
+    const sh = worldHRef.current * safeScaleRef.current;
     const ch = wrapRef.current?.clientHeight ?? sh;
     const maxScrollDown = Math.max(0, sh - ch);
     setPanOffset((prev) => ({
       x: prev.x,
       y: Math.min(0, Math.max(-(maxScrollDown * 2), prev.y - e.deltaY * 0.7)),
     }));
-  }, [worldH]);
+  }, []);
 
   // ── Portrait images: always max side space, no user toggle ─────
   // No expand state needed — determined purely by isPortrait below.
@@ -423,6 +423,7 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
   const targetOXRef = useRef(targetOX);  targetOXRef.current = targetOX;
   const targetWRef  = useRef(targetW);   targetWRef.current  = targetW;
   const isPortraitRef = useRef(isPortrait); isPortraitRef.current = isPortrait;
+  const worldHRef = useRef(worldH); worldHRef.current = worldH;
 
   // ── Scatter / redistribute ──────────────────────────────────────
   const prevWorldSize = useRef({ w: 0, h: 0 });
