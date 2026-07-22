@@ -337,7 +337,7 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
       e.preventDefault();
       setPanOffset((prev) => ({ x: prev.x, y: prev.y - e.deltaY * 0.7 }));
     }
-  }, [isPortrait]);
+  }, []); // isPortrait read via ref below
 
   // ── Portrait images: always max side space, no user toggle ─────
   // No expand state needed — determined purely by isPortrait below.
@@ -472,8 +472,7 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
     const rightRows = Math.ceil(rightPieces.length / rightCols);
 
     // Center the columns within each panel
-    const usedLeftW  = leftCols  * cW - gap; // total width used by left columns
-    const usedRightW = rightCols * cW - gap; // total width used by right columns
+    const usedLeftW  = leftCols  * cW - gap;
     const leftOffset  = Math.max(gap, Math.round((targetOX - usedLeftW) / 2));
     const rightOffset = Math.max(gap, Math.round(((worldW - rightPanelEndX - gap) / 2)));
 
@@ -706,7 +705,6 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
           const gp = Math.max(tabSz + 2, 12);
           const cellH = ph + gp;
           const lCols = Math.min(7, Math.max(1, Math.floor((targetOX - gp) / (pw + gp))));
-          const rCols = Math.min(7, Math.max(1, Math.floor((worldW - (targetOX + targetW + gp) - Math.round(52 / safeScale) - gp) / (pw + gp))));
           const lRows = Math.ceil((pieces.length / 2) / lCols);
           const totalH = Math.max(containerH, lRows * cellH * safeScale);
           const thumbPct = Math.max(10, Math.min(90, (containerH / totalH) * 100));
