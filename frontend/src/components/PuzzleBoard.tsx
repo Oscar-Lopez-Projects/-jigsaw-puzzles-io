@@ -30,7 +30,7 @@ function computeTrayScale(trayPixelW: number, pw: number): number {
   return Math.max(0.1, trayPixelW / totalColWidth);
 }
 
-function computeTrayLayout(pw: number, ph: number, pieceCount: number) {
+function computeTrayLayout(_pw: number, ph: number, pieceCount: number) {
   const colCount = TRAY_COLS;
   const rowCount = Math.ceil(pieceCount / colCount);
   // Content height in world coords

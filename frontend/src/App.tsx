@@ -854,6 +854,10 @@ export default function App() {
                     </svg>
                   )}
                 </button>
+                {/* Git version badge */}
+                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', fontFamily: 'monospace', userSelect: 'none' }}>
+                  {__GIT_HASH__}
+                </span>
               </div>
             </div>
 
