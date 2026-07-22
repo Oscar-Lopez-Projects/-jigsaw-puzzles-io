@@ -44,9 +44,9 @@
   overflow: hidden;
   cursor: default;
   will-change: transform;
-  /* Center the Konva canvas horizontally and vertically */
+  /* Center horizontally only — vertical alignment handled by panOffset */
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
 }
 

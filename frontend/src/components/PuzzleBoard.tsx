@@ -319,7 +319,16 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
   const handleBoardWheel = useCallback((e: React.WheelEvent<HTMLDivElement>) => {
     if (!isPortraitRef.current) return;
     e.preventDefault();
-    setPanOffset((prev) => ({ x: prev.x, y: prev.y - e.deltaY * 0.7 }));
+    // Clamp so the board never scrolls off screen entirely
+    // maxScrollDown = how many extra pixels of pieces exist below the viewport
+    const sh = stageHRef.current;
+    const ch = containerHRef.current;
+    const maxScrollDown = Math.max(0, sh - ch);
+    // Also allow scrolling up a bit (pieces at top always visible)
+    setPanOffset((prev) => ({
+      x: prev.x,
+      y: Math.min(0, Math.max(-(maxScrollDown * 2), prev.y - e.deltaY * 0.7)),
+    }));
   }, []);
 
   // ── Portrait images: always max side space, no user toggle ─────
@@ -717,13 +726,13 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
           <Stage
             ref={stageRef}
             width={stageW}
-            height={stageH}
+            height={stageH * 4}
             scaleX={safeScale}
             scaleY={safeScale}
           >
-          {/* Background — single uniform color, no borders */}
+          {/* Background — extends tall enough to cover all piece rows */}
           <Layer listening={false}>
-            <Rect x={0} y={0} width={worldW} height={worldH} fill="#3d3b4a" />
+            <Rect x={0} y={0} width={worldW} height={worldH * 4} fill="#3d3b4a" />
             {/* Target area: slightly different shade so user knows where to build */}
             <Rect x={targetOX} y={targetOY} width={targetW} height={targetH}
               fill="#2f2d3e" cornerRadius={4} listening={false} />
