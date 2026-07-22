@@ -315,29 +315,12 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
     setPanOffset({ x: 0, y: 0 });
   }, []);
 
-  // Wheel anywhere on the board scrolls vertically when in portrait mode.
-  // We detect if the pointer is over a side panel and scroll accordingly.
+  // Wheel on the board scrolls vertically in portrait mode
   const handleBoardWheel = useCallback((e: React.WheelEvent<HTMLDivElement>) => {
-    if (!isPortrait) return;
-    // Get the stage element bounds to find where side panels are
-    const wrap = wrapRef.current;
-    if (!wrap) return;
-    const rect = wrap.getBoundingClientRect();
-    const relX = e.clientX - rect.left; // pointer x relative to board
-    // Stage is centered — compute side panel screen widths
-    const stageScreenW = stageWRef.current;
-    const stageLeft = (rect.width - stageScreenW) / 2;
-    const stageRight = stageLeft + stageScreenW;
-    const targetScreenLeft  = stageLeft  + targetOXRef.current * safeScaleRef.current;
-    const targetScreenRight = stageLeft  + (targetOXRef.current + targetWRef.current) * safeScaleRef.current;
-    // Only scroll if pointer is over a side panel (left of target or right of target)
-    const inLeftPanel  = relX >= stageLeft  && relX < targetScreenLeft;
-    const inRightPanel = relX > targetScreenRight && relX <= stageRight;
-    if (inLeftPanel || inRightPanel) {
-      e.preventDefault();
-      setPanOffset((prev) => ({ x: prev.x, y: prev.y - e.deltaY * 0.7 }));
-    }
-  }, []); // isPortrait read via ref below
+    if (!isPortraitRef.current) return;
+    e.preventDefault();
+    setPanOffset((prev) => ({ x: prev.x, y: prev.y - e.deltaY * 0.7 }));
+  }, []);
 
   // ── Portrait images: always max side space, no user toggle ─────
   // No expand state needed — determined purely by isPortrait below.
@@ -433,6 +416,7 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
   const stageWRef   = useRef(stageW);    stageWRef.current   = stageW;
   const targetOXRef = useRef(targetOX);  targetOXRef.current = targetOX;
   const targetWRef  = useRef(targetW);   targetWRef.current  = targetW;
+  const isPortraitRef = useRef(isPortrait); isPortraitRef.current = isPortrait;
 
   // ── Scatter / redistribute ──────────────────────────────────────
   const prevWorldSize = useRef({ w: 0, h: 0 });
@@ -482,14 +466,12 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
       for (let col = 0; col < leftCols; col++)
         leftSlots.push({ x: leftOffset + col * cW, y: gap + row * cH });
 
-    // Right slots row-major
+    // Right slots row-major — generate all slots unconditionally (rightCols already bounds-checked)
     const rightStartX = targetOX + targetW + gap + rightOffset;
     const rightSlots: { x: number; y: number }[] = [];
     for (let row = 0; row < rightRows; row++)
-      for (let col = 0; col < rightCols; col++) {
-        const sx = rightStartX + col * cW;
-        if (sx + pw <= rightPanelEndX) rightSlots.push({ x: sx, y: gap + row * cH });
-      }
+      for (let col = 0; col < rightCols; col++)
+        rightSlots.push({ x: rightStartX + col * cW, y: gap + row * cH });
     // Every piece gets a side slot — no overflow to board interior
     const posMap = new Map<string, { x: number; y: number }>();
     leftPieces.forEach((p, i)  => posMap.set(p.id, leftSlots[Math.min(i, leftSlots.length - 1)]));
