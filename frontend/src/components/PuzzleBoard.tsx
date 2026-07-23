@@ -21,7 +21,7 @@ function useImage(src: string): HTMLImageElement | null {
 
 // ─── Slot helpers ──────────────────────────────────────────────
 const TRAY_GAP    = 12;  // gap between pieces and from edges (in world coords)
-const TRAY_COLS   = 4;   // target columns per tray — scale is derived from this
+const TRAY_COLS   = 5;   // target columns per tray
 
 // Compute the tray scale so TRAY_COLS fit within the visible tray pixel width.
 // All slot coords use world units; the Stage scaleX/Y converts to screen pixels.
@@ -194,46 +194,46 @@ function HintOverlay({ piece, targetOX, targetOY }: { piece: PuzzlePiece; target
 // ─── TrayPieceTile (Konva piece inside a tray stage) ──────────
 interface TrayPieceTileProps {
   piece: PuzzlePiece;
-  trayX: number; // tray-local X
-  trayY: number; // tray-local Y
-  trayW: number; // tray content width
-  contentH: number; // tray content height
+  trayX: number;
+  trayY: number;
   onDragOutOfTray: (id: string, pointerClientX: number, pointerClientY: number) => void;
 }
 
-function TrayPieceTile({ piece, trayX, trayY, trayW, contentH, onDragOutOfTray }: TrayPieceTileProps) {
+function TrayPieceTile({ piece, trayX, trayY, onDragOutOfTray }: TrayPieceTileProps) {
   const img = useImage(piece.imageUrl);
   const isDragging = useRef(false);
+  const groupRef = useRef<Konva.Group>(null);
 
   if (!img) return null;
 
   return (
     <Group
+      ref={groupRef}
       x={trayX} y={trayY}
       draggable
-      dragBoundFunc={(pos) => {
-        // Allow free movement while in the tray stage — clamped to content area
-        const maxX = Math.max(0, trayW - piece.pieceWidth);
-        const maxY = Math.max(0, contentH - piece.pieceHeight);
-        return { x: Math.max(0, Math.min(pos.x, maxX)), y: Math.max(0, Math.min(pos.y, maxY)) };
-      }}
+      // No dragBoundFunc — allow free dragging anywhere so piece can reach the board
       onDragStart={(e) => {
         isDragging.current = true;
         e.target.moveToTop();
         const stage = e.target.getStage();
-        if (stage) stage.container().style.cursor = 'grabbing';
+        if (stage) {
+          stage.container().style.cursor = 'grabbing';
+          // Elevate tray container above board stage during drag
+          stage.container().style.zIndex = '999';
+        }
       }}
       onDragEnd={(e) => {
         isDragging.current = false;
         const stage = e.target.getStage();
-        if (stage) stage.container().style.cursor = 'default';
-        // Get the pointer position in client coordinates at drag end
+        if (stage) {
+          stage.container().style.cursor = 'default';
+          stage.container().style.zIndex = '';
+        }
         const container = stage?.container();
         if (!container) return;
         const rect = container.getBoundingClientRect();
-        // Use the piece's screen position
-        const pieceScreenX = rect.left + e.target.x();
-        const pieceScreenY = rect.top + e.target.y();
+        const pieceScreenX = rect.left + e.target.x() * (stage?.scaleX() ?? 1);
+        const pieceScreenY = rect.top  + e.target.y() * (stage?.scaleY() ?? 1);
         onDragOutOfTray(piece.id, pieceScreenX + piece.pieceWidth / 2, pieceScreenY + piece.pieceHeight / 2);
       }}
       onMouseEnter={(e) => { const s = e.target.getStage(); if (s) s.container().style.cursor = 'grab'; }}
@@ -331,10 +331,7 @@ function ScrollableTray({ side, pieces, trayW, trayH, pw, ph, scrollY, onScrollY
                   piece={piece}
                   trayX={x}
                   trayY={y}
-                  trayW={stageWorldW}
-                  contentH={contentH}
                   onDragOutOfTray={(id, cx, cy) => {
-                    // Adjust pointer coords: tray stage has trayScale applied
                     onDragOutOfTray(id, cx, cy);
                   }}
                 />
@@ -484,13 +481,13 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
   const boardPixelW = Math.max(containerW - trayPixelW * 2, containerW * BOARD_FRAC);
   const trayH       = containerH;
 
-  // Board world dimensions = just the target area + small margins
-  const marginX = Math.max(pw, 20);
-  const marginY = Math.max(ph, 20);
-  const worldW  = targetW + marginX * 2;
-  const worldH  = targetH + marginY * 2;
-  const targetOX = marginX;
-  const targetOY = marginY;
+  // Board world dimensions: zero margins so the puzzle fills the full board area
+  const marginX  = 0;
+  const marginY  = 0;
+  const worldW   = targetW;
+  const worldH   = targetH;
+  const targetOX = 0;
+  const targetOY = 0;
 
   const scaleByW  = ready ? boardPixelW / worldW : 1;
   const scaleByH  = ready && containerH > 0 ? containerH / worldH : scaleByW;
