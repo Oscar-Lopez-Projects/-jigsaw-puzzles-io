@@ -217,8 +217,11 @@ function TrayPieceTile({ piece, trayX, trayY, onDragOutOfTray }: TrayPieceTilePr
         const stage = e.target.getStage();
         if (stage) {
           stage.container().style.cursor = 'grabbing';
-          // Elevate tray container above board stage during drag
+          // Elevate tray above everything during drag so piece is visible over the board
           stage.container().style.zIndex = '999';
+          // Remove overflow clip on the tray wrapper so piece can visually leave
+          const trayDiv = stage.container().closest('.puzzle-tray') as HTMLElement;
+          if (trayDiv) trayDiv.style.overflow = 'visible';
         }
       }}
       onDragEnd={(e) => {
@@ -227,6 +230,8 @@ function TrayPieceTile({ piece, trayX, trayY, onDragOutOfTray }: TrayPieceTilePr
         if (stage) {
           stage.container().style.cursor = 'default';
           stage.container().style.zIndex = '';
+          const trayDiv = stage.container().closest('.puzzle-tray') as HTMLElement;
+          if (trayDiv) trayDiv.style.overflow = 'hidden';
         }
         const container = stage?.container();
         if (!container) return;
@@ -793,7 +798,7 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
       <div
         className={`puzzle-board-center${panMode ? ' puzzle-board-center--pan' : ''}`}
         ref={boardWrapRef}
-        style={{ width: boardPixelW, height: containerH, position: 'relative', flexShrink: 0, overflow: 'hidden' }}
+        style={{ width: boardPixelW, height: containerH, position: 'relative', flexShrink: 0, overflow: 'visible' }}
         onPointerDown={handlePanPointerDown}
         onPointerMove={handlePanPointerMove}
         onPointerUp={handlePanPointerUp}

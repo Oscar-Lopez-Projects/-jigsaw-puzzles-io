@@ -11,7 +11,7 @@
   flex-direction: row;
   align-items: stretch;
   position: relative;
-  overflow: hidden;
+  overflow: visible;
   background: #1e1b32;
 }
 
@@ -21,6 +21,11 @@
   position: relative;
   overflow: hidden;
   flex-shrink: 0;
+}
+
+/* During drag, the tray gets z-index:999 via JS — also need overflow visible */
+.puzzle-tray canvas {
+  overflow: visible !important;
 }
 
 .puzzle-tray--left {
