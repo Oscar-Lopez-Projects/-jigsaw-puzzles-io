@@ -267,6 +267,79 @@ function nextGroupId(arr: PuzzlePiece[]): number {
   return arr.reduce((m, p) => Math.max(m, p.groupId ?? 0), 0) + 1;
 }
 
+// ─── TrayGroupTile — renders a connected group inside a tray ──
+interface TrayGroupTileProps {
+  groupPieces: PuzzlePiece[];
+  offsetX: number;
+  offsetY: number;
+  onDragGroupOutOfTray: (ids: string[], pointerClientX: number, pointerClientY: number) => void;
+}
+
+function TrayGroupTile({ groupPieces, offsetX, offsetY, onDragGroupOutOfTray }: TrayGroupTileProps) {
+  const ids = groupPieces.map((p) => p.id);
+
+  const createGroupGhost = useCallback((startX: number, startY: number) => {
+    // Show ghosts for all pieces in the group
+    const ghosts: HTMLImageElement[] = [];
+    groupPieces.forEach((piece, i) => {
+      const ghost = document.createElement('img');
+      ghost.src = piece.imageUrl;
+      const offX = (piece.currentX - offsetX) * 0.15;
+      const offY = (piece.currentY - offsetY) * 0.15;
+      ghost.style.cssText = `position:fixed;pointer-events:none;z-index:9999;width:${piece.pieceWidth * 0.15}px;height:${piece.pieceHeight * 0.15}px;opacity:0.85;left:${startX + offX}px;top:${startY + offY}px;transform:translate(-50%,-50%);`;
+      document.body.appendChild(ghost);
+      ghosts.push(ghost);
+    });
+
+    const moveGhosts = (e: PointerEvent) => {
+      groupPieces.forEach((piece, i) => {
+        const ghost = ghosts[i];
+        if (!ghost) return;
+        const offX = (piece.currentX - offsetX) * 0.15;
+        const offY = (piece.currentY - offsetY) * 0.15;
+        ghost.style.left = `${e.clientX + offX}px`;
+        ghost.style.top  = `${e.clientY + offY}px`;
+      });
+    };
+    const removeGhosts = (e: PointerEvent) => {
+      document.removeEventListener('pointermove', moveGhosts);
+      document.removeEventListener('pointerup', removeGhosts);
+      ghosts.forEach((g) => { if (g.parentElement) g.remove(); });
+      onDragGroupOutOfTray(ids, e.clientX, e.clientY);
+    };
+    document.addEventListener('pointermove', moveGhosts);
+    document.addEventListener('pointerup', removeGhosts);
+  }, [groupPieces, offsetX, offsetY, ids, onDragGroupOutOfTray]);
+
+  return (
+    <Group x={offsetX} y={offsetY}
+      onMouseDown={(e) => {
+        const stage = e.target.getStage();
+        const container = stage?.container();
+        if (!container) return;
+        const rect = container.getBoundingClientRect();
+        const scale = stage?.scaleX() ?? 1;
+        const screenX = rect.left + offsetX * scale;
+        const screenY = rect.top  + offsetY * scale;
+        createGroupGhost(screenX, screenY);
+        e.cancelBubble = true;
+      }}
+      onMouseEnter={(e) => { const s = e.target.getStage(); if (s) s.container().style.cursor = 'grab'; }}
+      onMouseLeave={(e) => { const s = e.target.getStage(); if (s) s.container().style.cursor = 'default'; }}
+    >
+      {groupPieces.map((piece) => {
+        return <TrayGroupPieceImage key={piece.id} piece={piece} relX={piece.currentX - offsetX} relY={piece.currentY - offsetY} />;
+      })}
+    </Group>
+  );
+}
+
+function TrayGroupPieceImage({ piece, relX, relY }: { piece: PuzzlePiece; relX: number; relY: number }) {
+  const img = useImage(piece.imageUrl);
+  if (!img) return null;
+  return <KonvaImage image={img} x={relX} y={relY} width={piece.pieceWidth} height={piece.pieceHeight} />;
+}
+
 // ─── Scrollable Tray component ────────────────────────────────
 interface TrayProps {
   side: 'left' | 'right';
@@ -279,9 +352,10 @@ interface TrayProps {
   scrollY: number;
   onScrollY: (y: number) => void;
   onDragOutOfTray: (id: string, pointerClientX: number, pointerClientY: number) => void;
+  onDragGroupOutOfTray: (ids: string[], pointerClientX: number, pointerClientY: number) => void;
 }
 
-function ScrollableTray({ side, pieces, trayW, trayH, pw, ph, boardScale, scrollY, onScrollY, onDragOutOfTray }: TrayProps) {
+function ScrollableTray({ side, pieces, trayW, trayH, pw, ph, boardScale, scrollY, onScrollY, onDragOutOfTray, onDragGroupOutOfTray }: TrayProps) {
   const trayScale = boardScale; // same scale as board so pieces render the same size
   const colCount = computeTrayColCount(trayW, pw, trayScale);
   const { contentH } = computeTrayLayout(pw, ph, pieces.length, colCount);
@@ -332,20 +406,47 @@ function ScrollableTray({ side, pieces, trayW, trayH, pw, ph, boardScale, scroll
             <Rect x={0} y={0} width={stageWorldW} height={contentH} fill="#2a2838" />
           </Layer>
           <Layer>
-            {pieces.map((piece, i) => {
-              const { x, y } = slotCoords(i, colCount, pw, ph);
-              return (
-                <TrayPieceTile
-                  key={piece.id}
-                  piece={piece}
-                  trayX={x}
-                  trayY={y}
-                  onDragOutOfTray={(id, cx, cy) => {
-                    onDragOutOfTray(id, cx, cy);
-                  }}
-                />
-              );
-            })}
+            {/* Ungrouped tray pieces at grid slots */}
+            {(() => {
+              let slotIdx = 0;
+              return pieces.map((piece) => {
+                if (piece.groupId != null) return null; // grouped pieces rendered separately
+                const { x, y } = slotCoords(slotIdx++, colCount, pw, ph);
+                return (
+                  <TrayPieceTile
+                    key={piece.id}
+                    piece={piece}
+                    trayX={x}
+                    trayY={y}
+                    onDragOutOfTray={(id, cx, cy) => onDragOutOfTray(id, cx, cy)}
+                  />
+                );
+              });
+            })()}
+            {/* Grouped tray pieces at free-form positions */}
+            {(() => {
+              const trayGroupMap = new Map<number, PuzzlePiece[]>();
+              for (const p of pieces) {
+                if (p.groupId != null) {
+                  const arr = trayGroupMap.get(p.groupId) ?? [];
+                  arr.push(p);
+                  trayGroupMap.set(p.groupId, arr);
+                }
+              }
+              return [...trayGroupMap.entries()].map(([gid, gPieces]) => {
+                const minX = Math.min(...gPieces.map((p) => p.currentX));
+                const minY = Math.min(...gPieces.map((p) => p.currentY));
+                return (
+                  <TrayGroupTile
+                    key={`tray-group-${gid}`}
+                    groupPieces={gPieces}
+                    offsetX={minX}
+                    offsetY={minY}
+                    onDragGroupOutOfTray={(ids, cx, cy) => onDragGroupOutOfTray(ids, cx, cy)}
+                  />
+                );
+              });
+            })()}
           </Layer>
         </Stage>
       </div>
@@ -465,6 +566,10 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
   // ── Tray scroll state ──────────────────────────────────────
   const [leftScrollY,  setLeftScrollY]  = useState(0);
   const [rightScrollY, setRightScrollY] = useState(0);
+  const leftScrollYRef  = useRef(0);
+  const rightScrollYRef = useRef(0);
+  leftScrollYRef.current  = leftScrollY;
+  rightScrollYRef.current = rightScrollY;
 
   // ── Piece dimensions ────────────────────────────────────────
   const pw = pieces[0]?.pieceWidth  ?? 0;
@@ -558,6 +663,38 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, pieces.length]);
 
+  // ── Handle GROUP dragged out of tray ────────────────────────
+  const handleDragGroupOutOfTray = useCallback((ids: string[], pointerClientX: number, pointerClientY: number) => {
+    const boardRect = boardWrapRef.current?.getBoundingClientRect();
+    if (!boardRect) return;
+
+    const screenX = pointerClientX - boardRect.left;
+    const screenY = pointerClientY - boardRect.top;
+    const overBoard = screenX >= 0 && screenX <= boardRect.width && screenY >= 0 && screenY <= boardRect.height;
+
+    if (overBoard) {
+      // Move all group pieces to board, offset relative to the first piece
+      const groupPieces = pieces.filter((p) => ids.includes(p.id));
+      if (groupPieces.length === 0) return;
+
+      const first = groupPieces[0];
+      const wx = screenX / safeScaleRef.current - first.pieceWidth / 2;
+      const wy = screenY / safeScaleRef.current - first.pieceHeight / 2;
+
+      // Place group so the first piece centers on the pointer
+      const updated = pieces.map((p) => {
+        if (!ids.includes(p.id)) return p;
+        const relX = p.currentX - first.currentX;
+        const relY = p.currentY - first.currentY;
+        return { ...p, currentX: wx + relX, currentY: wy + relY, zone: 'free' as const };
+      });
+      onPiecesChange(updated);
+    } else {
+      // Dropped back in tray — keep zone but update positions
+      // (pieces already have currentX/Y set from previous positions, keep them)
+    }
+  }, [pieces, onPiecesChange]);
+
   // ── Handle piece dragged out of tray onto board ─────────────
   // This receives the pointer's client X/Y at drag-end from the tray stage.
   // We convert it to board world coords and treat it like a board drag-end.
@@ -635,13 +772,53 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
         p.id === id ? { ...p, currentX: clampedWx, currentY: clampedWy, zone: 'free' as const } : p
       ));
     } else {
-      // Dropped back on a tray side — return to nearest tray slot
-      const isLeftSide = pointerClientX < (boardRect.left); // left of board
+      // Dropped back in tray — check piece-to-piece snap with other tray pieces
+      const isLeftSide = pointerClientX < (boardRect.left);
       const targetZone = isLeftSide ? 'left' : 'right';
-      const trayPieces = pieces.filter((p) => p.id !== id && p.zone === targetZone && !p.snapped);
-      const newSlotIndex = trayPieces.length; // append at end
+
+      // Convert pointer to tray-local coords (accounting for tray position and scroll)
+      const trayLeft = isLeftSide ? 0 : boardRect.right;
+      const scrollY  = isLeftSide ? leftScrollYRef.current : rightScrollYRef.current;
+      const trayX = (pointerClientX - trayLeft) / safeScaleRef.current;
+      const trayY = (pointerClientY / safeScaleRef.current) + scrollY;
+
+      const dropX = trayX - piece.pieceWidth  / 2;
+      const dropY = trayY - piece.pieceHeight / 2;
+
+      // Check snap to adjacent tray pieces
+      const trayNeighbors = pieces.filter((other) => {
+        if (other.id === id || other.zone !== targetZone || other.snapped) return false;
+        const colDiff = Math.abs(piece.correctCol - other.correctCol);
+        const rowDiff = Math.abs(piece.correctRow - other.correctRow);
+        return (colDiff === 1 && rowDiff === 0) || (colDiff === 0 && rowDiff === 1);
+      });
+
+      for (const neighbor of trayNeighbors) {
+        const neighborX = neighbor.groupId != null ? neighbor.currentX : 0; // slotted pieces are at 0,0
+        const neighborY = neighbor.groupId != null ? neighbor.currentY : 0;
+        const expectedDx = (piece.correctCol - neighbor.correctCol) * gridCellW;
+        const expectedDy = (piece.correctRow - neighbor.correctRow) * gridCellH;
+        const snapX = neighborX + expectedDx;
+        const snapY = neighborY + expectedDy;
+        const snapDist = Math.hypot(dropX - snapX, dropY - snapY);
+
+        if (snapDist <= gridCellW * SNAP_THRESHOLD * 2) {
+          playSnapSound();
+          const gid = neighbor.groupId ?? nextGroupId(pieces);
+          const updated = pieces.map((p) => {
+            if (p.id === id) return { ...p, currentX: snapX, currentY: snapY, zone: targetZone, groupId: gid };
+            if (p.id === neighbor.id && p.groupId == null) return { ...p, currentX: neighborX, currentY: neighborY, zone: targetZone, groupId: gid };
+            if (p.groupId != null && p.groupId === neighbor.groupId) return { ...p, groupId: gid };
+            return p;
+          });
+          onPiecesChange(updated);
+          return;
+        }
+      }
+
+      // No snap — place at drop position in tray as free-floating
       onPiecesChange(pieces.map((p) =>
-        p.id === id ? { ...p, zone: targetZone, slotIndex: newSlotIndex, currentX: 0, currentY: 0 } : p
+        p.id === id ? { ...p, zone: targetZone, currentX: dropX, currentY: dropY, groupId: null } : p
       ));
     }
   }, [pieces, pw, ph, gridCellW, gridCellH, targetOX, targetOY, worldW, worldH, onPiecesChange]);
@@ -794,6 +971,7 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
         scrollY={leftScrollY}
         onScrollY={setLeftScrollY}
         onDragOutOfTray={handleDragOutOfTray}
+        onDragGroupOutOfTray={handleDragGroupOutOfTray}
       />
 
       {/* ── Center board ── */}
@@ -916,6 +1094,7 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
         scrollY={rightScrollY}
         onScrollY={setRightScrollY}
         onDragOutOfTray={handleDragOutOfTray}
+        onDragGroupOutOfTray={handleDragGroupOutOfTray}
       />
     </div>
   );
