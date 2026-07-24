@@ -482,8 +482,6 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
   const trayH       = containerH;
 
   // Board world dimensions: zero margins so the puzzle fills the full board area
-  const marginX  = 0;
-  const marginY  = 0;
   const worldW   = targetW;
   const worldH   = targetH;
   const targetOX = 0;
