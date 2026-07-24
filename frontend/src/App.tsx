@@ -779,35 +779,6 @@ export default function App() {
                   </button>
                 )}
 
-                <button
-                  type="button"
-                  className={`toolbar-action-btn toolbar-action-btn--hint${hintPieceId ? ' toolbar-action-btn--active' : ''}`}
-                  onClick={handleHint}
-                  disabled={pieces.filter((p) => !p.snapped).length === 0}
-                  aria-label="Show a hint"
-                  title="Hint"
-                >
-                  <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
-                    <circle cx="10" cy="8" r="5" stroke="currentColor" strokeWidth="1.6" />
-                    <path d="M7.5 8a2.5 2.5 0 0 1 5 0c0 1.2-.8 2-1.5 2.5V12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-                    <circle cx="10" cy="14.5" r="1" fill="currentColor" />
-                  </svg>
-                  Hint
-                </button>
-
-                <button type="button" className="toolbar-action-btn toolbar-action-btn--reset" onClick={handleReset}>
-                  <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                    <path
-                      d="M13.5 8A5.5 5.5 0 1 1 8 2.5M13.5 2.5v3.5H10"
-                      stroke="currentColor"
-                      strokeWidth="1.6"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                  Reset
-                </button>
-
                 {/* Save Game — solo play only, requires login */}
                 {isSoloPuzzle && session?.access_token && (
                   <button

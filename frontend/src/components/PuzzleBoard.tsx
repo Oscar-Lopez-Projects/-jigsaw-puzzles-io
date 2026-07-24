@@ -350,12 +350,13 @@ interface TrayProps {
   ph: number;
   boardScale: number;
   scrollY: number;
+  trayDivRef: React.RefObject<HTMLDivElement>;
   onScrollY: (y: number) => void;
   onDragOutOfTray: (id: string, pointerClientX: number, pointerClientY: number) => void;
   onDragGroupOutOfTray: (ids: string[], pointerClientX: number, pointerClientY: number) => void;
 }
 
-function ScrollableTray({ side, pieces, trayW, trayH, pw, ph, boardScale, scrollY, onScrollY, onDragOutOfTray, onDragGroupOutOfTray }: TrayProps) {
+function ScrollableTray({ side, pieces, trayW, trayH, pw, ph, boardScale, scrollY, trayDivRef, onScrollY, onDragOutOfTray, onDragGroupOutOfTray }: TrayProps) {
   const trayScale = boardScale; // same scale as board so pieces render the same size
   const colCount = computeTrayColCount(trayW, pw, trayScale);
   const { contentH } = computeTrayLayout(pw, ph, pieces.length, colCount);
@@ -395,6 +396,7 @@ function ScrollableTray({ side, pieces, trayW, trayH, pw, ph, boardScale, scroll
   return (
     <div
       className={`puzzle-tray puzzle-tray--${side}`}
+      ref={trayDivRef}
       style={{ width: trayW, height: trayH, position: 'relative', overflow: 'visible', flexShrink: 0 }}
       onWheel={handleWheel}
     >
@@ -695,10 +697,9 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
     }
   }, [pieces, onPiecesChange]);
 
-  // ── Handle piece dragged out of tray onto board ─────────────
-  // This receives the pointer's client X/Y at drag-end from the tray stage.
-  // We convert it to board world coords and treat it like a board drag-end.
-  const boardWrapRef = useRef<HTMLDivElement>(null);
+  const boardWrapRef    = useRef<HTMLDivElement>(null);
+  const leftTrayRef     = useRef<HTMLDivElement>(null);
+  const rightTrayRef    = useRef<HTMLDivElement>(null);
 
   const handleDragOutOfTray = useCallback((id: string, pointerClientX: number, pointerClientY: number) => {
     const piece = pieces.find((p) => p.id === id);
@@ -773,17 +774,29 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
       ));
     } else {
       // Dropped back in tray — check piece-to-piece snap with other tray pieces
-      const isLeftSide = pointerClientX < (boardRect.left);
-      const targetZone = isLeftSide ? 'left' : 'right';
+      const isLeftSide = pointerClientX < boardRect.left;
+      const targetZone = (isLeftSide ? 'left' : 'right') as import('../types/puzzle').PieceZone;
+      const trayRef    = isLeftSide ? leftTrayRef : rightTrayRef;
+      const trayRect   = trayRef.current?.getBoundingClientRect();
+      const scrollY    = isLeftSide ? leftScrollYRef.current : rightScrollYRef.current;
 
-      // Convert pointer to tray-local coords (accounting for tray position and scroll)
-      const trayLeft = isLeftSide ? 0 : boardRect.right;
-      const scrollY  = isLeftSide ? leftScrollYRef.current : rightScrollYRef.current;
-      const trayX = (pointerClientX - trayLeft) / safeScaleRef.current;
-      const trayY = (pointerClientY / safeScaleRef.current) + scrollY;
+      // Convert pointer to tray world coords
+      // trayScale = safeScale (they're the same)
+      const trayLocalX = trayRect ? (pointerClientX - trayRect.left) / safeScaleRef.current : 0;
+      const trayLocalY = trayRect ? (pointerClientY - trayRect.top  + scrollY) / safeScaleRef.current : 0;
 
-      const dropX = trayX - piece.pieceWidth  / 2;
-      const dropY = trayY - piece.pieceHeight / 2;
+      const dropX = trayLocalX - piece.pieceWidth  / 2;
+      const dropY = trayLocalY - piece.pieceHeight / 2;
+
+      // Get ungrouped pieces slot coords so we can snap against them too
+      const ungroupedInTray = pieces.filter((p) => p.zone === targetZone && !p.snapped && p.groupId == null && p.id !== id);
+      const colCount_ = computeTrayColCount(trayPixelW, pw, safeScaleRef.current);
+      let slotIdx = 0;
+      const slotMap = new Map<string, { x: number; y: number }>();
+      for (const p of ungroupedInTray) {
+        const { x, y } = slotCoords(slotIdx++, colCount_, pw, ph);
+        slotMap.set(p.id, { x, y });
+      }
 
       // Check snap to adjacent tray pieces
       const trayNeighbors = pieces.filter((other) => {
@@ -794,8 +807,10 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
       });
 
       for (const neighbor of trayNeighbors) {
-        const neighborX = neighbor.groupId != null ? neighbor.currentX : 0; // slotted pieces are at 0,0
-        const neighborY = neighbor.groupId != null ? neighbor.currentY : 0;
+        // Use free-form position if grouped, slot position if in grid
+        const slot = slotMap.get(neighbor.id);
+        const neighborX = neighbor.groupId != null ? neighbor.currentX : (slot?.x ?? 0);
+        const neighborY = neighbor.groupId != null ? neighbor.currentY : (slot?.y ?? 0);
         const expectedDx = (piece.correctCol - neighbor.correctCol) * gridCellW;
         const expectedDy = (piece.correctRow - neighbor.correctRow) * gridCellH;
         const snapX = neighborX + expectedDx;
@@ -806,8 +821,8 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
           playSnapSound();
           const gid = neighbor.groupId ?? nextGroupId(pieces);
           const updated = pieces.map((p) => {
-            if (p.id === id) return { ...p, currentX: snapX, currentY: snapY, zone: targetZone as import('../types/puzzle').PieceZone, groupId: gid };
-            if (p.id === neighbor.id && p.groupId == null) return { ...p, currentX: neighborX, currentY: neighborY, zone: targetZone as import('../types/puzzle').PieceZone, groupId: gid };
+            if (p.id === id) return { ...p, currentX: snapX, currentY: snapY, zone: targetZone, groupId: gid };
+            if (p.id === neighbor.id && p.groupId == null) return { ...p, currentX: neighborX, currentY: neighborY, zone: targetZone, groupId: gid };
             if (p.groupId != null && p.groupId === neighbor.groupId) return { ...p, groupId: gid };
             return p;
           });
@@ -816,12 +831,12 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
         }
       }
 
-      // No snap — place at drop position in tray as free-floating
+      // No snap — place at tray-local drop position
       onPiecesChange(pieces.map((p) =>
-        p.id === id ? { ...p, zone: targetZone as import('../types/puzzle').PieceZone, currentX: dropX, currentY: dropY, groupId: null } : p
+        p.id === id ? { ...p, zone: targetZone, currentX: dropX, currentY: dropY, groupId: null } : p
       ));
     }
-  }, [pieces, pw, ph, gridCellW, gridCellH, targetOX, targetOY, worldW, worldH, onPiecesChange]);
+  }, [pieces, pw, ph, gridCellW, gridCellH, targetOX, targetOY, worldW, worldH, trayPixelW, onPiecesChange]);
 
   // ── Board drag end (pieces already on the board) ────────────
   const handleDragEnd = useCallback(
@@ -969,6 +984,7 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
         ph={ph}
         boardScale={safeScale}
         scrollY={leftScrollY}
+        trayDivRef={leftTrayRef}
         onScrollY={setLeftScrollY}
         onDragOutOfTray={handleDragOutOfTray}
         onDragGroupOutOfTray={handleDragGroupOutOfTray}
@@ -1092,6 +1108,7 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
         ph={ph}
         boardScale={safeScale}
         scrollY={rightScrollY}
+        trayDivRef={rightTrayRef}
         onScrollY={setRightScrollY}
         onDragOutOfTray={handleDragOutOfTray}
         onDragGroupOutOfTray={handleDragGroupOutOfTray}
