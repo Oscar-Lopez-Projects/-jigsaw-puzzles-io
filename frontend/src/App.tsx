@@ -17,7 +17,7 @@ import CommunityPuzzles from './components/CommunityPuzzles';
 import Leaderboard from './components/Leaderboard';
 import UserProfile from './components/UserProfile';
 import FriendsPage from './components/FriendsPage';
-import { getGrid, generatePieces, reshufflePieces } from './utils/puzzleUtils';
+import { getGrid, generatePieces } from './utils/puzzleUtils';
 import { useAuth } from './context/AuthContext';
 import { apiFetch } from './lib/api';
 import { startUpload, claimUpload, type UploadTask } from './lib/imageUpload';
