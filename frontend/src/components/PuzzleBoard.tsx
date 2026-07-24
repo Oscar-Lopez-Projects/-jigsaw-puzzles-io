@@ -21,19 +21,18 @@ function useImage(src: string): HTMLImageElement | null {
 
 // ─── Slot helpers ──────────────────────────────────────────────
 const TRAY_GAP    = 12;  // gap between pieces and from edges (in world coords)
-const TRAY_COLS   = 5;   // target columns per tray
 
-// Compute the tray scale so TRAY_COLS fit within the visible tray pixel width.
-// All slot coords use world units; the Stage scaleX/Y converts to screen pixels.
-function computeTrayScale(trayPixelW: number, pw: number): number {
-  const totalColWidth = TRAY_COLS * pw + (TRAY_COLS + 1) * TRAY_GAP;
-  return Math.max(0.1, trayPixelW / totalColWidth);
+// Compute tray scale = board scale so pieces render the same size.
+// Then compute how many columns fit at that scale.
+function computeTrayColCount(trayPixelW: number, pw: number, boardScale: number): number {
+  const pieceSizeOnScreen = pw * boardScale;
+  const gapOnScreen = TRAY_GAP * boardScale;
+  const cols = Math.max(1, Math.floor((trayPixelW - gapOnScreen) / (pieceSizeOnScreen + gapOnScreen)));
+  return cols;
 }
 
-function computeTrayLayout(_pw: number, ph: number, pieceCount: number) {
-  const colCount = TRAY_COLS;
+function computeTrayLayout(_pw: number, ph: number, pieceCount: number, colCount: number) {
   const rowCount = Math.ceil(pieceCount / colCount);
-  // Content height in world coords
   const contentH = rowCount * (ph + TRAY_GAP) + TRAY_GAP;
   return { colCount, rowCount, contentH };
 }
@@ -265,18 +264,20 @@ function nextGroupId(arr: PuzzlePiece[]): number {
 interface TrayProps {
   side: 'left' | 'right';
   pieces: PuzzlePiece[];
-  trayW: number;       // pixel width of the visible tray
-  trayH: number;       // pixel height of the visible tray
-  pw: number;          // piece width
-  ph: number;          // piece height
+  trayW: number;
+  trayH: number;
+  pw: number;
+  ph: number;
+  boardScale: number;
   scrollY: number;
   onScrollY: (y: number) => void;
   onDragOutOfTray: (id: string, pointerClientX: number, pointerClientY: number) => void;
 }
 
-function ScrollableTray({ side, pieces, trayW, trayH, pw, ph, scrollY, onScrollY, onDragOutOfTray }: TrayProps) {
-  const trayScale = computeTrayScale(trayW, pw);
-  const { colCount, contentH } = computeTrayLayout(pw, ph, pieces.length);
+function ScrollableTray({ side, pieces, trayW, trayH, pw, ph, boardScale, scrollY, onScrollY, onDragOutOfTray }: TrayProps) {
+  const trayScale = boardScale; // same scale as board so pieces render the same size
+  const colCount = computeTrayColCount(trayW, pw, trayScale);
+  const { contentH } = computeTrayLayout(pw, ph, pieces.length, colCount);
   // contentH is in world coords; convert to screen pixels for scrolling
   const contentHScreen = contentH * trayScale;
   const maxScrollY = Math.max(0, contentHScreen - trayH);
@@ -307,18 +308,19 @@ function ScrollableTray({ side, pieces, trayW, trayH, pw, ph, scrollY, onScrollY
   const handleThumbPointerUp = () => { thumbDrag.current = null; };
 
   const SCROLLBAR_W = 8;
-  // Stage world dimensions
-  const stageWorldW = TRAY_COLS * (pw + TRAY_GAP) + TRAY_GAP;
+  // Stage world width = enough for colCount columns
+  const stageWorldW = colCount * (pw + TRAY_GAP) + TRAY_GAP;
 
   return (
     <div
       className={`puzzle-tray puzzle-tray--${side}`}
-      style={{ width: trayW, height: trayH, position: 'relative', overflow: 'hidden', flexShrink: 0 }}
+      style={{ width: trayW, height: trayH, position: 'relative', overflow: 'visible', flexShrink: 0 }}
       onWheel={handleWheel}
     >
-      {/* Stage offset by scroll — translateY moves content up */}
-      <div style={{ position: 'absolute', top: 0, left: 0, width: trayW, height: contentHScreen, transform: `translateY(${-clampedScrollY}px)` }}>
-        <Stage width={trayW} height={contentHScreen} scaleX={trayScale} scaleY={trayScale}>
+      {/* Stage offset by scroll — translateY moves content up. overflow:visible so dragged piece isn't clipped */}
+      <div style={{ position: 'absolute', top: 0, left: 0, width: trayW, height: contentHScreen, transform: `translateY(${-clampedScrollY}px)`, overflow: 'visible' }}>
+        <Stage width={trayW} height={contentHScreen} scaleX={trayScale} scaleY={trayScale}
+          style={{ overflow: 'visible' }}>
           <Layer>
             <Rect x={0} y={0} width={stageWorldW} height={contentH} fill="#2a2838" />
           </Layer>
@@ -781,6 +783,7 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
         trayH={trayH}
         pw={pw}
         ph={ph}
+        boardScale={safeScale}
         scrollY={leftScrollY}
         onScrollY={setLeftScrollY}
         onDragOutOfTray={handleDragOutOfTray}
@@ -902,6 +905,7 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
         trayH={trayH}
         pw={pw}
         ph={ph}
+        boardScale={safeScale}
         scrollY={rightScrollY}
         onScrollY={setRightScrollY}
         onDragOutOfTray={handleDragOutOfTray}
