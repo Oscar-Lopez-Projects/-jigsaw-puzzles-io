@@ -201,44 +201,46 @@ interface TrayPieceTileProps {
 function TrayPieceTile({ piece, trayX, trayY, onDragOutOfTray }: TrayPieceTileProps) {
   const img = useImage(piece.imageUrl);
   const isDragging = useRef(false);
-  const groupRef = useRef<Konva.Group>(null);
+  const ghostRef = useRef<HTMLImageElement | null>(null);
+
+  // Create a floating ghost image that follows the pointer across the entire page
+  const createGhost = useCallback((startX: number, startY: number) => {
+    const ghost = document.createElement('img');
+    ghost.src = piece.imageUrl;
+    ghost.style.cssText = `position:fixed;pointer-events:none;z-index:9999;width:${piece.pieceWidth * 0.15}px;height:${piece.pieceHeight * 0.15}px;opacity:0.85;left:${startX}px;top:${startY}px;transform:translate(-50%,-50%);`;
+    document.body.appendChild(ghost);
+    ghostRef.current = ghost;
+
+    const moveGhost = (e: PointerEvent) => {
+      if (ghost) { ghost.style.left = `${e.clientX}px`; ghost.style.top = `${e.clientY}px`; }
+    };
+    const removeGhost = (e: PointerEvent) => {
+      document.removeEventListener('pointermove', moveGhost);
+      document.removeEventListener('pointerup', removeGhost);
+      if (ghost.parentElement) ghost.remove();
+      ghostRef.current = null;
+      onDragOutOfTray(piece.id, e.clientX, e.clientY);
+    };
+    document.addEventListener('pointermove', moveGhost);
+    document.addEventListener('pointerup', removeGhost);
+  }, [piece.id, piece.imageUrl, piece.pieceWidth, piece.pieceHeight, onDragOutOfTray]);
 
   if (!img) return null;
 
   return (
     <Group
-      ref={groupRef}
       x={trayX} y={trayY}
-      draggable
-      // No dragBoundFunc — allow free dragging anywhere so piece can reach the board
-      onDragStart={(e) => {
-        isDragging.current = true;
-        e.target.moveToTop();
+      onMouseDown={(e) => {
         const stage = e.target.getStage();
-        if (stage) {
-          stage.container().style.cursor = 'grabbing';
-          // Elevate tray above everything during drag so piece is visible over the board
-          stage.container().style.zIndex = '999';
-          // Remove overflow clip on the tray wrapper so piece can visually leave
-          const trayDiv = stage.container().closest('.puzzle-tray') as HTMLElement;
-          if (trayDiv) trayDiv.style.overflow = 'visible';
-        }
-      }}
-      onDragEnd={(e) => {
-        isDragging.current = false;
-        const stage = e.target.getStage();
-        if (stage) {
-          stage.container().style.cursor = 'default';
-          stage.container().style.zIndex = '';
-          const trayDiv = stage.container().closest('.puzzle-tray') as HTMLElement;
-          if (trayDiv) trayDiv.style.overflow = 'hidden';
-        }
         const container = stage?.container();
         if (!container) return;
         const rect = container.getBoundingClientRect();
-        const pieceScreenX = rect.left + e.target.x() * (stage?.scaleX() ?? 1);
-        const pieceScreenY = rect.top  + e.target.y() * (stage?.scaleY() ?? 1);
-        onDragOutOfTray(piece.id, pieceScreenX + piece.pieceWidth / 2, pieceScreenY + piece.pieceHeight / 2);
+        const scale = stage?.scaleX() ?? 1;
+        const screenX = rect.left + trayX * scale;
+        const screenY = rect.top + trayY * scale;
+        createGhost(screenX + piece.pieceWidth * scale / 2, screenY + piece.pieceHeight * scale / 2);
+        // Prevent Konva from starting its own drag
+        e.cancelBubble = true;
       }}
       onMouseEnter={(e) => { const s = e.target.getStage(); if (s) s.container().style.cursor = 'grab'; }}
       onMouseLeave={(e) => { if (isDragging.current) return; const s = e.target.getStage(); if (s) s.container().style.cursor = 'default'; }}
