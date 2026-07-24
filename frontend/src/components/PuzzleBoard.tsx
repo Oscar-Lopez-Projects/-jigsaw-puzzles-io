@@ -281,7 +281,7 @@ function TrayGroupTile({ groupPieces, offsetX, offsetY, onDragGroupOutOfTray }: 
   const createGroupGhost = useCallback((startX: number, startY: number) => {
     // Show ghosts for all pieces in the group
     const ghosts: HTMLImageElement[] = [];
-    groupPieces.forEach((piece, i) => {
+    groupPieces.forEach((piece, _i) => {
       const ghost = document.createElement('img');
       ghost.src = piece.imageUrl;
       const offX = (piece.currentX - offsetX) * 0.15;
@@ -806,8 +806,8 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
           playSnapSound();
           const gid = neighbor.groupId ?? nextGroupId(pieces);
           const updated = pieces.map((p) => {
-            if (p.id === id) return { ...p, currentX: snapX, currentY: snapY, zone: targetZone, groupId: gid };
-            if (p.id === neighbor.id && p.groupId == null) return { ...p, currentX: neighborX, currentY: neighborY, zone: targetZone, groupId: gid };
+            if (p.id === id) return { ...p, currentX: snapX, currentY: snapY, zone: targetZone as import('../types/puzzle').PieceZone, groupId: gid };
+            if (p.id === neighbor.id && p.groupId == null) return { ...p, currentX: neighborX, currentY: neighborY, zone: targetZone as import('../types/puzzle').PieceZone, groupId: gid };
             if (p.groupId != null && p.groupId === neighbor.groupId) return { ...p, groupId: gid };
             return p;
           });
@@ -818,7 +818,7 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
 
       // No snap — place at drop position in tray as free-floating
       onPiecesChange(pieces.map((p) =>
-        p.id === id ? { ...p, zone: targetZone, currentX: dropX, currentY: dropY, groupId: null } : p
+        p.id === id ? { ...p, zone: targetZone as import('../types/puzzle').PieceZone, currentX: dropX, currentY: dropY, groupId: null } : p
       ));
     }
   }, [pieces, pw, ph, gridCellW, gridCellH, targetOX, targetOY, worldW, worldH, onPiecesChange]);
