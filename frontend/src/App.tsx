@@ -392,12 +392,6 @@ export default function App() {
     }
   }, [isWon, session, pieceCount, imageFileName, activePuzzleId, activeChallengeId, challengeOpponent, selectedImage, resolveImageUrl]);
 
-  const handleReset = useCallback(() => {
-    setPieces((prev) => reshufflePieces(prev));
-    setIsWon(false);
-    startTimer();
-  }, []);
-
   const handleBackToSetup = () => {
     setPhase('setup');
     setPieces([]);
@@ -486,19 +480,6 @@ export default function App() {
       setIsSaving(false);
     }
   }, [session, selectedImage, imageFileName, pieceCount, gridCols, gridRows, pieces, activePuzzleId, activeSaveId, resolveImageUrl]);
-
-  const handleHint = useCallback(() => {
-    // Prefer loose (free, unconnected) pieces; fall back to any not-yet-placed piece.
-    const notPlaced = pieces.filter((p) => !p.snapped);
-    if (notPlaced.length === 0) return;
-    const free = notPlaced.filter((p) => p.groupId == null);
-    const pool = free.length > 0 ? free : notPlaced;
-    // clear any running hint first
-    if (hintTimer.current) clearTimeout(hintTimer.current);
-    const pick = pool[Math.floor(Math.random() * pool.length)];
-    setHintPieceId(pick.id);
-    hintTimer.current = setTimeout(() => setHintPieceId(null), 5000);
-  }, [pieces]);
 
   // ── Fullscreen toggle ─────────────────────────────────────────
   const toggleFullscreen = useCallback(() => {

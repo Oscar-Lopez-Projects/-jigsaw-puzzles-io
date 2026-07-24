@@ -350,7 +350,7 @@ interface TrayProps {
   ph: number;
   boardScale: number;
   scrollY: number;
-  trayDivRef: React.RefObject<HTMLDivElement>;
+  trayDivRef: React.RefObject<HTMLDivElement | null>;
   onScrollY: (y: number) => void;
   onDragOutOfTray: (id: string, pointerClientX: number, pointerClientY: number) => void;
   onDragGroupOutOfTray: (ids: string[], pointerClientX: number, pointerClientY: number) => void;
