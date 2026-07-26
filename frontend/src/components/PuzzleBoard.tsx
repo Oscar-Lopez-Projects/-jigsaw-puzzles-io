@@ -436,17 +436,13 @@ function ScrollableTray({ side, pieces, trayW, trayH, pw, ph, boardScale, scroll
                   trayGroupMap.set(p.groupId, arr);
                 }
               }
-              return [...trayGroupMap.entries()].map(([gid, gPieces]) => {
-                const minX = Math.min(...gPieces.map((p) => p.currentX));
-                const minY = Math.min(...gPieces.map((p) => p.currentY));
-                return (
+              return [...trayGroupMap.entries()].map(([gid, gPieces]) => (
                   <TrayGroupTile
                     key={`tray-group-${gid}`}
                     groupPieces={gPieces}
                     onDragGroupOutOfTray={(ids, cx, cy) => onDragGroupOutOfTray(ids, cx, cy)}
                   />
-                );
-              });
+                ));
             })()}
           </Layer>
         </Stage>
