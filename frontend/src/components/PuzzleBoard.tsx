@@ -204,22 +204,27 @@ function TrayPieceTile({ piece, trayX, trayY, onDragOutOfTray }: TrayPieceTilePr
   const ghostRef = useRef<HTMLImageElement | null>(null);
 
   // Create a floating ghost image that follows the pointer across the entire page
-  const createGhost = useCallback((startX: number, startY: number) => {
+  const createGhost = useCallback((grabOffsetX: number, grabOffsetY: number, pieceScreenX: number, pieceScreenY: number) => {
     const ghost = document.createElement('img');
     ghost.src = piece.imageUrl;
-    ghost.style.cssText = `position:fixed;pointer-events:none;z-index:9999;width:${piece.pieceWidth * 0.15}px;height:${piece.pieceHeight * 0.15}px;opacity:0.85;left:${startX}px;top:${startY}px;transform:translate(-50%,-50%);`;
+    const scale = piece.pieceWidth > 200 ? 0.15 : 0.2; // visual scale for ghost
+    ghost.style.cssText = `position:fixed;pointer-events:none;z-index:9999;width:${piece.pieceWidth * scale}px;height:${piece.pieceHeight * scale}px;opacity:0.85;left:${pieceScreenX}px;top:${pieceScreenY}px;`;
     document.body.appendChild(ghost);
     ghostRef.current = ghost;
 
     const moveGhost = (e: PointerEvent) => {
-      if (ghost) { ghost.style.left = `${e.clientX}px`; ghost.style.top = `${e.clientY}px`; }
+      if (ghost) {
+        ghost.style.left = `${e.clientX - grabOffsetX * scale}px`;
+        ghost.style.top  = `${e.clientY - grabOffsetY * scale}px`;
+      }
     };
     const removeGhost = (e: PointerEvent) => {
       document.removeEventListener('pointermove', moveGhost);
       document.removeEventListener('pointerup', removeGhost);
       if (ghost.parentElement) ghost.remove();
       ghostRef.current = null;
-      onDragOutOfTray(piece.id, e.clientX, e.clientY);
+      // Pass drop position adjusted for grab offset so piece lands exactly where dropped
+      onDragOutOfTray(piece.id, e.clientX - grabOffsetX, e.clientY - grabOffsetY);
     };
     document.addEventListener('pointermove', moveGhost);
     document.addEventListener('pointerup', removeGhost);
@@ -236,10 +241,14 @@ function TrayPieceTile({ piece, trayX, trayY, onDragOutOfTray }: TrayPieceTilePr
         if (!container) return;
         const rect = container.getBoundingClientRect();
         const scale = stage?.scaleX() ?? 1;
-        const screenX = rect.left + trayX * scale;
-        const screenY = rect.top + trayY * scale;
-        createGhost(screenX + piece.pieceWidth * scale / 2, screenY + piece.pieceHeight * scale / 2);
-        // Prevent Konva from starting its own drag
+        // Where within the piece did the user click (world coords)
+        const pointerInWorld = stage?.getPointerPosition();
+        const grabOffsetX = pointerInWorld ? pointerInWorld.x - trayX : piece.pieceWidth / 2;
+        const grabOffsetY = pointerInWorld ? pointerInWorld.y - trayY : piece.pieceHeight / 2;
+        // Starting screen position of the piece top-left
+        const pieceScreenX = rect.left + trayX * scale;
+        const pieceScreenY = rect.top  + trayY * scale;
+        createGhost(grabOffsetX, grabOffsetY, pieceScreenX, pieceScreenY);
         e.cancelBubble = true;
       }}
       onMouseEnter={(e) => { const s = e.target.getStage(); if (s) s.container().style.cursor = 'grab'; }}
@@ -712,13 +721,13 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
     const overBoard = screenX >= 0 && screenX <= boardRect.width && screenY >= 0 && screenY <= boardRect.height;
 
     if (overBoard) {
-      // Convert screen coords to world coords
-      const wx = screenX / safeScaleRef.current - piece.pieceWidth / 2;
-      const wy = screenY / safeScaleRef.current - piece.pieceHeight / 2;
+      // Convert top-left screen position to board world coords
+      const wx = screenX / safeScaleRef.current;
+      const wy = screenY / safeScaleRef.current;
       const clampedWx = Math.max(0, Math.min(wx, worldW - piece.pieceWidth));
       const clampedWy = Math.max(0, Math.min(wy, worldH - piece.pieceHeight));
 
-      // Check snap to final position
+      // Check snap to final position — use piece center for distance
       const correctWorldX = targetOX + piece.correctX;
       const correctWorldY = targetOY + piece.correctY;
       const distToTarget  = Math.hypot(
