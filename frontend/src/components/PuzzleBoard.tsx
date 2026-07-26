@@ -270,35 +270,36 @@ function nextGroupId(arr: PuzzlePiece[]): number {
 // ─── TrayGroupTile — renders a connected group inside a tray ──
 interface TrayGroupTileProps {
   groupPieces: PuzzlePiece[];
-  offsetX: number;
-  offsetY: number;
   onDragGroupOutOfTray: (ids: string[], pointerClientX: number, pointerClientY: number) => void;
 }
 
-function TrayGroupTile({ groupPieces, offsetX, offsetY, onDragGroupOutOfTray }: TrayGroupTileProps) {
+function TrayGroupTile({ groupPieces, onDragGroupOutOfTray }: TrayGroupTileProps) {
   const ids = groupPieces.map((p) => p.id);
 
-  const createGroupGhost = useCallback((startX: number, startY: number) => {
-    // Show ghosts for all pieces in the group
+  const createGroupGhost = useCallback((stageRect: DOMRect, scrollY: number, trayScale: number) => {
     const ghosts: HTMLImageElement[] = [];
-    groupPieces.forEach((piece, _i) => {
+    groupPieces.forEach((piece) => {
       const ghost = document.createElement('img');
       ghost.src = piece.imageUrl;
-      const offX = (piece.currentX - offsetX) * 0.15;
-      const offY = (piece.currentY - offsetY) * 0.15;
-      ghost.style.cssText = `position:fixed;pointer-events:none;z-index:9999;width:${piece.pieceWidth * 0.15}px;height:${piece.pieceHeight * 0.15}px;opacity:0.85;left:${startX + offX}px;top:${startY + offY}px;transform:translate(-50%,-50%);`;
+      const screenX = stageRect.left + piece.currentX * trayScale;
+      const screenY = stageRect.top  - scrollY + piece.currentY * trayScale;
+      ghost.style.cssText = `position:fixed;pointer-events:none;z-index:9999;width:${piece.pieceWidth * trayScale}px;height:${piece.pieceHeight * trayScale}px;opacity:0.85;left:${screenX}px;top:${screenY}px;`;
       document.body.appendChild(ghost);
       ghosts.push(ghost);
     });
 
+    // Store initial pointer position and piece positions for delta movement
+    let lastX = 0, lastY = 0;
+    let started = false;
+
     const moveGhosts = (e: PointerEvent) => {
-      groupPieces.forEach((piece, i) => {
-        const ghost = ghosts[i];
-        if (!ghost) return;
-        const offX = (piece.currentX - offsetX) * 0.15;
-        const offY = (piece.currentY - offsetY) * 0.15;
-        ghost.style.left = `${e.clientX + offX}px`;
-        ghost.style.top  = `${e.clientY + offY}px`;
+      if (!started) { lastX = e.clientX; lastY = e.clientY; started = true; }
+      const dx = e.clientX - lastX;
+      const dy = e.clientY - lastY;
+      lastX = e.clientX; lastY = e.clientY;
+      ghosts.forEach((g) => {
+        g.style.left = `${parseFloat(g.style.left) + dx}px`;
+        g.style.top  = `${parseFloat(g.style.top)  + dy}px`;
       });
     };
     const removeGhosts = (e: PointerEvent) => {
@@ -309,27 +310,27 @@ function TrayGroupTile({ groupPieces, offsetX, offsetY, onDragGroupOutOfTray }: 
     };
     document.addEventListener('pointermove', moveGhosts);
     document.addEventListener('pointerup', removeGhosts);
-  }, [groupPieces, offsetX, offsetY, ids, onDragGroupOutOfTray]);
+  }, [groupPieces, ids, onDragGroupOutOfTray]);
 
   return (
-    <Group x={offsetX} y={offsetY}
+    <Group x={0} y={0}
       onMouseDown={(e) => {
         const stage = e.target.getStage();
         const container = stage?.container();
         if (!container) return;
         const rect = container.getBoundingClientRect();
         const scale = stage?.scaleX() ?? 1;
-        const screenX = rect.left + offsetX * scale;
-        const screenY = rect.top  + offsetY * scale;
-        createGroupGhost(screenX, screenY);
+        const stageWrapper = container.parentElement;
+        const scrollY = stageWrapper ? -parseFloat(stageWrapper.style.transform?.match(/translateY\((.*)px\)/)?.[1] ?? '0') : 0;
+        createGroupGhost(rect, scrollY, scale);
         e.cancelBubble = true;
       }}
       onMouseEnter={(e) => { const s = e.target.getStage(); if (s) s.container().style.cursor = 'grab'; }}
       onMouseLeave={(e) => { const s = e.target.getStage(); if (s) s.container().style.cursor = 'default'; }}
     >
-      {groupPieces.map((piece) => {
-        return <TrayGroupPieceImage key={piece.id} piece={piece} relX={piece.currentX - offsetX} relY={piece.currentY - offsetY} />;
-      })}
+      {groupPieces.map((piece) => (
+        <TrayGroupPieceImage key={piece.id} piece={piece} relX={piece.currentX} relY={piece.currentY} />
+      ))}
     </Group>
   );
 }
@@ -405,7 +406,7 @@ function ScrollableTray({ side, pieces, trayW, trayH, pw, ph, boardScale, scroll
         <Stage width={trayW} height={contentHScreen} scaleX={trayScale} scaleY={trayScale}
           style={{ overflow: 'visible' }}>
           <Layer>
-            <Rect x={0} y={0} width={stageWorldW} height={contentH} fill="#2a2838" />
+            <Rect x={0} y={0} width={stageWorldW} height={contentH} fill="#2f2d3e" />
           </Layer>
           <Layer>
             {/* Ungrouped tray pieces at grid slots */}
@@ -442,8 +443,6 @@ function ScrollableTray({ side, pieces, trayW, trayH, pw, ph, boardScale, scroll
                   <TrayGroupTile
                     key={`tray-group-${gid}`}
                     groupPieces={gPieces}
-                    offsetX={minX}
-                    offsetY={minY}
                     onDragGroupOutOfTray={(ids, cx, cy) => onDragGroupOutOfTray(ids, cx, cy)}
                   />
                 );
@@ -1012,7 +1011,7 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
             scaleY={safeScale}
           >
             <Layer listening={false}>
-              <Rect x={0} y={0} width={worldW} height={worldH} fill="#3d3b4a" />
+              <Rect x={0} y={0} width={worldW} height={worldH} fill="#2f2d3e" />
               <Rect x={targetOX} y={targetOY} width={targetW} height={targetH} fill="#2f2d3e" cornerRadius={4} listening={false} />
             </Layer>
             <Layer>
