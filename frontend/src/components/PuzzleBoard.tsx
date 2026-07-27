@@ -207,12 +207,18 @@ function TrayPieceTile({ piece, trayX, trayY, onDragOutOfTray }: TrayPieceTilePr
   const createGhost = useCallback((startX: number, startY: number) => {
     const ghost = document.createElement('img');
     ghost.src = piece.imageUrl;
-    ghost.style.cssText = `position:fixed;pointer-events:none;z-index:9999;width:${piece.pieceWidth * 0.15}px;height:${piece.pieceHeight * 0.15}px;opacity:0.85;left:${startX}px;top:${startY}px;transform:translate(-50%,-50%);`;
+    const displayW = piece.pieceWidth * 0.15;
+    const displayH = piece.pieceHeight * 0.15;
+    // Position ghost so its center is at the pointer — same offset as the piece will land
+    ghost.style.cssText = `position:fixed;pointer-events:none;z-index:9999;width:${displayW}px;height:${displayH}px;opacity:0.85;left:${startX - displayW/2}px;top:${startY - displayH/2}px;`;
     document.body.appendChild(ghost);
     ghostRef.current = ghost;
 
     const moveGhost = (e: PointerEvent) => {
-      if (ghost) { ghost.style.left = `${e.clientX}px`; ghost.style.top = `${e.clientY}px`; }
+      if (ghost) {
+        ghost.style.left = `${e.clientX - displayW/2}px`;
+        ghost.style.top  = `${e.clientY - displayH/2}px`;
+      }
     };
     const removeGhost = (e: PointerEvent) => {
       document.removeEventListener('pointermove', moveGhost);
