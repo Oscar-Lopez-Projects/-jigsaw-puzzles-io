@@ -203,14 +203,10 @@ function TrayPieceTile({ piece, trayX, trayY, onDragOutOfTray }: TrayPieceTilePr
   const isDragging = useRef(false);
   const ghostRef = useRef<HTMLImageElement | null>(null);
 
-  // Create a floating ghost image that follows the pointer across the entire page
-  const createGhost = useCallback((startX: number, startY: number) => {
+  const createGhost = useCallback((startX: number, startY: number, displayW: number, displayH: number) => {
     const ghost = document.createElement('img');
     ghost.src = piece.imageUrl;
-    const displayW = piece.pieceWidth * 0.15;
-    const displayH = piece.pieceHeight * 0.15;
-    // Position ghost so its center is at the pointer — same offset as the piece will land
-    ghost.style.cssText = `position:fixed;pointer-events:none;z-index:9999;width:${displayW}px;height:${displayH}px;opacity:0.85;left:${startX - displayW/2}px;top:${startY - displayH/2}px;`;
+    ghost.style.cssText = `position:fixed;pointer-events:none;z-index:9999;width:${displayW}px;height:${displayH}px;opacity:0.85;left:${startX}px;top:${startY}px;`;
     document.body.appendChild(ghost);
     ghostRef.current = ghost;
 
@@ -229,7 +225,7 @@ function TrayPieceTile({ piece, trayX, trayY, onDragOutOfTray }: TrayPieceTilePr
     };
     document.addEventListener('pointermove', moveGhost);
     document.addEventListener('pointerup', removeGhost);
-  }, [piece.id, piece.imageUrl, piece.pieceWidth, piece.pieceHeight, onDragOutOfTray]);
+  }, [piece.id, piece.imageUrl, onDragOutOfTray]);
 
   if (!img) return null;
 
@@ -242,10 +238,12 @@ function TrayPieceTile({ piece, trayX, trayY, onDragOutOfTray }: TrayPieceTilePr
         if (!container) return;
         const rect = container.getBoundingClientRect();
         const scale = stage?.scaleX() ?? 1;
-        const screenX = rect.left + trayX * scale;
-        const screenY = rect.top + trayY * scale;
-        createGhost(screenX + piece.pieceWidth * scale / 2, screenY + piece.pieceHeight * scale / 2);
-        // Prevent Konva from starting its own drag
+        // Ghost size = actual board piece size
+        const displayW = piece.pieceWidth  * scale;
+        const displayH = piece.pieceHeight * scale;
+        const startX = rect.left + trayX * scale - displayW/2;
+        const startY = rect.top  + trayY * scale - displayH/2;
+        createGhost(startX, startY, displayW, displayH);
         e.cancelBubble = true;
       }}
       onMouseEnter={(e) => { const s = e.target.getStage(); if (s) s.container().style.cursor = 'grab'; }}
