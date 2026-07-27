@@ -195,7 +195,7 @@ interface TrayPieceTileProps {
   piece: PuzzlePiece;
   trayX: number;
   trayY: number;
-  onDragOutOfTray: (id: string, pointerClientX: number, pointerClientY: number) => void;
+  onDragOutOfTray: (id: string, pointerClientX: number, pointerClientY: number, grabOffsetX: number, grabOffsetY: number) => void;
 }
 
 function TrayPieceTile({ piece, trayX, trayY, onDragOutOfTray }: TrayPieceTileProps) {
@@ -203,25 +203,25 @@ function TrayPieceTile({ piece, trayX, trayY, onDragOutOfTray }: TrayPieceTilePr
   const isDragging = useRef(false);
   const ghostRef = useRef<HTMLImageElement | null>(null);
 
-  const createGhost = useCallback((startX: number, startY: number, displayW: number, displayH: number) => {
+  const createGhost = useCallback((displayW: number, displayH: number, grabOffsetX: number, grabOffsetY: number, startLeft: number, startTop: number) => {
     const ghost = document.createElement('img');
     ghost.src = piece.imageUrl;
-    ghost.style.cssText = `position:fixed;pointer-events:none;z-index:9999;width:${displayW}px;height:${displayH}px;opacity:0.85;left:${startX}px;top:${startY}px;`;
+    ghost.style.cssText = `position:fixed;pointer-events:none;z-index:9999;width:${displayW}px;height:${displayH}px;opacity:0.85;left:${startLeft}px;top:${startTop}px;`;
     document.body.appendChild(ghost);
     ghostRef.current = ghost;
 
+    // Keep the exact pointer-to-piece grab offset so the piece never
+    // re-centers or jumps under the cursor while dragging.
     const moveGhost = (e: PointerEvent) => {
-      if (ghost) {
-        ghost.style.left = `${e.clientX - displayW/2}px`;
-        ghost.style.top  = `${e.clientY - displayH/2}px`;
-      }
+      ghost.style.left = `${e.clientX - grabOffsetX}px`;
+      ghost.style.top  = `${e.clientY - grabOffsetY}px`;
     };
     const removeGhost = (e: PointerEvent) => {
       document.removeEventListener('pointermove', moveGhost);
       document.removeEventListener('pointerup', removeGhost);
       if (ghost.parentElement) ghost.remove();
       ghostRef.current = null;
-      onDragOutOfTray(piece.id, e.clientX, e.clientY);
+      onDragOutOfTray(piece.id, e.clientX, e.clientY, grabOffsetX, grabOffsetY);
     };
     document.addEventListener('pointermove', moveGhost);
     document.addEventListener('pointerup', removeGhost);
@@ -241,9 +241,13 @@ function TrayPieceTile({ piece, trayX, trayY, onDragOutOfTray }: TrayPieceTilePr
         // Ghost size = actual board piece size
         const displayW = piece.pieceWidth  * scale;
         const displayH = piece.pieceHeight * scale;
-        const startX = rect.left + trayX * scale - displayW/2;
-        const startY = rect.top  + trayY * scale - displayH/2;
-        createGhost(startX, startY, displayW, displayH);
+        // Piece top-left on screen (rect already reflects the tray scroll transform)
+        const pieceScreenLeft = rect.left + trayX * scale;
+        const pieceScreenTop  = rect.top  + trayY * scale;
+        // Exact pointer-to-piece grab offset in screen pixels
+        const grabOffsetX = e.evt.clientX - pieceScreenLeft;
+        const grabOffsetY = e.evt.clientY - pieceScreenTop;
+        createGhost(displayW, displayH, grabOffsetX, grabOffsetY, pieceScreenLeft, pieceScreenTop);
         e.cancelBubble = true;
       }}
       onMouseEnter={(e) => { const s = e.target.getStage(); if (s) s.container().style.cursor = 'grab'; }}
@@ -357,7 +361,7 @@ interface TrayProps {
   scrollY: number;
   trayDivRef: React.RefObject<HTMLDivElement | null>;
   onScrollY: (y: number) => void;
-  onDragOutOfTray: (id: string, pointerClientX: number, pointerClientY: number) => void;
+  onDragOutOfTray: (id: string, pointerClientX: number, pointerClientY: number, grabOffsetX: number, grabOffsetY: number) => void;
   onDragGroupOutOfTray: (ids: string[], pointerClientX: number, pointerClientY: number) => void;
 }
 
@@ -425,7 +429,7 @@ function ScrollableTray({ side, pieces, trayW, trayH, pw, ph, boardScale, scroll
                     piece={piece}
                     trayX={x}
                     trayY={y}
-                    onDragOutOfTray={(id, cx, cy) => onDragOutOfTray(id, cx, cy)}
+                    onDragOutOfTray={onDragOutOfTray}
                   />
                 );
               });
@@ -700,25 +704,28 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
   const leftTrayRef     = useRef<HTMLDivElement>(null);
   const rightTrayRef    = useRef<HTMLDivElement>(null);
 
-  const handleDragOutOfTray = useCallback((id: string, pointerClientX: number, pointerClientY: number) => {
+  const handleDragOutOfTray = useCallback((id: string, pointerClientX: number, pointerClientY: number, grabOffsetX = 0, grabOffsetY = 0) => {
     const piece = pieces.find((p) => p.id === id);
     if (!piece) return;
 
-    // Get board stage position on screen
+    // Board column rect — used only as a coarse "is the release over the board?" test
     const boardRect = boardWrapRef.current?.getBoundingClientRect();
     if (!boardRect) return;
 
-    // Convert pointer position to board world coords
-    const screenX = pointerClientX - boardRect.left;
-    const screenY = pointerClientY - boardRect.top;
-
-    // Check if the pointer is actually over the board area
-    const overBoard = screenX >= 0 && screenX <= boardRect.width && screenY >= 0 && screenY <= boardRect.height;
+    const overBoard =
+      pointerClientX >= boardRect.left && pointerClientX <= boardRect.right &&
+      pointerClientY >= boardRect.top  && pointerClientY <= boardRect.bottom;
 
     if (overBoard) {
-      // Convert screen coords to world coords
-      const wx = screenX / safeScaleRef.current - piece.pieceWidth / 2;
-      const wy = screenY / safeScaleRef.current - piece.pieceHeight / 2;
+      // Precise world origin = the actual Konva Stage container rect. Its
+      // getBoundingClientRect already reflects flex-centering AND the pan CSS
+      // transform, so no manual centering/pan math is needed.
+      const stageEl = stageRef.current?.container();
+      const stageRect = stageEl ? stageEl.getBoundingClientRect() : boardRect;
+      // Preserve the exact grab offset: the piece's top-left goes to
+      // (pointer − grab), then convert screen → board-world.
+      const wx = (pointerClientX - grabOffsetX - stageRect.left) / safeScaleRef.current;
+      const wy = (pointerClientY - grabOffsetY - stageRect.top)  / safeScaleRef.current;
       const clampedWx = Math.max(0, Math.min(wx, worldW - piece.pieceWidth));
       const clampedWy = Math.max(0, Math.min(wy, worldH - piece.pieceHeight));
 
