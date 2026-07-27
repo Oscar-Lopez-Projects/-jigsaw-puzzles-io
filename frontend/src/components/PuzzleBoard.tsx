@@ -726,7 +726,7 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
         (clampedWy + ph / 2) - (correctWorldY + ph / 2)
       );
 
-      if (distToTarget <= gridCellW * SNAP_THRESHOLD) {
+      if (distToTarget <= gridCellW * SNAP_THRESHOLD * 3) {
         playSnapSound();
         let updated = pieces.map((p) =>
           p.id === id ? { ...p, currentX: correctWorldX, currentY: correctWorldY, zone: 'free' as const } : p
@@ -749,7 +749,7 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
         const expectedX  = neighbor.currentX + expectedDx;
         const expectedY  = neighbor.currentY + expectedDy;
         const snapDist   = Math.hypot(clampedWx - expectedX, clampedWy - expectedY);
-        if (snapDist <= gridCellW * SNAP_THRESHOLD) {
+        if (snapDist <= gridCellW * SNAP_THRESHOLD * 3) {
           playSnapSound();
           const gid = neighbor.groupId ?? nextGroupId(pieces);
           let updated = pieces.map((p) => {
