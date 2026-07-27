@@ -1008,7 +1008,8 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
           >
             <Layer listening={false}>
               <Rect x={0} y={0} width={worldW} height={worldH} fill="#2f2d3e" />
-              <Rect x={targetOX} y={targetOY} width={targetW} height={targetH} fill="#2f2d3e" cornerRadius={4} listening={false} />
+              {/* Target area: slightly lighter so users can see the puzzle board shape */}
+              <Rect x={targetOX} y={targetOY} width={targetW} height={targetH} fill="#3a3850" cornerRadius={4} listening={false} />
             </Layer>
             <Layer>
               {lockedPieces.map((piece) => (
