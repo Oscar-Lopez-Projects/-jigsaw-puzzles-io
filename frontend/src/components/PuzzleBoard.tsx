@@ -592,26 +592,35 @@ function PuzzleBoard({ pieces, cols, rows, onPiecesChange, hintPieceId }, ref) {
   const ready = pieces.length > 0 && containerW > 0 && pw > 0 && ph > 0;
 
   // ── Three-column layout calculations ───────────────────────
-  // Column percentages: 29% left tray, 42% board, 29% right tray
-  const TRAY_FRAC  = 0.29;
-  const BOARD_FRAC = 0.42;
-
-  const trayPixelW  = Math.floor(containerW * TRAY_FRAC);
-  const boardPixelW = Math.max(containerW - trayPixelW * 2, containerW * BOARD_FRAC);
-  const trayH       = containerH;
-
   // Board world dimensions: zero margins so the puzzle fills the full board area
   const worldW   = targetW;
   const worldH   = targetH;
   const targetOX = 0;
   const targetOY = 0;
 
-  const scaleByW  = ready ? boardPixelW / worldW : 1;
+  // Default split: ~42% board column, ~29% each tray. Board scale is fit to that
+  // default board width AND the full height (whichever is smaller).
+  const DEFAULT_BOARD_FRAC = 0.42;
+  const ZOOM_CONTROL_PAD   = 60; // room for the zoom/pan controls beside the board
+  const defaultBoardW = containerW * DEFAULT_BOARD_FRAC;
+
+  const scaleByW  = ready ? defaultBoardW / worldW : 1;
   const scaleByH  = ready && containerH > 0 ? containerH / worldH : scaleByW;
   const baseScale = Math.min(scaleByW, scaleByH);
   const safeScale = baseScale * zoomLevel;
   const stageW    = worldW * safeScale;
   const stageH    = worldH * safeScale;
+
+  // The board's natural rendered width at zoom 1. For portrait images this is
+  // much narrower than the default board column, leaving dead space between the
+  // board and the trays. In that case, shrink the board column to fit the board
+  // and hand the leftover width to the trays so pieces fill that space.
+  const naturalBoardW = worldW * baseScale;
+  const boardPixelW = (ready && naturalBoardW + ZOOM_CONTROL_PAD < defaultBoardW)
+    ? naturalBoardW + ZOOM_CONTROL_PAD
+    : defaultBoardW;
+  const trayPixelW = Math.floor((containerW - boardPixelW) / 2);
+  const trayH      = containerH;
 
   cropRef.current = { targetOX, targetOY, targetW, targetH, scale: safeScale };
   const safeScaleRef = useRef(safeScale);
